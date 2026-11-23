@@ -125,7 +125,6 @@ std::vector<UINT>           dupesScanRowEnd;
 UINT                        dupesScanOuter = 0;
 INT64                       dupesScanBlock = 0;
 UINT                        dupesScanMihBlock = 0;
-UINT64                      dupesScanMaskApplied = ~0ULL;
 // qpv-dupes-state-end - sliced by tests/run-tests.sh; leave the marker in place.
 
 // One candidate row, as dupesFetchRows() hands it to AHK. The path is not in the record:
@@ -163,116 +162,47 @@ std::vector<DupeResultRow>  dupesFilterRows;
 
 // ---- the pair sweep, the scan cursor and the threshold filter -------------------------
 
-// SWAR population count, with hardware POPCNT / AVX2 detected once via CPUID + XGETBV.
-// qpv-cpu-begin
-#if defined(_M_X64) || defined(_M_AMD64) || defined(__x86_64__)
-#define QPV_X64 1
-#include <immintrin.h>
-#if defined(_MSC_VER)
-#include <intrin.h>
-#define QPV_NOINLINE       __declspec(noinline)
-#define QPV_TARGET_AVX2    __declspec(noinline)
-#define QPV_TARGET_POPCNT  __declspec(noinline)
-#define QPV_POPCNT64_HW(x) ((int)__popcnt64(x))
-#elif defined(__GNUC__) || defined(__clang__)
-#include <cpuid.h>
-#define QPV_NOINLINE       __attribute__((noinline))
-#define QPV_TARGET_AVX2    __attribute__((noinline, target("avx2,popcnt")))
-#define QPV_TARGET_POPCNT  __attribute__((noinline, target("popcnt")))
-#define QPV_POPCNT64_HW(x) __builtin_popcountll((unsigned long long)(x))
-#endif
-#endif
-#ifndef QPV_NOINLINE
-#if defined(_MSC_VER)
-#define QPV_NOINLINE __declspec(noinline)
-#elif defined(__GNUC__) || defined(__clang__)
-#define QPV_NOINLINE __attribute__((noinline))
-#else
-#define QPV_NOINLINE
-#endif
-#endif
-
-#ifdef QPV_X64
-struct QpvCpuCaps {
-    bool popcnt;
-    bool avx2;
-};
-
-static QpvCpuCaps qpvDetectCpuCaps() {
-    QpvCpuCaps caps = { false, false };
-#if defined(_MSC_VER)
-    int r0[4] = {0, 0, 0, 0};
-    __cpuid(r0, 0);
-    const int maxLeaf = r0[0];
-    if (maxLeaf < 1)
-       return caps;
-
-    int r1[4] = {0, 0, 0, 0};
-    __cpuid(r1, 1);
-    caps.popcnt = (r1[2] & (1 << 23)) != 0;   // CPUID.01H:ECX.POPCNT
-    const bool hasOsXsave = (r1[2] & (1 << 27)) != 0;
-    const bool hasAvx     = (r1[2] & (1 << 28)) != 0;
-    if (hasOsXsave && hasAvx && maxLeaf >= 7)
-    {
-       if ((_xgetbv(0) & 0x6ULL) == 0x6ULL)
-       {
-          int r7[4] = {0, 0, 0, 0};
-          __cpuidex(r7, 7, 0);
-          caps.avx2 = (r7[1] & (1 << 5)) != 0; // CPUID.07H:EBX.AVX2
-       }
-    }
-#elif defined(__GNUC__) || defined(__clang__)
-    unsigned int eax = 0, ebx = 0, ecx = 0, edx = 0;
-    const unsigned int maxLeaf = __get_cpuid_max(0, NULL);
-    if (maxLeaf < 1)
-       return caps;
-
-    __cpuid(1, eax, ebx, ecx, edx);
-    caps.popcnt = (ecx & (1u << 23)) != 0;
-    const bool hasOsXsave = (ecx & (1u << 27)) != 0;
-    const bool hasAvx     = (ecx & (1u << 28)) != 0;
-    if (hasOsXsave && hasAvx && maxLeaf >= 7)
-    {
-       unsigned int xlo = 0, xhi = 0;
-       __asm__ volatile("xgetbv" : "=a"(xlo), "=d"(xhi) : "c"(0));
-       if ((xlo & 0x6u) == 0x6u)
-       {
-          __cpuid_count(7, 0, eax, ebx, ecx, edx);
-          caps.avx2 = (ebx & (1u << 5)) != 0;
-       }
-    }
-#endif
-    return caps;
+// POPCNT is an SSE4.2 instruction. This project builds with
+// EnableEnhancedInstructionSet=SSE2 and ships a Win7 x64 DLL, and MSVC emits the
+// instruction wherever __popcnt64() appears - /arch does not gate it - so using the
+// intrinsic unconditionally faults with an illegal instruction on the x64 machines
+// that predate it (Intel before Nehalem, AMD before K10). Hence the run-time check:
+// the CPUID bit is read once at load and the branch below is perfectly predicted,
+// which is noise next to the memory traffic of the sweep. DO NOT remove the SWAR
+// fallback - hammingDistance() runs n*n/2 times per group and this is the one place
+// where the baseline the project declares actually has teeth.
+#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_AMD64))
+static bool qpvDetectPopcnt() {
+    int regs[4] = {0, 0, 0, 0};
+    __cpuid(regs, 1);
+    return (regs[2] & (1 << 23))!=0;    // CPUID.01H:ECX.POPCNT[bit 23]
 }
-
-static const QpvCpuCaps qpvCpuCaps = qpvDetectCpuCaps();
-static const bool qpvHasPopcnt = qpvCpuCaps.popcnt;
-static const bool qpvHasAvx2   = qpvCpuCaps.avx2;
-#else
-static const bool qpvHasPopcnt = false;
-static const bool qpvHasAvx2   = false;
+static const bool qpvHasPopcnt = qpvDetectPopcnt();
 #endif
-// qpv-cpu-end
 
-inline int popcount64SWAR(UINT64 x) {
+// SWAR population count, with the hardware instruction when this CPU has it.
+inline int popcount64(UINT64 x) {
+#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_AMD64))
+    if (qpvHasPopcnt)
+       return (int)__popcnt64(x);
+#elif defined(__GNUC__) || defined(__clang__)
+    // without -mpopcnt this expands to a table or the same SWAR, never a bare POPCNT
+    return __builtin_popcountll((unsigned long long)x);
+#endif
+
     x -= (x >> 1) & 0x5555555555555555ULL;
     x  = (x & 0x3333333333333333ULL) + ((x >> 2) & 0x3333333333333333ULL);
     x  = (x + (x >> 4)) & 0x0F0F0F0F0F0F0F0FULL;
     return (int)((x * 0x0101010101010101ULL) >> 56);
 }
 
-inline int popcount64(UINT64 x) {
-#if defined(_MSC_VER) && defined(QPV_X64)
-    if (qpvHasPopcnt)
-       return (int)__popcnt64(x);
-#elif (defined(__GNUC__) || defined(__clang__)) && defined(__POPCNT__)
-    return __builtin_popcountll((unsigned long long)x);
-#endif
-    return popcount64SWAR(x);
-}
-
 // Builds the bit window the two crop settings describe: lCrop drops that many
-// LOW bits, rCrop that many HIGH bits.
+// LOW bits, rCrop that many HIGH bits. That is what the 8x8 preview grid in
+// updateUIimageHashPreview() promises; the old loop compared a 1-based counter
+// against hamDistLBorderCrop and so dropped only lCrop-1 low bits while
+// dropping rCrop high bits.
+// A crop wider than the hash is treated as "no crop": the alternative is an
+// empty mask, which makes every distance 0 and every image a duplicate.
 inline UINT64 buildHamMask(UINT lCrop, UINT rCrop) {
     if (lCrop > 64) lCrop = 64;
     if (rCrop > 64) rCrop = 64;
@@ -287,26 +217,28 @@ inline int hammingDistance(const UINT64 n1, const UINT64 n2, const UINT64 mask) 
     return popcount64((n1 ^ n2) & mask);
 }
 
+// "MSD was not computed for this pair" - the same sentinel calcMSDvalues()'s caller
+// seeded MSE with; it is above every MSD bound the panel offers (0-400).
 #define QPV_MSD_NONE 2500
 
-// qpv-msd-begin
-static INT64 msdSumSquaresSSE2(const unsigned char *a, const unsigned char *b, const int count) {
-    __m128i acc0 = _mm_setzero_si128();
-    __m128i acc1 = _mm_setzero_si128();
-    const __m128i mask00FF = _mm_set1_epi16(0x00FF);
+// Sum of squared differences over two grayscale fingerprints.
+// The accumulator cannot overflow the INT32 lanes _mm_madd_epi16 sums into:
+// 1024 * 255^2 = 66,585,600, and graylevelCompressor only ever shrinks the operands
+// (they are stored pre-division - see decodeFingerprintBlob).
+QPV_FORCEINLINE INT64 msdSumSquares(const unsigned char *a, const unsigned char *b, const int count) {
+    __m128i acc = _mm_setzero_si128();
+    const __m128i zero = _mm_setzero_si128();
     int i = 0;
     for ( ; i + 16 <= count ; i += 16)
     {
         const __m128i va = _mm_loadu_si128((const __m128i*)(a + i));
         const __m128i vb = _mm_loadu_si128((const __m128i*)(b + i));
-        const __m128i d8 = _mm_or_si128(_mm_subs_epu8(va, vb), _mm_subs_epu8(vb, va));
-        const __m128i lo = _mm_and_si128(d8, mask00FF);
-        const __m128i hi = _mm_srli_epi16(d8, 8);
-        acc0 = _mm_add_epi32(acc0, _mm_madd_epi16(lo, lo));
-        acc1 = _mm_add_epi32(acc1, _mm_madd_epi16(hi, hi));
+        const __m128i dlo = _mm_sub_epi16(_mm_unpacklo_epi8(va, zero), _mm_unpacklo_epi8(vb, zero));
+        const __m128i dhi = _mm_sub_epi16(_mm_unpackhi_epi8(va, zero), _mm_unpackhi_epi8(vb, zero));
+        acc = _mm_add_epi32(acc, _mm_madd_epi16(dlo, dlo));
+        acc = _mm_add_epi32(acc, _mm_madd_epi16(dhi, dhi));
     }
 
-    __m128i acc = _mm_add_epi32(acc0, acc1);
     acc = _mm_add_epi32(acc, _mm_shuffle_epi32(acc, _MM_SHUFFLE(1, 0, 3, 2)));
     acc = _mm_add_epi32(acc, _mm_shuffle_epi32(acc, _MM_SHUFFLE(2, 3, 0, 1)));
     INT64 sum = (INT64)_mm_cvtsi128_si32(acc);
@@ -319,64 +251,19 @@ static INT64 msdSumSquaresSSE2(const unsigned char *a, const unsigned char *b, c
     return sum;
 }
 
-#ifdef QPV_X64
-static QPV_TARGET_AVX2 INT64 msdSumSquaresAVX2(const unsigned char *a, const unsigned char *b, const int count) {
-    __m256i acc0 = _mm256_setzero_si256();
-    __m256i acc1 = _mm256_setzero_si256();
-    const __m256i mask00FF = _mm256_set1_epi16(0x00FF);
-    int i = 0;
-    for ( ; i + 32 <= count ; i += 32)
-    {
-        const __m256i va = _mm256_loadu_si256((const __m256i*)(a + i));
-        const __m256i vb = _mm256_loadu_si256((const __m256i*)(b + i));
-        const __m256i d8 = _mm256_or_si256(_mm256_subs_epu8(va, vb), _mm256_subs_epu8(vb, va));
-        const __m256i lo = _mm256_and_si256(d8, mask00FF);
-        const __m256i hi = _mm256_srli_epi16(d8, 8);
-        acc0 = _mm256_add_epi32(acc0, _mm256_madd_epi16(lo, lo));
-        acc1 = _mm256_add_epi32(acc1, _mm256_madd_epi16(hi, hi));
-    }
-
-    const __m256i sum256 = _mm256_add_epi32(acc0, acc1);
-    __m128i acc = _mm_add_epi32(_mm256_castsi256_si128(sum256), _mm256_extracti128_si256(sum256, 1));
-    if (i + 16 <= count)
-    {
-        const __m128i va = _mm_loadu_si128((const __m128i*)(a + i));
-        const __m128i vb = _mm_loadu_si128((const __m128i*)(b + i));
-        const __m128i d8 = _mm_or_si128(_mm_subs_epu8(va, vb), _mm_subs_epu8(vb, va));
-        const __m128i lo = _mm_and_si128(d8, _mm256_castsi256_si128(mask00FF));
-        const __m128i hi = _mm_srli_epi16(d8, 8);
-        acc = _mm_add_epi32(acc, _mm_madd_epi16(lo, lo));
-        acc = _mm_add_epi32(acc, _mm_madd_epi16(hi, hi));
-        i += 16;
-    }
-
-    acc = _mm_add_epi32(acc, _mm_shuffle_epi32(acc, _MM_SHUFFLE(1, 0, 3, 2)));
-    acc = _mm_add_epi32(acc, _mm_shuffle_epi32(acc, _MM_SHUFFLE(2, 3, 0, 1)));
-    INT64 sum = (INT64)_mm_cvtsi128_si32(acc);
-    for ( ; i < count ; i++)
-    {
-        const int d = (int)a[i] - (int)b[i];
-        sum += (INT64)d * d;
-    }
-
-    _mm256_zeroupper();
-    return sum;
-}
-#endif
-
-QPV_FORCEINLINE INT64 msdSumSquares(const unsigned char *a, const unsigned char *b, const int count) {
-#ifdef QPV_X64
-    if (qpvHasAvx2 && count >= 32)
-       return msdSumSquaresAVX2(a, b, count);
-#endif
-    return msdSumSquaresSSE2(a, b, count);
-}
-
+// What the interpreted calcMSDvalues() produced: Round(sqrt(sumOfSquares/(count/2))).
+// The /2 is not a typo - it is the scale every stored userFindDupesMSElvl threshold is
+// calibrated against - and AHK's Round() is half away from zero, so floor(x + 0.5) and
+// not rint().
+// scale folds graylevelCompressor back in. discretizeValue() stored Round(v/L)*L, which
+// reaches 256 for v=255, L=2 and so does not fit a byte; the fingerprints are stored as
+// the quotient Round(v/L) instead, and every difference is therefore L times too small.
+// Sum of (L*d)^2 is L^2 * sum of d^2, so the factor comes back out here exactly - no
+// clamping, and the operands stay bytes for the SSE2 path.
 QPV_FORCEINLINE int msdScore(const unsigned char *a, const unsigned char *b, const int count, const int scale) {
     const INT64 sum = msdSumSquares(a, b, count) * (INT64)scale * (INT64)scale;
     return (int)floor(sqrt((double)sum / ((double)count / 2.0)) + 0.5);
 }
-// qpv-msd-end
 
 // Color-inverted and horizontally-flipped MSD counterparts for API callers that enable
 // checkInverted or checkFlipped alongside wantMSD. Named away from msdScore() so
@@ -437,16 +324,6 @@ static void decodeFingerprintChunk(const wchar_t *blob, const UINT firstIndex, c
     if (endIndex > dupesPixData.size() / (size_t)stride)
        return;
 
-    const int scale = dupesPixScale;
-    static int lutScale = 0;
-    static unsigned char lut[256];
-    if (scale > 1 && lutScale != scale)
-    {
-       for ( int v = 0 ; v < 256 ; v++)
-           lut[v] = (unsigned char)floor((double)v / scale + 0.5);
-       lutScale = scale;
-    }
-
     for ( UINT rec = 0 ; rec < count ; rec++)
     {
         const wchar_t *src = blob + (size_t)rec * stride;
@@ -455,25 +332,14 @@ static void decodeFingerprintChunk(const wchar_t *blob, const UINT firstIndex, c
 
         const size_t slot = (size_t)firstIndex + (size_t)rec;
         unsigned char *dst = &dupesPixData[slot * (size_t)stride];
-        if (scale > 1)
+        for ( UINT k = 0 ; k < stride ; k++)
         {
-           for ( UINT k = 0 ; k < stride ; k++)
-           {
-               int v = (int)src[k] - 161;
-               if (v < 0) v = 0;
-               else if (v > 255) v = 255;
-               dst[k] = lut[v];
-           }
-        }
-        else
-        {
-           for ( UINT k = 0 ; k < stride ; k++)
-           {
-               int v = (int)src[k] - 161;
-               if (v < 0) v = 0;
-               else if (v > 255) v = 255;
-               dst[k] = (unsigned char)v;
-           }
+            int v = (int)src[k] - 161;
+            if (v < 0) v = 0;
+            else if (v > 255) v = 255;
+            if (dupesPixScale > 1)
+               v = (int)floor((double)v / dupesPixScale + 0.5);
+            dst[k] = (unsigned char)v;
         }
         dupesPixOK[slot] = 1;
     }
@@ -559,7 +425,6 @@ DLL_API UINT DLL_CALLCONV dupesClearPairs() {
     dupesScanOuter = 0;
     dupesScanBlock = 0;
     dupesScanMihBlock = 0;
-    dupesScanMaskApplied = ~0ULL;
     memset((void*)&dupesScanState, 0, sizeof(dupesScanState));
 
     return 1;
@@ -609,12 +474,10 @@ struct DupesSweepCtx {
     const UINT   *rowEnd;     // NULL: every row's group ends at flatEnd (the one-group entry point)
     UINT   flatEnd;
     UINT64 hamMask;
-    int    maskBits;
     int    threshold;
     int    checkInverted;
     int    checkFlipped;
     bool   wantMSD;
-    bool   preMasked;
     const DupesMIHIndex *mih;
 };
 
@@ -629,7 +492,6 @@ struct DupesSweepBufBody {
     std::vector<DupePairRec> v;
     std::vector<UINT64> mihBits;
     std::vector<UINT>   mihHits;
-    std::vector<UINT>   rowHits[4];
     UINT maxId;
 };
 
@@ -637,7 +499,6 @@ struct DupesSweepBuf {
     std::vector<DupePairRec> v;
     std::vector<UINT64> mihBits;
     std::vector<UINT>   mihHits;
-    std::vector<UINT>   rowHits[4];
     UINT maxId = 0;
     char pad[128 - (sizeof(DupesSweepBufBody) % 128)];
 };
@@ -831,16 +692,12 @@ QPV_FORCEINLINE void dupesCheckAndEmitPair(
     const DupesSweepCtx &C, const UINT secondIndex, const UINT mainIndex,
     const UINT64 hashSecond, const UINT64 invert2ndindex, const UINT64 flipped2ndindex,
     std::vector<DupePairRec> &out, UINT &maxId) {
-    (void)invert2ndindex;
     const UINT64 hMain = C.hashes[mainIndex];
     const UINT64 hamMask = C.hamMask;
     const int threshold = C.threshold;
-    const UINT64 x = hMain ^ hashSecond;
-    const int diff  = popcount64(C.preMasked ? x : (x & hamMask));
-    const int diff2 = (C.checkInverted==1) ? (C.maskBits - diff) : 900;
-    const int diff3 = (C.checkFlipped==1)
-                    ? popcount64(C.preMasked ? (hMain ^ flipped2ndindex) : ((hMain ^ flipped2ndindex) & hamMask))
-                    : 900;
+    const int diff  = hammingDistance(hMain, hashSecond, hamMask);
+    const int diff2 = (C.checkInverted==1) ? hammingDistance(hMain, invert2ndindex, hamMask) : 900;
+    const int diff3 = (C.checkFlipped==1)  ? hammingDistance(hMain, flipped2ndindex, hamMask) : 900;
 
     int bestDiff = diff;
     if (diff2 < bestDiff) bestDiff = diff2;
@@ -877,24 +734,6 @@ QPV_FORCEINLINE void dupesCheckAndEmitPair(
     if (idA > maxId) maxId = idA;
     if (idB > maxId) maxId = idB;
     out.push_back({ idA, idB, (UINT)bestDiff, mse });
-}
-
-static QPV_NOINLINE void dupesEmitMatchedPair(
-    const DupesSweepCtx &C, const UINT secondIndex, const UINT mainIndex,
-    const UINT64 hashSecond, const UINT64 flipped2ndindex,
-    std::vector<DupePairRec> &out, UINT &maxId) {
-    dupesCheckAndEmitPair(C, secondIndex, mainIndex, hashSecond, 0, flipped2ndindex, out, maxId);
-}
-
-static QPV_NOINLINE void dupesFlushRowHits(
-    const DupesSweepCtx &C, const UINT secondIndex, const std::vector<UINT> &hits,
-    std::vector<DupePairRec> &out, UINT &maxId) {
-    const UINT64 hashSecond = C.hashes[secondIndex];
-    const UINT64 flipped2ndindex = (C.checkFlipped==1) ? C.flipped[secondIndex] : 0;
-    const size_t nh = hits.size();
-    const UINT *hp = hits.data();
-    for ( size_t i = 0 ; i < nh ; i++)
-        dupesCheckAndEmitPair(C, secondIndex, hp[i], hashSecond, 0, flipped2ndindex, out, maxId);
 }
 
 QPV_FORCEINLINE UINT qpvCtz64(UINT64 x) {
@@ -1215,11 +1054,10 @@ static void mihSweepRowsInto(const DupesSweepCtx &C, const DupesMIHIndex &MIH, c
                    continue;
 
                 const UINT64 hMain = givenHashesArray[gStart + cand];
-                const int d0 = popcount64(C.preMasked ? (hMain ^ hashSecond) : ((hMain ^ hashSecond) & hamMask));
-                if (d0 >= threshold)
+                if (hammingDistance(hMain, hashSecond, hamMask) >= threshold)
                 {
-                   if (checkInverted!=1 || (C.maskBits - d0) >= threshold)
-                      if (checkFlipped!=1 || popcount64(C.preMasked ? (hMain ^ flipped2ndindex) : ((hMain ^ flipped2ndindex) & hamMask)) >= threshold)
+                   if (checkInverted!=1 || hammingDistance(hMain, invert2ndindex, hamMask) >= threshold)
+                      if (checkFlipped!=1 || hammingDistance(hMain, flipped2ndindex, hamMask) >= threshold)
                          continue;
                 }
 
@@ -1292,394 +1130,26 @@ static void mihSweepRowsInto(const DupesSweepCtx &C, const DupesMIHIndex &MIH, c
     }
 }
 
-template <bool Masked, bool CheckInverted, bool CheckFlipped>
-static void sweepRowsSWAR(const DupesSweepCtx &C, const UINT firstRow, const UINT lastRow, DupesSweepBuf &buf) {
-    const UINT64 *hashes = C.hashes;
-    const UINT64 *flipped = C.flipped;
-    const UINT   *rowEnd = C.rowEnd;
-    const UINT64 hamMask = C.hamMask;
-    const int    threshold = C.threshold;
-    const int    maskBits = C.maskBits;
-    const bool   invAll = CheckInverted && ((INT64)threshold * 2 > (INT64)maskBits);
-    const UINT   invSpan = (CheckInverted && !invAll) ? (UINT)(maskBits - 2 * threshold) : 0u;
-    (void)flipped; (void)hamMask; (void)invAll; (void)invSpan;
+static void sweepRowsInto(const DupesSweepCtx &C, const UINT firstRow, const UINT lastRow, std::vector<DupePairRec> &out, UINT &maxId) {
+    const UINT64 *givenHashesArray = C.hashes;
+    const UINT64 *givenFlippedHashesArray = C.flipped;
+    const UINT   *rowEnd   = C.rowEnd;
+    const int  checkInverted = C.checkInverted;
+    const int  checkFlipped  = C.checkFlipped;
 
-    std::vector<DupePairRec> &out = buf.v;
-    std::vector<UINT> &b0 = buf.rowHits[0];
-    std::vector<UINT> &b1 = buf.rowHits[1];
-    std::vector<UINT> &b2 = buf.rowHits[2];
-    std::vector<UINT> &b3 = buf.rowHits[3];
-
-    #define QPV_SWAR_DIST(a, b) popcount64SWAR(Masked ? (((a) ^ (b)) & hamMask) : ((a) ^ (b)))
-    #define QPV_SWAR_MATCH(hM, hR, fR) ( \
-        (CheckInverted ? (int)(invAll || ((UINT)(QPV_SWAR_DIST(hM, hR) - threshold) > invSpan)) \
-                       : (int)(QPV_SWAR_DIST(hM, hR) < threshold)) \
-        | (CheckFlipped ? (int)(QPV_SWAR_DIST(hM, fR) < threshold) : 0) \
-    )
-
-    UINT s = firstRow;
-    while (s <= lastRow)
+    for ( UINT secondIndex = firstRow ; secondIndex <= lastRow ; secondIndex++)
     {
-        const UINT n = (rowEnd!=NULL) ? rowEnd[s] : C.flatEnd;
-        if (s + 3 <= lastRow && n >= s + 4 && (rowEnd==NULL || rowEnd[s + 3]==n))
-        {
-           const UINT64 h0 = hashes[s], h1 = hashes[s + 1], h2 = hashes[s + 2], h3 = hashes[s + 3];
-           const UINT64 f0 = CheckFlipped ? flipped[s]     : 0;
-           const UINT64 f1 = CheckFlipped ? flipped[s + 1] : 0;
-           const UINT64 f2 = CheckFlipped ? flipped[s + 2] : 0;
-           const UINT64 f3 = CheckFlipped ? flipped[s + 3] : 0;
-           b0.clear(); b1.clear(); b2.clear(); b3.clear();
-
-           if (QPV_SWAR_MATCH(h1, h0, f0)) b0.push_back(s + 1);
-           if (QPV_SWAR_MATCH(h2, h0, f0)) b0.push_back(s + 2);
-           if (QPV_SWAR_MATCH(h3, h0, f0)) b0.push_back(s + 3);
-           if (QPV_SWAR_MATCH(h2, h1, f1)) b1.push_back(s + 2);
-           if (QPV_SWAR_MATCH(h3, h1, f1)) b1.push_back(s + 3);
-           if (QPV_SWAR_MATCH(h3, h2, f2)) b2.push_back(s + 3);
-
-           for ( UINT mainIndex = s + 4 ; mainIndex < n ; mainIndex++)
-           {
-               const UINT64 hM = hashes[mainIndex];
-               const int m0 = QPV_SWAR_MATCH(hM, h0, f0);
-               const int m1 = QPV_SWAR_MATCH(hM, h1, f1);
-               const int m2 = QPV_SWAR_MATCH(hM, h2, f2);
-               const int m3 = QPV_SWAR_MATCH(hM, h3, f3);
-               if ((m0 | m1 | m2 | m3) != 0)
-               {
-                  if (m0) b0.push_back(mainIndex);
-                  if (m1) b1.push_back(mainIndex);
-                  if (m2) b2.push_back(mainIndex);
-                  if (m3) b3.push_back(mainIndex);
-               }
-           }
-
-           if (!b0.empty()) dupesFlushRowHits(C, s,     b0, out, buf.maxId);
-           if (!b1.empty()) dupesFlushRowHits(C, s + 1, b1, out, buf.maxId);
-           if (!b2.empty()) dupesFlushRowHits(C, s + 2, b2, out, buf.maxId);
-           if (!b3.empty()) dupesFlushRowHits(C, s + 3, b3, out, buf.maxId);
-           s += 4;
+        const UINT n = (rowEnd!=NULL) ? rowEnd[secondIndex] : C.flatEnd;
+        if (secondIndex + 1 >= n)
            continue;
-        }
 
-        if (s + 1 < n)
-        {
-           const UINT64 h0 = hashes[s];
-           const UINT64 f0 = CheckFlipped ? flipped[s] : 0;
-           for ( UINT mainIndex = s + 1 ; mainIndex < n ; mainIndex++)
-               if (QPV_SWAR_MATCH(hashes[mainIndex], h0, f0))
-                  dupesEmitMatchedPair(C, s, mainIndex, h0, f0, out, buf.maxId);
-        }
-        s++;
+        const UINT64 hashSecond = givenHashesArray[secondIndex];
+        const UINT64 invert2ndindex = (checkInverted==1) ? ~hashSecond : 0;
+        const UINT64 flipped2ndindex = (checkFlipped==1) ? givenFlippedHashesArray[secondIndex] : 0;
+
+        for ( UINT mainIndex = secondIndex + 1 ; mainIndex < n ; mainIndex++)
+            dupesCheckAndEmitPair(C, secondIndex, mainIndex, hashSecond, invert2ndindex, flipped2ndindex, out, maxId);
     }
-
-    #undef QPV_SWAR_MATCH
-    #undef QPV_SWAR_DIST
-}
-
-#ifdef QPV_X64
-template <bool Masked, bool CheckInverted, bool CheckFlipped>
-static QPV_TARGET_POPCNT void sweepRowsPopcnt(const DupesSweepCtx &C, const UINT firstRow, const UINT lastRow, DupesSweepBuf &buf) {
-    const UINT64 *hashes = C.hashes;
-    const UINT64 *flipped = C.flipped;
-    const UINT   *rowEnd = C.rowEnd;
-    const UINT64 hamMask = C.hamMask;
-    const int    threshold = C.threshold;
-    const int    maskBits = C.maskBits;
-    const bool   invAll = CheckInverted && ((INT64)threshold * 2 > (INT64)maskBits);
-    const UINT   invSpan = (CheckInverted && !invAll) ? (UINT)(maskBits - 2 * threshold) : 0u;
-    (void)flipped; (void)hamMask; (void)invAll; (void)invSpan;
-
-    std::vector<DupePairRec> &out = buf.v;
-    std::vector<UINT> &b0 = buf.rowHits[0];
-    std::vector<UINT> &b1 = buf.rowHits[1];
-    std::vector<UINT> &b2 = buf.rowHits[2];
-    std::vector<UINT> &b3 = buf.rowHits[3];
-
-    #define QPV_HW_DIST(a, b) QPV_POPCNT64_HW(Masked ? (((a) ^ (b)) & hamMask) : ((a) ^ (b)))
-    #define QPV_HW_MATCH(hM, hR, fR) ( \
-        (CheckInverted ? (int)(invAll || ((UINT)(QPV_HW_DIST(hM, hR) - threshold) > invSpan)) \
-                       : (int)(QPV_HW_DIST(hM, hR) < threshold)) \
-        | (CheckFlipped ? (int)(QPV_HW_DIST(hM, fR) < threshold) : 0) \
-    )
-
-    UINT s = firstRow;
-    while (s <= lastRow)
-    {
-        const UINT n = (rowEnd!=NULL) ? rowEnd[s] : C.flatEnd;
-        if (s + 3 <= lastRow && n >= s + 4 && (rowEnd==NULL || rowEnd[s + 3]==n))
-        {
-           const UINT64 h0 = hashes[s], h1 = hashes[s + 1], h2 = hashes[s + 2], h3 = hashes[s + 3];
-           const UINT64 f0 = CheckFlipped ? flipped[s]     : 0;
-           const UINT64 f1 = CheckFlipped ? flipped[s + 1] : 0;
-           const UINT64 f2 = CheckFlipped ? flipped[s + 2] : 0;
-           const UINT64 f3 = CheckFlipped ? flipped[s + 3] : 0;
-           b0.clear(); b1.clear(); b2.clear(); b3.clear();
-
-           if (QPV_HW_MATCH(h1, h0, f0)) b0.push_back(s + 1);
-           if (QPV_HW_MATCH(h2, h0, f0)) b0.push_back(s + 2);
-           if (QPV_HW_MATCH(h3, h0, f0)) b0.push_back(s + 3);
-           if (QPV_HW_MATCH(h2, h1, f1)) b1.push_back(s + 2);
-           if (QPV_HW_MATCH(h3, h1, f1)) b1.push_back(s + 3);
-           if (QPV_HW_MATCH(h3, h2, f2)) b2.push_back(s + 3);
-
-           for ( UINT mainIndex = s + 4 ; mainIndex < n ; mainIndex++)
-           {
-               const UINT64 hM = hashes[mainIndex];
-               const int m0 = QPV_HW_MATCH(hM, h0, f0);
-               const int m1 = QPV_HW_MATCH(hM, h1, f1);
-               const int m2 = QPV_HW_MATCH(hM, h2, f2);
-               const int m3 = QPV_HW_MATCH(hM, h3, f3);
-               if ((m0 | m1 | m2 | m3) != 0)
-               {
-                  if (m0) b0.push_back(mainIndex);
-                  if (m1) b1.push_back(mainIndex);
-                  if (m2) b2.push_back(mainIndex);
-                  if (m3) b3.push_back(mainIndex);
-               }
-           }
-
-           if (!b0.empty()) dupesFlushRowHits(C, s,     b0, out, buf.maxId);
-           if (!b1.empty()) dupesFlushRowHits(C, s + 1, b1, out, buf.maxId);
-           if (!b2.empty()) dupesFlushRowHits(C, s + 2, b2, out, buf.maxId);
-           if (!b3.empty()) dupesFlushRowHits(C, s + 3, b3, out, buf.maxId);
-           s += 4;
-           continue;
-        }
-
-        if (s + 1 < n)
-        {
-           const UINT64 h0 = hashes[s];
-           const UINT64 f0 = CheckFlipped ? flipped[s] : 0;
-           for ( UINT mainIndex = s + 1 ; mainIndex < n ; mainIndex++)
-               if (QPV_HW_MATCH(hashes[mainIndex], h0, f0))
-                  dupesEmitMatchedPair(C, s, mainIndex, h0, f0, out, buf.maxId);
-        }
-        s++;
-    }
-
-    #undef QPV_HW_MATCH
-    #undef QPV_HW_DIST
-}
-
-template <bool Masked, bool CheckInverted, bool CheckFlipped>
-static QPV_TARGET_AVX2 void sweepRowsAVX2(const DupesSweepCtx &C, const UINT firstRow, const UINT lastRow, DupesSweepBuf &buf) {
-    const UINT64 *hashes = C.hashes;
-    const UINT64 *flipped = C.flipped;
-    const UINT   *rowEnd = C.rowEnd;
-    const UINT64 hamMask = C.hamMask;
-    const int    threshold = C.threshold;
-    const int    maskBits = C.maskBits;
-    const bool   invAll = CheckInverted && ((INT64)threshold * 2 > (INT64)maskBits);
-    const UINT   invSpan = (CheckInverted && !invAll) ? (UINT)(maskBits - 2 * threshold) : 0u;
-    (void)flipped; (void)hamMask; (void)invAll; (void)invSpan;
-
-    std::vector<DupePairRec> &out = buf.v;
-    std::vector<UINT> &b0 = buf.rowHits[0];
-    std::vector<UINT> &b1 = buf.rowHits[1];
-    std::vector<UINT> &b2 = buf.rowHits[2];
-    std::vector<UINT> &b3 = buf.rowHits[3];
-
-    const __m256i vLowMask = _mm256_set1_epi8(0x0F);
-    const __m256i vLut = _mm256_setr_epi8(
-        0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
-        0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4
-    );
-    const __m256i vZero   = _mm256_setzero_si256();
-    const __m256i vMask   = _mm256_set1_epi64x((long long)hamMask);
-    const __m256i vThresh = _mm256_set1_epi64x((long long)threshold);
-    const __m256i vInvHi  = _mm256_set1_epi64x((long long)(maskBits - threshold));
-    (void)vMask; (void)vInvHi;
-
-    #define QPV_HW_DIST(a, b) QPV_POPCNT64_HW(Masked ? (((a) ^ (b)) & hamMask) : ((a) ^ (b)))
-    #define QPV_HW_MATCH(hM, hR, fR) ( \
-        (CheckInverted ? (int)(invAll || ((UINT)(QPV_HW_DIST(hM, hR) - threshold) > invSpan)) \
-                       : (int)(QPV_HW_DIST(hM, hR) < threshold)) \
-        | (CheckFlipped ? (int)(QPV_HW_DIST(hM, fR) < threshold) : 0) \
-    )
-    #define QPV_AVX2_POP64(outCnt, xVal) do { \
-        const __m256i _x  = Masked ? _mm256_and_si256((xVal), vMask) : (xVal); \
-        const __m256i _lo = _mm256_and_si256(_x, vLowMask); \
-        const __m256i _hi = _mm256_and_si256(_mm256_srli_epi16(_x, 4), vLowMask); \
-        const __m256i _p8 = _mm256_add_epi8(_mm256_shuffle_epi8(vLut, _lo), _mm256_shuffle_epi8(vLut, _hi)); \
-        (outCnt) = _mm256_sad_epu8(_p8, vZero); \
-    } while (0)
-    #define QPV_AVX2_HIT(outHit, vhM, vhR, vfR) do { \
-        __m256i _c; \
-        QPV_AVX2_POP64(_c, _mm256_xor_si256((vhM), (vhR))); \
-        __m256i _h = _mm256_cmpgt_epi64(vThresh, _c); \
-        if constexpr (CheckInverted) \
-           _h = _mm256_or_si256(_h, _mm256_cmpgt_epi64(_c, vInvHi)); \
-        if constexpr (CheckFlipped) { \
-           __m256i _cf; \
-           QPV_AVX2_POP64(_cf, _mm256_xor_si256((vhM), (vfR))); \
-           _h = _mm256_or_si256(_h, _mm256_cmpgt_epi64(vThresh, _cf)); \
-        } \
-        (outHit) = _h; \
-    } while (0)
-    #define QPV_PUSH_MASK4(vec, baseIdx, mask4) do { \
-        if (mask4) { \
-           if ((mask4) & 1) (vec).push_back((baseIdx)); \
-           if ((mask4) & 2) (vec).push_back((baseIdx) + 1); \
-           if ((mask4) & 4) (vec).push_back((baseIdx) + 2); \
-           if ((mask4) & 8) (vec).push_back((baseIdx) + 3); \
-        } \
-    } while (0)
-
-    UINT s = firstRow;
-    while (s <= lastRow)
-    {
-        const UINT n = (rowEnd!=NULL) ? rowEnd[s] : C.flatEnd;
-        if (s + 3 <= lastRow && n >= s + 4 && (rowEnd==NULL || rowEnd[s + 3]==n))
-        {
-           const UINT64 h0 = hashes[s], h1 = hashes[s + 1], h2 = hashes[s + 2], h3 = hashes[s + 3];
-           const UINT64 f0 = CheckFlipped ? flipped[s]     : 0;
-           const UINT64 f1 = CheckFlipped ? flipped[s + 1] : 0;
-           const UINT64 f2 = CheckFlipped ? flipped[s + 2] : 0;
-           const UINT64 f3 = CheckFlipped ? flipped[s + 3] : 0;
-           b0.clear(); b1.clear(); b2.clear(); b3.clear();
-
-           if (QPV_HW_MATCH(h1, h0, f0)) b0.push_back(s + 1);
-           if (QPV_HW_MATCH(h2, h0, f0)) b0.push_back(s + 2);
-           if (QPV_HW_MATCH(h3, h0, f0)) b0.push_back(s + 3);
-           if (QPV_HW_MATCH(h2, h1, f1)) b1.push_back(s + 2);
-           if (QPV_HW_MATCH(h3, h1, f1)) b1.push_back(s + 3);
-           if (QPV_HW_MATCH(h3, h2, f2)) b2.push_back(s + 3);
-
-           UINT mainIndex = s + 4;
-           if (mainIndex + 4 <= n)
-           {
-              const __m256i vh0 = _mm256_set1_epi64x((long long)h0);
-              const __m256i vh1 = _mm256_set1_epi64x((long long)h1);
-              const __m256i vh2 = _mm256_set1_epi64x((long long)h2);
-              const __m256i vh3 = _mm256_set1_epi64x((long long)h3);
-              const __m256i vf0 = CheckFlipped ? _mm256_set1_epi64x((long long)f0) : vZero;
-              const __m256i vf1 = CheckFlipped ? _mm256_set1_epi64x((long long)f1) : vZero;
-              const __m256i vf2 = CheckFlipped ? _mm256_set1_epi64x((long long)f2) : vZero;
-              const __m256i vf3 = CheckFlipped ? _mm256_set1_epi64x((long long)f3) : vZero;
-              (void)vf0; (void)vf1; (void)vf2; (void)vf3;
-
-              for ( ; mainIndex + 4 <= n ; mainIndex += 4)
-              {
-                  const __m256i vhM = _mm256_loadu_si256((const __m256i*)(hashes + mainIndex));
-                  __m256i hit0, hit1, hit2, hit3;
-                  QPV_AVX2_HIT(hit0, vhM, vh0, vf0);
-                  QPV_AVX2_HIT(hit1, vhM, vh1, vf1);
-                  QPV_AVX2_HIT(hit2, vhM, vh2, vf2);
-                  QPV_AVX2_HIT(hit3, vhM, vh3, vf3);
-                  const __m256i anyHit = _mm256_or_si256(_mm256_or_si256(hit0, hit1),
-                                                         _mm256_or_si256(hit2, hit3));
-                  if (_mm256_movemask_pd(_mm256_castsi256_pd(anyHit)) != 0)
-                  {
-                     const int m0 = _mm256_movemask_pd(_mm256_castsi256_pd(hit0));
-                     const int m1 = _mm256_movemask_pd(_mm256_castsi256_pd(hit1));
-                     const int m2 = _mm256_movemask_pd(_mm256_castsi256_pd(hit2));
-                     const int m3 = _mm256_movemask_pd(_mm256_castsi256_pd(hit3));
-                     QPV_PUSH_MASK4(b0, mainIndex, m0);
-                     QPV_PUSH_MASK4(b1, mainIndex, m1);
-                     QPV_PUSH_MASK4(b2, mainIndex, m2);
-                     QPV_PUSH_MASK4(b3, mainIndex, m3);
-                  }
-              }
-           }
-
-           for ( ; mainIndex < n ; mainIndex++)
-           {
-               const UINT64 hM = hashes[mainIndex];
-               if (QPV_HW_MATCH(hM, h0, f0)) b0.push_back(mainIndex);
-               if (QPV_HW_MATCH(hM, h1, f1)) b1.push_back(mainIndex);
-               if (QPV_HW_MATCH(hM, h2, f2)) b2.push_back(mainIndex);
-               if (QPV_HW_MATCH(hM, h3, f3)) b3.push_back(mainIndex);
-           }
-
-           if (!b0.empty()) dupesFlushRowHits(C, s,     b0, out, buf.maxId);
-           if (!b1.empty()) dupesFlushRowHits(C, s + 1, b1, out, buf.maxId);
-           if (!b2.empty()) dupesFlushRowHits(C, s + 2, b2, out, buf.maxId);
-           if (!b3.empty()) dupesFlushRowHits(C, s + 3, b3, out, buf.maxId);
-           s += 4;
-           continue;
-        }
-
-        if (s + 1 < n)
-        {
-           const UINT64 h0 = hashes[s];
-           const UINT64 f0 = CheckFlipped ? flipped[s] : 0;
-           UINT mainIndex = s + 1;
-           if (mainIndex + 4 <= n)
-           {
-              b0.clear();
-              const __m256i vh0 = _mm256_set1_epi64x((long long)h0);
-              const __m256i vf0 = CheckFlipped ? _mm256_set1_epi64x((long long)f0) : vZero;
-              (void)vf0;
-              for ( ; mainIndex + 4 <= n ; mainIndex += 4)
-              {
-                  const __m256i vhM = _mm256_loadu_si256((const __m256i*)(hashes + mainIndex));
-                  __m256i hit0;
-                  QPV_AVX2_HIT(hit0, vhM, vh0, vf0);
-                  const int m0 = _mm256_movemask_pd(_mm256_castsi256_pd(hit0));
-                  QPV_PUSH_MASK4(b0, mainIndex, m0);
-              }
-              for ( ; mainIndex < n ; mainIndex++)
-                  if (QPV_HW_MATCH(hashes[mainIndex], h0, f0))
-                     b0.push_back(mainIndex);
-              if (!b0.empty())
-                 dupesFlushRowHits(C, s, b0, out, buf.maxId);
-           }
-           else
-           {
-              for ( ; mainIndex < n ; mainIndex++)
-                  if (QPV_HW_MATCH(hashes[mainIndex], h0, f0))
-                     dupesEmitMatchedPair(C, s, mainIndex, h0, f0, out, buf.maxId);
-           }
-        }
-        s++;
-    }
-
-    #undef QPV_PUSH_MASK4
-    #undef QPV_AVX2_HIT
-    #undef QPV_AVX2_POP64
-    #undef QPV_HW_MATCH
-    #undef QPV_HW_DIST
-    _mm256_zeroupper();
-}
-#endif
-
-// mode: 0 = SWAR, 1 = hardware POPCNT, 2 = AVX2+POPCNT
-static void sweepRowsDispatchMode(const DupesSweepCtx &C, const UINT firstRow, const UINT lastRow, DupesSweepBuf &buf, const int mode) {
-    if (C.threshold <= 0 || firstRow > lastRow)
-       return;
-
-    const int key = (C.preMasked ? 0 : 4)
-                  | ((C.checkInverted==1) ? 2 : 0)
-                  | ((C.checkFlipped==1) ? 1 : 0);
-
-    #define QPV_DISPATCH_8(FN) switch (key) { \
-        case 0: FN<false, false, false>(C, firstRow, lastRow, buf); break; \
-        case 1: FN<false, false, true >(C, firstRow, lastRow, buf); break; \
-        case 2: FN<false, true,  false>(C, firstRow, lastRow, buf); break; \
-        case 3: FN<false, true,  true >(C, firstRow, lastRow, buf); break; \
-        case 4: FN<true,  false, false>(C, firstRow, lastRow, buf); break; \
-        case 5: FN<true,  false, true >(C, firstRow, lastRow, buf); break; \
-        case 6: FN<true,  true,  false>(C, firstRow, lastRow, buf); break; \
-        default: FN<true, true,  true >(C, firstRow, lastRow, buf); break; \
-    }
-
-#ifdef QPV_X64
-    if (mode == 2 && qpvHasAvx2 && qpvHasPopcnt) { QPV_DISPATCH_8(sweepRowsAVX2); return; }
-    if (mode >= 1 && qpvHasPopcnt)               { QPV_DISPATCH_8(sweepRowsPopcnt); return; }
-#endif
-    (void)mode;
-    QPV_DISPATCH_8(sweepRowsSWAR);
-
-    #undef QPV_DISPATCH_8
-}
-
-static void sweepRowsInto(const DupesSweepCtx &C, const UINT firstRow, const UINT lastRow, DupesSweepBuf &buf) {
-#ifdef QPV_X64
-    const int mode = (qpvHasAvx2 && qpvHasPopcnt) ? 2 : (qpvHasPopcnt ? 1 : 0);
-#else
-    const int mode = 0;
-#endif
-    sweepRowsDispatchMode(C, firstRow, lastRow, buf, mode);
 }
 
 static void dupesReservePairs(size_t need) {
@@ -1842,7 +1312,7 @@ static void dupesSweepWorker(const DupesSweepCtx *ctx, DupesSweepItem *items, co
             if (ctx->mih!=NULL)
                mihSweepRowsInto(*ctx, *ctx->mih, items[i].firstRow, items[i].lastRow, bufs[slot]);
             else
-               sweepRowsInto(*ctx, items[i].firstRow, items[i].lastRow, bufs[slot]);
+               sweepRowsInto(*ctx, items[i].firstRow, items[i].lastRow, out, bufs[slot].maxId);
         }
         catch (...)
         {
@@ -1850,8 +1320,6 @@ static void dupesSweepWorker(const DupesSweepCtx *ctx, DupesSweepItem *items, co
             if (!bufs[slot].mihBits.empty())
                std::fill(bufs[slot].mihBits.begin(), bufs[slot].mihBits.end(), 0ULL);
             bufs[slot].mihHits.clear();
-            for ( int b = 0 ; b < 4 ; b++)
-                bufs[slot].rowHits[b].clear();
         }
 
         items[i].slot   = slot;
@@ -2057,12 +1525,10 @@ DLL_API UINT DLL_CALLCONV dupesSweepPairs(UINT64 *givenHashesArray, UINT64 *give
     C.rowEnd   = NULL;
     C.flatEnd  = n;
     C.hamMask  = buildHamMask(hamDistLBorderCrop, hamDistRBorderCrop);
-    C.maskBits = popcount64(C.hamMask);
     C.threshold = threshold;
     C.checkInverted = checkInverted;
     C.checkFlipped  = (givenFlippedHashesArray!=NULL) ? checkFlipped : 0;
     C.wantMSD  = (doMSD==1 && dupesPixStride > 0 && dupesPixOK.size() >= (size_t)arraySize);
-    C.preMasked = (C.hamMask == ~0ULL);
     C.mih      = NULL;
     if (C.wantMSD)
        dupesPairsMSD = 1;
@@ -2129,7 +1595,6 @@ DLL_API int DLL_CALLCONV dupesScanBegin(UINT rows, UINT groups, int pixStride, i
     dupesScanOuter = 0;
     dupesScanBlock = 0;
     dupesScanMihBlock = 0;
-    dupesScanMaskApplied = ~0ULL;
     dupesScanWantMSD = 0;
     dupesPixStride = 0;
     dupesPixScale = 1;
@@ -2186,10 +1651,7 @@ DLL_API int DLL_CALLCONV dupesScanFeed(UINT firstIndex, UINT count, const UINT64
        return 0;
 
     if (hashes!=NULL)
-    {
        memcpy(&dupesScanHashes[firstIndex], hashes, (size_t)count * sizeof(UINT64));
-       dupesScanMaskApplied = ~0ULL;
-    }
 
     if (ids!=NULL)
        memcpy(&dupesScanIDs[firstIndex], ids, (size_t)count * sizeof(UINT));
@@ -2212,7 +1674,6 @@ DLL_API int DLL_CALLCONV dupesScanFeed(UINT firstIndex, UINT count, const UINT64
        }
 
        memcpy(&dupesScanFlipped[firstIndex], flipped, (size_t)count * sizeof(UINT64));
-       dupesScanMaskApplied = ~0ULL;
     }
 
     if (dupesScanWantMSD==1 && pixelBlob!=NULL)
@@ -2322,7 +1783,6 @@ DLL_API int DLL_CALLCONV dupesScanSetGroups(const UINT *groupStart, UINT groups)
     dupesScanOuter = 0;
     dupesScanBlock = 1 << 16;
     dupesScanMihBlock = 0;
-    dupesScanMaskApplied = ~0ULL;
     dupesScanState.phase = 3;
     return 1;
 }
@@ -2341,34 +1801,17 @@ DLL_API int DLL_CALLCONV dupesScanStep(int threshold, UINT hamDistLBorderCrop, U
        return 0;
     }
 
-    const UINT64 hamMask = buildHamMask(hamDistLBorderCrop, hamDistRBorderCrop);
-    if (hamMask != ~0ULL && dupesScanMaskApplied != hamMask)
-    {
-       UINT64 *hd = dupesScanHashes.data();
-       for ( UINT i = 0 ; i < dupesScanRows ; i++)
-           hd[i] &= hamMask;
-       if (dupesScanFlipped.size() >= dupesScanRows)
-       {
-          UINT64 *fh = dupesScanFlipped.data();
-          for ( UINT i = 0 ; i < dupesScanRows ; i++)
-              fh[i] &= hamMask;
-       }
-       dupesScanMaskApplied = hamMask;
-    }
-
     DupesSweepCtx C;
     C.hashes   = dupesScanHashes.data();
     C.flipped  = (dupesScanFlipped.size() >= dupesScanRows) ? dupesScanFlipped.data() : dupesScanHashes.data();
     C.ids      = dupesScanIDs.data();
     C.rowEnd   = dupesScanRowEnd.data();
     C.flatEnd  = dupesScanRows;
-    C.hamMask  = hamMask;
-    C.maskBits = popcount64(hamMask);
+    C.hamMask  = buildHamMask(hamDistLBorderCrop, hamDistRBorderCrop);
     C.threshold = threshold;
     C.checkInverted = checkInverted;
     C.checkFlipped  = (dupesScanFlipped.size() >= dupesScanRows) ? checkFlipped : 0;
     C.wantMSD  = (dupesScanWantMSD==1 && dupesPixStride > 0 && dupesPixOK.size() >= dupesScanRows);
-    C.preMasked = true;
     C.mih      = NULL;
     if (C.wantMSD)
        dupesPairsMSD = 1;
@@ -2537,7 +1980,6 @@ DLL_API int DLL_CALLCONV dupesScanEnd() {
     dupesScanOuter = 0;
     dupesScanBlock = 0;
     dupesScanMihBlock = 0;
-    dupesScanMaskApplied = ~0ULL;
     if (dupesHasSavedPairs)
     {
        if (dupesScanState.phase!=5 || dupesPairsList.empty())
@@ -3033,7 +2475,6 @@ DLL_API int DLL_CALLCONV dupesHaveMSD() {
 static sqlite3      *dupesDB = NULL;      // private, read-only; AHK keeps its own handle
 static std::mutex    dupesDBMutex;        // guards dupesDB lifetime against cross-thread dupesEngineCancel()
 static sqlite3_stmt *dupesStmt = NULL;
-static sqlite3_stmt *dupesPixStmt = NULL;
 static std::atomic<int> dupesCancelFlag(0);
 static std::wstring  dupesEngineError;
 
@@ -3048,7 +2489,6 @@ struct DupesQueryCfg {
     int  hasHash = 0;
     int  hasFlip = 0;
     int  hasPix = 0;
-    int  deferredPix = 0;
     int  pixStride = 0;
     int  grayCompressor = 1;
 };
@@ -3105,7 +2545,6 @@ DLL_API int DLL_CALLCONV dupesEngineInit(const wchar_t *dbPath) {
        return 0;
 
     if (dupesStmt!=NULL) { SQ.finalize(dupesStmt); dupesStmt = NULL; }
-    if (dupesPixStmt!=NULL) { SQ.finalize(dupesPixStmt); dupesPixStmt = NULL; }
     {
        std::lock_guard<std::mutex> lk(dupesDBMutex);
        if (dupesDB!=NULL)
@@ -3168,7 +2607,6 @@ DLL_API int DLL_CALLCONV dupesEngineRelease() {
     if (SQ.ok)
     {
        if (dupesStmt!=NULL) { SQ.finalize(dupesStmt); dupesStmt = NULL; }
-       if (dupesPixStmt!=NULL) { SQ.finalize(dupesPixStmt); dupesPixStmt = NULL; }
        std::lock_guard<std::mutex> lk(dupesDBMutex);
        if (dupesDB!=NULL)
        {
@@ -3267,30 +2705,19 @@ static bool buildRowKey(sqlite3_stmt *st, const int firstCol, const int count, c
         }
         else if (t==SQLITE_TEXT)
         {
-           const unsigned char *s = SQ.column_text(st, col);
-           int n = (s!=NULL) ? SQ.column_bytes(st, col) : 0;
+           const wchar_t *s = (const wchar_t*)SQ.column_text16(st, col);
+           int n = (s!=NULL) ? SQ.column_bytes16(st, col) / (int)sizeof(wchar_t) : 0;
            if (n < 0) n = 0;
-           const size_t pos = out.size();
-           out.resize(pos + 1 + sizeof(n) + (size_t)n);
-           unsigned char *dst = out.data() + pos;
-           dst[0] = 3;
-           memcpy(dst + 1, &n, sizeof(n));
-           if (n > 0)
+           out.push_back(3);
+           appendKeyBytes(out, &n, sizeof(n));
+           const bool fold = (k < 32) && (((nocaseMask >> k) & 1u)!=0);
+           for ( int i = 0 ; i < n ; i++)
            {
-              unsigned char *tdst = dst + 1 + sizeof(n);
-              const bool fold = (k < 32) && (((nocaseMask >> k) & 1u)!=0);
-              if (!fold)
-                 memcpy(tdst, s, (size_t)n);
-              else
-              {
-                 for ( int i = 0 ; i < n ; i++)
-                 {
-                     unsigned char c = s[i];
-                     if (c >= 'A' && c <= 'Z')
-                        c = (unsigned char)(c + 32);
-                     tdst[i] = c;
-                 }
-              }
+               wchar_t c = s[i];
+               if (fold && c >= L'A' && c <= L'Z')   // SQLite's NOCASE folds ASCII only,
+                  c = (wchar_t)(c + 32);             // and so does this
+
+               appendKeyBytes(out, &c, sizeof(c));
            }
         }
         else
@@ -3313,18 +2740,18 @@ static bool buildRowKey(sqlite3_stmt *st, const int firstCol, const int count, c
 // of 0 sits at distance 0 from every other image with few set bits, which is exactly the
 // phantom-group shape the ifnull() guard in the WHERE clause exists to prevent. Here an
 // unparseable hash drops the row instead.
-static bool parseHexHash(const unsigned char *s, int n, UINT64 &out) {
+static bool parseHexHash(const wchar_t *s, int n, UINT64 &out) {
     out = 0;
     if (s==NULL || n < 1 || n > 16)
        return false;
 
     for ( int i = 0 ; i < n ; i++)
     {
-        const unsigned char c = s[i];
+        const wchar_t c = s[i];
         int v;
-        if (c >= '0' && c <= '9')       v = c - '0';
-        else if (c >= 'a' && c <= 'f')  v = c - 'a' + 10;
-        else if (c >= 'A' && c <= 'F')  v = c - 'A' + 10;
+        if (c >= L'0' && c <= L'9')       v = c - L'0';
+        else if (c >= L'a' && c <= L'f')  v = c - L'a' + 10;
+        else if (c >= L'A' && c <= L'F')  v = c - L'A' + 10;
         else return false;
 
         out = (out << 4) | (UINT64)v;
@@ -3368,24 +2795,15 @@ static void dupesQueryReset() {
     dupesScanOuter = 0;
     dupesScanBlock = 0;
     dupesScanMihBlock = 0;
-    dupesScanMaskApplied = ~0ULL;
-    dupesQCfg.deferredPix = 0;
     memset((void*)&dupesScanState, 0, sizeof(dupesScanState));
 }
 
-static const unsigned char* dupesGetPixScaleLUT(const int scale) {
-    static int lutScale = 0;
-    static unsigned char lut[256];
-    if (scale > 1 && lutScale != scale)
-    {
-       for ( int v = 0 ; v < 256 ; v++)
-           lut[v] = (unsigned char)floor((double)v / scale + 0.5);
-       lutScale = scale;
-    }
-    return lut;
-}
-
-static inline void decodeFingerprintBytes(const unsigned char *blob, const UINT firstIndex, const UINT count) {
+// Schema v3 keeps the fingerprints as raw BLOBs in imagesPixels, one byte per pixel: the
+// Chr(gray + 161) encoding above only ever existed so the values could survive being
+// pasted into an SQL string literal, which bound parameters make unnecessary. Half the
+// bytes, and the decode collapses to the grayCompressor division - which still has to
+// happen here, exactly as above, because msdScore() multiplies the level back in.
+static void decodeFingerprintBytes(const unsigned char *blob, const UINT firstIndex, const UINT count) {
     if (blob==NULL || count==0 || dupesPixStride==0)
        return;
 
@@ -3397,17 +2815,15 @@ static inline void decodeFingerprintBytes(const unsigned char *blob, const UINT 
     if (endIndex > dupesPixData.size() / (size_t)stride)
        return;
 
-    const int scale = dupesPixScale;
-    const unsigned char *lut = (scale > 1) ? dupesGetPixScaleLUT(scale) : NULL;
     for ( UINT rec = 0 ; rec < count ; rec++)
     {
         const unsigned char *src = blob + (size_t)rec * stride;
         const size_t slot = (size_t)firstIndex + (size_t)rec;
         unsigned char *dst = &dupesPixData[slot * (size_t)stride];
-        if (scale > 1)
+        if (dupesPixScale > 1)
         {
            for ( UINT k = 0 ; k < stride ; k++)
-               dst[k] = lut[src[k]];
+               dst[k] = (unsigned char)floor((double)src[k] / dupesPixScale + 0.5);
         } else
            memcpy(dst, src, stride);
 
@@ -3415,6 +2831,8 @@ static inline void decodeFingerprintBytes(const unsigned char *blob, const UINT 
     }
 }
 
+// Drops the run that is still open back off the output arrays. A run of one is not a
+// duplicate group, and the old query never produced one: HAVING count(*)>1.
 static void dupesCloseRun() {
     if (!dupesRunOpen)
        return;
@@ -3427,6 +2845,7 @@ static void dupesCloseRun() {
            dupesCandRows[i].groupID = dupesCandGroups;
     } else
     {
+       // truncate every parallel array back to where the run began
        if (dupesRunStart < n)
           dupesPathBuf.resize(dupesCandRows[dupesRunStart].pathOffset);
 
@@ -3435,7 +2854,7 @@ static void dupesCloseRun() {
        if (!dupesScanFlipped.empty())
           dupesScanFlipped.resize(dupesRunStart);
 
-       if (dupesQCfg.hasPix==1 && dupesQCfg.deferredPix==0 && dupesPixStride > 0)
+       if (dupesQCfg.hasPix==1 && dupesPixStride > 0)
        {
           dupesPixData.resize(dupesRunStart * dupesPixStride);
           dupesPixOK.resize(dupesRunStart);
@@ -3458,7 +2877,6 @@ DLL_API int DLL_CALLCONV dupesQueryBegin(const wchar_t *sql, int keyCount, UINT 
        return 0;
 
     if (dupesStmt!=NULL) { SQ.finalize(dupesStmt); dupesStmt = NULL; }
-    if (dupesPixStmt!=NULL) { SQ.finalize(dupesPixStmt); dupesPixStmt = NULL; }
 
     dupesQueryReset();
     dupesCancelFlag.store(0, std::memory_order_relaxed);
@@ -3467,7 +2885,6 @@ DLL_API int DLL_CALLCONV dupesQueryBegin(const wchar_t *sql, int keyCount, UINT 
     dupesQCfg.hasHash = (hasHash==1) ? 1 : 0;
     dupesQCfg.hasFlip = (hasFlip==1) ? 1 : 0;
     dupesQCfg.hasPix  = (hasPix==1 && pixStride > 0) ? 1 : 0;
-    dupesQCfg.deferredPix = 0;
     dupesQCfg.pixStride = pixStride;
     dupesQCfg.grayCompressor = (grayCompressor > 1) ? grayCompressor : 1;
     if (dupesQCfg.hasPix==1)
@@ -3492,26 +2909,10 @@ DLL_API int DLL_CALLCONV dupesQueryBegin(const wchar_t *sql, int keyCount, UINT 
        return 0;
     }
 
-    // Accepts both deferred mode (no p.big column; point-fetched in dupesScanBuildFromQuery)
-    // and inline mode (p.big column present in SELECT).
-    const int baseNoPix = 4 + dupesQCfg.hasHash + dupesQCfg.hasFlip + keyCount;
-    const int colCount = (SQ.column_count!=NULL) ? SQ.column_count(dupesStmt) : (baseNoPix + dupesQCfg.hasPix);
-    if (dupesQCfg.hasPix==1 && colCount==baseNoPix)
-    {
-       const int prc = SQ.prepare16_v2(dupesDB, L"SELECT big FROM imagesPixels WHERE imgidu=?1;", -1, &dupesPixStmt, NULL);
-       if (prc!=SQLITE_OK || dupesPixStmt==NULL)
-       {
-          dupesSetError(L"could not prepare the pixel-fingerprint lookup query", dupesDB);
-          SQ.finalize(dupesStmt);
-          dupesStmt = NULL;
-          dupesPixStmt = NULL;
-          dupesScanState.lastError = 3;
-          dupesScanState.phase = -1;
-          return 0;
-       }
-       dupesQCfg.deferredPix = 1;
-    }
-    else if (colCount != baseNoPix + dupesQCfg.hasPix)
+    // the column count is fixed by the layout above; a mismatch means the caller and the
+    // DLL disagree about the SELECT, which would silently read the wrong columns
+    const int want = 4 + dupesQCfg.hasHash + dupesQCfg.hasFlip + dupesQCfg.hasPix + keyCount;
+    if (SQ.column_count!=NULL && SQ.column_count(dupesStmt)!=want)
     {
        dupesSetError(L"the duplicates query does not have the expected column layout", dupesDB);
        SQ.finalize(dupesStmt);
@@ -3525,6 +2926,9 @@ DLL_API int DLL_CALLCONV dupesQueryBegin(const wchar_t *sql, int keyCount, UINT 
     return 1;
 }
 
+// Steps the query for up to msBudget milliseconds. Returns 1 while rows remain, 0 when
+// the whole result set has been consumed and the groups are closed, -1 on error or when
+// the user cancelled.
 DLL_API int DLL_CALLCONV dupesQueryStep(int msBudget) {
     if (!SQ.ok || dupesStmt==NULL)
        return -1;
@@ -3532,11 +2936,10 @@ DLL_API int DLL_CALLCONV dupesQueryStep(int msBudget) {
     if (msBudget < 1)
        msBudget = 1;
 
-    const int inlinePix = (dupesQCfg.hasPix==1 && dupesQCfg.deferredPix==0) ? 1 : 0;
-    const int base = 4 + dupesQCfg.hasHash + dupesQCfg.hasFlip + inlinePix;
+    const int base = 4 + dupesQCfg.hasHash + dupesQCfg.hasFlip + dupesQCfg.hasPix;
     const int colHash = dupesQCfg.hasHash ? 4 : -1;
     const int colFlip = dupesQCfg.hasFlip ? (4 + dupesQCfg.hasHash) : -1;
-    const int colPix  = inlinePix ? (4 + dupesQCfg.hasHash + dupesQCfg.hasFlip) : -1;
+    const int colPix  = dupesQCfg.hasPix  ? (4 + dupesQCfg.hasHash + dupesQCfg.hasFlip) : -1;
     const UINT stride = (UINT)dupesQCfg.pixStride;
     const std::chrono::steady_clock::time_point tStart = std::chrono::steady_clock::now();
     int sinceClock = 0;
@@ -3553,6 +2956,8 @@ DLL_API int DLL_CALLCONV dupesQueryStep(int msBudget) {
            {
               if (!buildRowKey(dupesStmt, base, dupesQCfg.keyCount, dupesQCfg.nocaseMask, dupesKeyCur))
               {
+                 // a NULL key column: not a candidate, and it also breaks the run - two rows
+                 // either side of it are not adjacent as far as grouping is concerned
                  dupesCloseRun();
                  dupesKeyPrev.clear();
               }
@@ -3562,23 +2967,30 @@ DLL_API int DLL_CALLCONV dupesQueryStep(int msBudget) {
                  bool usable = true;
                  if (colHash >= 0)
                  {
-                    const unsigned char *h = SQ.column_text(dupesStmt, colHash);
-                    usable = parseHexHash(h, (h!=NULL) ? SQ.column_bytes(dupesStmt, colHash) : 0, hash);
+                    const wchar_t *h = (const wchar_t*)SQ.column_text16(dupesStmt, colHash);
+                    usable = parseHexHash(h, (h!=NULL) ? SQ.column_bytes16(dupesStmt, colHash) / (int)sizeof(wchar_t) : 0, hash);
                     flip = hash;
                     if (usable && colFlip >= 0)
                     {
-                       const unsigned char *f = SQ.column_text(dupesStmt, colFlip);
-                       if (!parseHexHash(f, (f!=NULL) ? SQ.column_bytes(dupesStmt, colFlip) : 0, flip))
+                       const wchar_t *f = (const wchar_t*)SQ.column_text16(dupesStmt, colFlip);
+                       // no flipped hash stored: mirroring its own hash makes the flipped
+                       // comparison degenerate to the ordinary one, which is harmless. A 0
+                       // would have matched every sparse hash in the group.
+                       if (!parseHexHash(f, (f!=NULL) ? SQ.column_bytes16(dupesStmt, colFlip) / (int)sizeof(wchar_t) : 0, flip))
                           flip = hash;
                     }
                  }
 
+                 // Hashes are not in ORDER BY, so an unparseable hash can sit in the middle
+                 // of an equal-key run. Skipping it without closing the run keeps the group
+                 // intact; if the row belonged to a new key, the next usable row (or EOF)
+                 // will close the previous run cleanly.
                  if (usable)
                  {
                     if (!dupesRunOpen || dupesKeyPrev!=dupesKeyCur)
                     {
                        dupesCloseRun();
-                       dupesKeyPrev.swap(dupesKeyCur);
+                       dupesKeyPrev = dupesKeyCur;
                        dupesRunStart = dupesCandRows.size();
                        dupesRunOpen = true;
                     }
@@ -3592,6 +3004,8 @@ DLL_API int DLL_CALLCONV dupesQueryStep(int msBudget) {
 
                     const wchar_t *p = (const wchar_t*)SQ.column_text16(dupesStmt, 1);
                     const int plen = (p!=NULL) ? SQ.column_bytes16(dupesStmt, 1) / (int)sizeof(wchar_t) : 0;
+                    // the parallel arrays must stay the same length, so a row goes in whole or not at
+                    // all: dupesScanBuildFromQuery() indexes them in step
                     nPath = dupesPathBuf.size(); nRows = dupesCandRows.size(); nHash = dupesScanHashes.size();
                     nFlip = dupesScanFlipped.size(); nPixData = dupesPixData.size(); nPixOK = dupesPixOK.size();
                     appending = true;
@@ -3607,39 +3021,15 @@ DLL_API int DLL_CALLCONV dupesQueryStep(int msBudget) {
 
                     if (colPix >= 0)
                     {
+                       const size_t slot = dupesCandRows.size() - 1;
+                       dupesPixData.resize((slot + 1) * stride, 0);
+                       dupesPixOK.resize(slot + 1, 0);
                        const unsigned char *px = (const unsigned char*)SQ.column_blob(dupesStmt, colPix);
                        const int pxlen = (px!=NULL) ? SQ.column_bytes(dupesStmt, colPix) : 0;
+                       // a fingerprint of the wrong length is treated as absent rather than
+                       // decoded short: a partial one would score as a near-perfect match
                        if (px!=NULL && pxlen==(int)stride)
-                       {
-                          if (dupesPixScale > 1)
-                          {
-                             const unsigned char *lut = dupesGetPixScaleLUT(dupesPixScale);
-                             if (stride <= 1024)
-                             {
-                                unsigned char tmp[1024];
-                                for ( UINT k = 0 ; k < stride ; k++)
-                                    tmp[k] = lut[px[k]];
-                                dupesPixData.insert(dupesPixData.end(), tmp, tmp + stride);
-                             }
-                             else
-                             {
-                                const size_t slot = dupesCandRows.size() - 1;
-                                dupesPixData.resize((slot + 1) * stride);
-                                unsigned char *dst = &dupesPixData[slot * stride];
-                                for ( UINT k = 0 ; k < stride ; k++)
-                                    dst[k] = lut[px[k]];
-                             }
-                          }
-                          else
-                             dupesPixData.insert(dupesPixData.end(), px, px + stride);
-
-                          dupesPixOK.push_back(1);
-                       }
-                       else
-                       {
-                          dupesPixData.insert(dupesPixData.end(), stride, 0);
-                          dupesPixOK.push_back(0);
-                       }
+                          decodeFingerprintBytes(px, (UINT)slot, 1);
                     }
                  }
               }
@@ -3745,12 +3135,10 @@ DLL_API int DLL_CALLCONV dupesScanBuildFromQuery(const unsigned char *keepMask, 
     if (keepMask!=NULL && maskCount < total)
        return 0;
 
-    const bool deferredPix = (dupesQCfg.hasPix==1 && dupesQCfg.deferredPix==1 && dupesPixStride > 0);
-    const bool wantPix = (!deferredPix && dupesScanWantMSD==1 && dupesPixStride > 0 && dupesPixData.size() >= (size_t)total * dupesPixStride);
+    const bool wantPix = (dupesScanWantMSD==1 && dupesPixStride > 0 && dupesPixData.size() >= (size_t)total * dupesPixStride);
     const bool wantFlip = (dupesScanFlipped.size() >= total);
     UINT kept = 0;
     UINT prevGroup = 0;
-    INT64 comparisons = 0;
     dupesScanGroupStart.clear();
     dupesScanIDs.clear();
 
@@ -3759,10 +3147,6 @@ DLL_API int DLL_CALLCONV dupesScanBuildFromQuery(const unsigned char *keepMask, 
         dupesScanIDs.reserve(total);
         if (dupesCandGroups < 0xFFFFFFFFu)
            dupesScanGroupStart.reserve((size_t)dupesCandGroups + 1);
-
-        std::vector<INT64> keptImgIds;
-        if (deferredPix)
-           keptImgIds.reserve(total);
 
         for ( UINT i = 0 ; i < total ; i++)
         {
@@ -3776,6 +3160,8 @@ DLL_API int DLL_CALLCONV dupesScanBuildFromQuery(const unsigned char *keepMask, 
                prevGroup = g;
             }
 
+            // compact in place: kept <= i always, so this never overwrites a row it still
+            // has to read
             dupesScanHashes[kept] = dupesScanHashes[i];
             if (wantFlip)
                dupesScanFlipped[kept] = dupesScanFlipped[i];
@@ -3787,8 +3173,6 @@ DLL_API int DLL_CALLCONV dupesScanBuildFromQuery(const unsigned char *keepMask, 
 
                dupesPixOK[kept] = dupesPixOK[i];
             }
-            else if (deferredPix)
-               keptImgIds.push_back(dupesCandRows[i].imgidu);
 
             dupesScanIDs.push_back(idBase + kept + 1);
             kept++;
@@ -3806,115 +3190,12 @@ DLL_API int DLL_CALLCONV dupesScanBuildFromQuery(const unsigned char *keepMask, 
 
         if (kept >= 2 && !dupesScanGroupStart.empty())
            dupesScanGroupStart.push_back(kept);
-
-        for ( size_t g = 0 ; g + 1 < dupesScanGroupStart.size() ; g++)
-        {
-            const INT64 m = (INT64)(dupesScanGroupStart[g + 1] - dupesScanGroupStart[g]);
-            comparisons += m * (m - 1) / 2;
-        }
-
-        if (kept >= 2 && dupesScanGroupStart.size() >= 2 && comparisons >= 1 && deferredPix)
-        {
-           const UINT stride = dupesPixStride;
-           if ((size_t)kept > ((size_t)-1) / (size_t)stride)
-              throw std::bad_alloc();
-
-           dupesPixData.assign((size_t)kept * (size_t)stride, 0);
-           dupesPixOK.assign(kept, 0);
-
-           if (dupesPixStmt!=NULL && SQ.ok)
-           {
-              struct PixFetchReq { INT64 imgidu; UINT slot; };
-              std::vector<PixFetchReq> reqs;
-              reqs.reserve(kept);
-              for ( size_t g = 0 ; g + 1 < dupesScanGroupStart.size() ; g++)
-              {
-                  const UINT a = dupesScanGroupStart[g], b = dupesScanGroupStart[g + 1];
-                  if (b - a < 2)
-                     continue;
-                  for ( UINT s = a ; s < b ; s++)
-                      reqs.push_back({ keptImgIds[s], s });
-              }
-
-              // Primary-key order turns random lookups into a sequential B-tree scan.
-              std::sort(reqs.begin(), reqs.end(), [](const PixFetchReq &x, const PixFetchReq &y) {
-                  return x.imgidu < y.imgidu;
-              });
-
-              const int scale = dupesPixScale;
-              const unsigned char *lut = (scale > 1) ? dupesGetPixScaleLUT(scale) : NULL;
-              for ( size_t r = 0 ; r < reqs.size() ; r++)
-              {
-                  if ((r & 255u)==0 && dupesCancelFlag.load(std::memory_order_relaxed)!=0)
-                  {
-                     SQ.reset(dupesPixStmt);
-                     dupesScanGroupStart.clear();
-                     dupesScanIDs.clear();
-                     dupesScanRowEnd.clear();
-                     dupesPixData.clear();
-                     dupesPixOK.clear();
-                     dupesScanRows = 0;
-                     dupesScanState.rows = 0;
-                     dupesScanState.groups = 0;
-                     dupesScanState.total = 0;
-                     dupesScanState.lastError = 0;
-                     dupesScanState.phase = -1;
-                     dupesSetError(L"the duplicates query was cancelled", dupesDB);
-                     return 0;
-                  }
-
-                  SQ.reset(dupesPixStmt);
-                  SQ.bind_int64(dupesPixStmt, 1, (sqlite3_int64)reqs[r].imgidu);
-                  const int prc = SQ.step(dupesPixStmt);
-                  if (prc==SQLITE_ROW)
-                  {
-                     const unsigned char *px = (const unsigned char*)SQ.column_blob(dupesPixStmt, 0);
-                     const int pxlen = (px!=NULL) ? SQ.column_bytes(dupesPixStmt, 0) : 0;
-                     if (px!=NULL && pxlen==(int)stride)
-                     {
-                        unsigned char *dst = &dupesPixData[(size_t)reqs[r].slot * (size_t)stride];
-                        if (scale > 1)
-                        {
-                           for ( UINT k = 0 ; k < stride ; k++)
-                               dst[k] = lut[px[k]];
-                        }
-                        else
-                           memcpy(dst, px, stride);
-
-                        dupesPixOK[reqs[r].slot] = 1;
-                     }
-                  }
-                  else if (prc!=SQLITE_DONE)
-                  {
-                     SQ.reset(dupesPixStmt);
-                     dupesScanGroupStart.clear();
-                     dupesScanIDs.clear();
-                     dupesScanRowEnd.clear();
-                     dupesPixData.clear();
-                     dupesPixOK.clear();
-                     dupesScanRows = 0;
-                     dupesScanState.rows = 0;
-                     dupesScanState.groups = 0;
-                     dupesScanState.total = 0;
-                     dupesScanState.lastError = (prc==SQLITE_INTERRUPT) ? 0 : 5;
-                     dupesScanState.phase = -1;
-                     dupesSetError((prc==SQLITE_INTERRUPT) ? L"the duplicates query was cancelled" : L"could not read pixel fingerprints", dupesDB);
-                     return 0;
-                  }
-              }
-              SQ.reset(dupesPixStmt);
-           }
-        }
     }
     catch (...)
     {
-        if (dupesPixStmt!=NULL && SQ.ok)
-           SQ.reset(dupesPixStmt);
         dupesScanGroupStart.clear();
         dupesScanIDs.clear();
         dupesScanRowEnd.clear();
-        dupesPixData.clear();
-        dupesPixOK.clear();
         dupesScanRows = 0;
         dupesScanState.rows = 0;
         dupesScanState.groups = 0;
@@ -3923,6 +3204,13 @@ DLL_API int DLL_CALLCONV dupesScanBuildFromQuery(const unsigned char *keepMask, 
         dupesScanState.phase = -1;
         dupesSetError(L"not enough memory to prepare the duplicates sweep", NULL);
         return 0;
+    }
+
+    INT64 comparisons = 0;
+    for ( size_t g = 0 ; g + 1 < dupesScanGroupStart.size() ; g++)
+    {
+        const INT64 m = (INT64)(dupesScanGroupStart[g + 1] - dupesScanGroupStart[g]);
+        comparisons += m * (m - 1) / 2;
     }
 
     if (kept < 2 || dupesScanGroupStart.size() < 2 || comparisons < 1)
@@ -3973,7 +3261,6 @@ DLL_API int DLL_CALLCONV dupesScanBuildFromQuery(const unsigned char *keepMask, 
     dupesScanOuter = 0;
     dupesScanBlock = 1 << 16;
     dupesScanMihBlock = 0;
-    dupesScanMaskApplied = ~0ULL;
     dupesScanState.phase = 3;
     return 1;
 }
