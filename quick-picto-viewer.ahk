@@ -33086,10 +33086,20 @@ readRecentFiltersEntries() {
 }
 
 EraseFilterzHisto() {
+  IniRead, savedList, % mainRecentsFile, RecentFilters
+  If (savedList="" || savedList="ERROR")
+     Return msgBeepTimer("The files list filters history is already empty")
+
+  msgResult := msgBoxWrapper(appTitle ": Erase history", "Do you want to erase the history of the files list filters?`n`nThe saved filter strings will be removed from the list. The typed filter and the other options stay as they are.", 4, 0, "question")
+  If (msgResult!="yes")
+     Return
+
   IniDelete, % mainRecentsFile, RecentFilters
-  CloseWindow()
-  Sleep, 50
-  PanelEnableFilesFilter()
+  Gui, SettingsGUIA: Default
+  GuiControlGet, typedFilter,, UsrEditFilter
+  GuiControl,, UsrEditFilter, % "`n"   ; the delimiter alone empties the list
+  GuiControl, Text, UsrEditFilter, % typedFilter
+  msgBeepTimer("Files list filters history erased", 900)
 }
 
 InitialFilterSettingsPanel(modus) {
