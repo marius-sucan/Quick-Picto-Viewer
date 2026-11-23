@@ -33093,36 +33093,25 @@ EraseFilterzHisto() {
 }
 
 InitialFilterSettingsPanel(modus) {
-    Static o_userFilterDoString, o_userFilterStringPos
-         , o_userFilterStringIsNot, o_userFilterInvertThis
-         , o_userFilterProperty, o_userFilterWhat
-         , o_UsrEditFilter, o_FilteruMaxRange
-         , o_FilteruMinRange, o_userFilterSizeProperty
+; modus: 1 = remember the settings; 0 = put them back; 2 = put back those remembered before the last «1»
+    Static saved := [], before := []
+         , names := "userFilterDoString|userFilterStringPos|userFilterStringIsNot|userFilterInvertThis|userFilterProperty|userFilterWhat"
+                  . "|UsrEditFilter|FilteruMaxRange|FilteruMinRange|userFilterSizeProperty"
 
     If (modus=1)
     {
-       o_userFilterDoString := userFilterDoString
-       o_userFilterStringPos := userFilterStringPos
-       o_userFilterStringIsNot := userFilterStringIsNot
-       o_userFilterInvertThis := userFilterInvertThis
-       o_userFilterProperty := userFilterProperty
-       o_userFilterWhat := userFilterWhat
-       o_UsrEditFilter := UsrEditFilter
-       o_FilteruMaxRange := FilteruMaxRange
-       o_FilteruMinRange := FilteruMinRange
-       o_userFilterSizeProperty := userFilterSizeProperty
-    } Else
+       before := saved
+       saved := []
+    }
+
+    Loop, Parse, names, |
     {
-       userFilterDoString := o_userFilterDoString
-       userFilterStringPos := o_userFilterStringPos
-       userFilterStringIsNot := o_userFilterStringIsNot
-       userFilterInvertThis := o_userFilterInvertThis
-       userFilterProperty := o_userFilterProperty
-       userFilterWhat := o_userFilterWhat
-       UsrEditFilter := o_UsrEditFilter
-       FilteruMaxRange := o_FilteruMaxRange
-       FilteruMinRange := o_FilteruMinRange
-       userFilterSizeProperty := o_userFilterSizeProperty
+       If (modus=1)
+          saved[A_LoopField] := %A_LoopField%
+       Else If (modus=2)
+          %A_LoopField% := before[A_LoopField]
+       Else
+          %A_LoopField% := saved[A_LoopField]
     }
 }
 
@@ -33443,7 +33432,7 @@ quickFindSeenImages(dummy:=0) {
    userFilterProperty := 20
    userFilterInvertThis := (dummy="unseen") ? 1 : 0
    updateUIFiltersPanel("external")
-   retrieveAlreadySeenImageFromCurrentList()
+   retrieveAlreadySeenImageFromCurrentList(1)
    InitialFilterSettingsPanel(1)
 }
 
@@ -33472,7 +33461,8 @@ BtnApplyFilesFilter() {
    {
       InitialFilterSettingsPanel(1)
       BtnCloseWindow()
-      retrieveAlreadySeenImageFromCurrentList()
+      If (retrieveAlreadySeenImageFromCurrentList(1)=-1)
+         InitialFilterSettingsPanel(2)
       Return
    }
 
@@ -33487,7 +33477,8 @@ BtnApplyFilesFilter() {
    If (userFilterDoString=1 && UsrEditFilter)
       RecordUsedFiltersManager(UsrEditFilter)
 
-   coreSetFilesFilteru(newFilter)
+   If (coreSetFilesFilteru(newFilter)=-1)
+      InitialFilterSettingsPanel(2)
    dummyTimerDelayiedImageDisplay(50)
 }
 
@@ -33713,7 +33704,7 @@ coreSetFilesFilteru(stringu, noStringProcessing:=0) {
         filesFilter := SubStr(stringu, 3)
   } Else filesFilter := stringu
 
-  FilterFilesListuIndex(thereWasFilter, prevFilter, ostringu)
+  r := FilterFilesListuIndex(thereWasFilter, prevFilter, ostringu)
   If (maxFilesIndex<1)
   {
      SoundBeep, 300, 100
@@ -33742,6 +33733,7 @@ coreSetFilesFilteru(stringu, noStringProcessing:=0) {
   SetTimer, RemoveTooltip, % -msgDisplayTime
   If (StrLen(filesFilter)>1 && noStringProcessing!=1 && maxFilesIndex>0)
      quickBarLater("Remove filter,,MenuRemNowFilesListFilter")
+  Return r
 }
 
 FilterFilesListuIndex(thereWasFilter:=0, prevFilter:="", ostringu:="") {
@@ -33791,11 +33783,12 @@ FilterFilesListuIndex(thereWasFilter:=0, prevFilter:="", ostringu:="") {
 
          If (r=1)
          {
-            resultedFilesList := []
-            resultedFilesList := bckpResultedFilesList.Clone()
-            bckpResultedFilesList := []
-            filesFilter := ""
-            Return msgBeepTimer("Operation abandoned. The files list was not filtered, because data collection did not complete.")
+            ; the list is as it was: the previous filter, if any, stays active
+            filesFilter := (thereWasFilter=1) ? prevFilter : ""
+            If (thereWasFilter!=1)
+               bckpResultedFilesList := []
+            msgBeepTimer("Operation abandoned. The files list was left unchanged, because data collection did not complete.")
+            Return -1
          }
       }
       ; ToolTip, % queryType "=" queryMin "=" queryMax , , , 2
@@ -36200,7 +36193,8 @@ findFavesInList(modus:=0, doSel:=0) {
    }
 }
 
-retrieveAlreadySeenImageFromCurrentList() {
+retrieveAlreadySeenImageFromCurrentList(keepFilter:=0) {
+; keepFilter=1: the caller left the list as it was, so an active filter stays when no records are found
    ; Critical, on
    stopSlideshow()
    initSeenImagesListDB()
@@ -36240,15 +36234,22 @@ retrieveAlreadySeenImageFromCurrentList() {
       seenEntries := retrieveEntireSeenImagesDB(totalSeenIMGs, 0)
       If (totalSeenIMGs<2)
       {
-         userFilterDoString := 0
-         userFilterProperty := 1
-         filesFilter := ""
+         If (keepFilter!=1)
+            filesFilter := ""
+
+         If (StrLen(filesFilter)<2)
+         {
+            userFilterDoString := 0
+            userFilterProperty := 1
+         }
+
          SetTimer, ResetImgLoadStatus, -50
          SoundBeep, 900, 100
          CurrentSLD := backCurrentSLD
          dummyTimerDelayiedImageDisplay(50)
          etaTime := "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
-         Return msgBeepTimer("No records found matching the criteria" etaTime, 0)
+         msgBeepTimer("No records found matching the criteria" ((keepFilter=1) ? ". The files list was left unchanged." : "") etaTime, 0)
+         Return -1
       }
 
       If (StrLen(filesFilter)>1) ; && filesFilter!="||Already-Seen-Images||") I do not know why i had this extra condition...
