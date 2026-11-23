@@ -33216,7 +33216,7 @@ BTNuiDiscardFilesFilter() {
    InitialFilterSettingsPanel(1)
    BtnCloseWindow()
    If (remFilesListFilter()=1)
-      SetTimer, RandomPicture, -90
+      dummyTimerDelayiedImageDisplay(50)
 }
 
 SQLescapeStr(str, likeu:=0) {
