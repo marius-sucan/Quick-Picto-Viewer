@@ -1,4 +1,4 @@
-# Verification of `bug-analysis-report.md`
+# Verification of `bug-analysis-report-2026-08-10.md`
 
 Every one of the 21 claims was checked against the current working tree
 (`quick-picto-viewer.ahk`, `QPV DLL source code/`). Verdicts below.

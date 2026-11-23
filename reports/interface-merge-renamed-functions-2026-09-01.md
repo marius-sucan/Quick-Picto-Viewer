@@ -263,7 +263,7 @@ Outside the merge machinery; listed so the count reconciles.
 | `UIoffsetSelProperPanel(dummy:=0)` | quick-picto-viewer.ahk | 102 | the selection-properties panel's nudge buttons: steps the selection coordinates or size, Ctrl+click prompts for a value, `&align` opens the alignment menu |
 | `dummyUIoffsetSelProperPanel()` | quick-picto-viewer.ahk | 5 | repeats the nudge every 25 ms while the button stays pressed |
 
-Not functions of the application: `merge-probes/` holds thirteen standalone probe scripts
+Not functions of the application: `merge-probes-2026-08-31/` holds thirteen standalone probe scripts
 (p1–p13) with a README of verdicts on what runs during a same-interpreter menu loop.
 
 ## Appendix — reproducing the numbers
