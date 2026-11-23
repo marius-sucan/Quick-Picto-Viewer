@@ -48071,8 +48071,8 @@ BtnPerformSearchNow(a, b, c) {
 }
 
 OpenFilterPanelBTNaction() {
-   userSearchString := ""
    BtnCloseWindow()
+   Sleep, 5
    PanelEnableFilesFilter()
 }
 
