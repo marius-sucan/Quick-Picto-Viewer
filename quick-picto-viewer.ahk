@@ -89559,8 +89559,9 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
    useHashes := (userFindDupesFilterHamDist>1 && includeHash) ? 1 : 0
    validGroups := 0
    If (useHashes=1 && abandonAll!=1 && candCount>1)
+   {
       builtCandidates := DllCall("qpvmain.dll\dupesScanBuildFromQuery", "UPtr", &keepMask, "uint", totalCandidates, "uint", 0, "int")
-   Else If (useHashes!=1 && abandonAll!=1 && candCount>0)
+   } Else If (useHashes!=1 && abandonAll!=1 && candCount>0)
    {
       hasSingleton := 0
       For k, v in groupies
@@ -89570,6 +89571,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
          Else
             hasSingleton := 1
       }
+
       If (hasSingleton=1)
       {
          newArr := []
