@@ -33103,8 +33103,9 @@ EraseFilterzHisto() {
 }
 
 InitialFilterSettingsPanel(modus) {
-; modus: 1 = remember the settings; 0 = put them back; 2 = put back those remembered before the last «1»
-    Static saved := [], before := []
+; modus: 1 = remember the settings; 0 = put them back, and keep the typed ones for «3»
+; 2 = put back those remembered before the last «1»; 3 = put back the typed ones
+    Static saved := [], before := [], typed := []
          , names := "userFilterDoString|userFilterStringPos|userFilterStringIsNot|userFilterInvertThis|userFilterProperty|userFilterWhat"
                   . "|UsrEditFilter|FilteruMaxRange|FilteruMinRange|userFilterSizeProperty|FilteruDateMinRange|FilteruDateMaxRange"
 
@@ -33117,15 +33118,24 @@ InitialFilterSettingsPanel(modus) {
     Loop, Parse, names, |
     {
        If (modus=1)
+       {
           saved[A_LoopField] := %A_LoopField%
-       Else If (modus=2)
+       } Else If (modus=2)
+       {
           %A_LoopField% := before[A_LoopField]
-       Else
+       } Else If (modus=3)
+       {
+          %A_LoopField% := typed[A_LoopField]
+       } Else
+       {
+          typed[A_LoopField] := %A_LoopField%
           %A_LoopField% := saved[A_LoopField]
+       }
     }
 }
 
-PanelEnableFilesFilter() {
+PanelEnableFilesFilter(modus:="") {
+; modus: "rebuild" = the theme and font toggles build the panel again, with the fields as they were typed
     Global FilterTypeu := 0, InternalFilterString := ""
     If (StrLen(mustOpenStartFolder)>1)
        currentFileIndex := doOpenStartFolder()
@@ -33155,24 +33165,28 @@ PanelEnableFilesFilter() {
        Gui, Font, s%LargeUIfontValue%
     }
 
-    If !filesFilter
+    isRebuild := (modus="rebuild") ? 1 : 0
+    If (!filesFilter && isRebuild=0)
     {
        userFilterProperty := 1 
        userFilterDoString := 0
     }
 
-    InitialFilterSettingsPanel(1)
     listu := readRecentFiltersEntries()
     ; the active filter's text comes first and is listed once
     If (!InStr(listu, "`n`n") && StrLen(UsrEditFilter)>0 && userFilterDoString=1 && StrLen(filesFilter)>1)
        listu := UsrEditFilter "`n`n" SubStr(StrReplace("`n" listu, "`n" UsrEditFilter "`n", "`n"), 2)
 
+    InitialFilterSettingsPanel(isRebuild ? 3 : 1)
     Gui, SettingsGUIA: +Delimiter`n
     Gui, Add, Tab3, %tabzDarkModus%, Text`nFile and image
     Gui, Tab, 1
     Gui, Add, Checkbox, x+15 y+15 Section gupdateUIFiltersPanel Checked%userFilterDoString% vuserFilterDoString, Filter files list with given string
     Gui, Add, Text, y+7 w1 h1, String filter
     Gui, Add, ComboBox, yp w%EditWid% gUIgenericComboAction vUsrEditFilter, % listu
+    If (isRebuild=1)
+       GuiControl, SettingsGUIA: Text, UsrEditFilter, % UsrEditFilter
+
     If (SLDtypeLoaded=3 && userFilterStringPos>3)
        userFilterStringPos := 1
 
@@ -33214,7 +33228,7 @@ PanelEnableFilesFilter() {
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Files list filtering: " appTitle)
     ; EM_SETCUEBANNER(hEditC, "String to match")
-    updateUIFiltersPanel("opened")
+    updateUIFiltersPanel(isRebuild ? "rebuilt" : "opened")
 }
 
 BTNuiDiscardFilesFilter() {
@@ -74414,6 +74428,11 @@ ToggleLargeUIfonts() {
        BtnCloseWindow()
        Sleep, 5
        PanelMultiFileDelete()
+    } Else If (AnyWindowOpen=6)
+    {
+       BtnCloseWindow()
+       Sleep, 5
+       PanelEnableFilesFilter("rebuild")
     } Else If (AnyWindowOpen && thisfunc)
     {
        BtnCloseWindow()
@@ -74469,7 +74488,12 @@ ToggleDarkModus() {
     }
 
     ; tabzDarkModus := (uiUseDarkMode=1) ? "-Border +Buttons cFFFFaa" : ""
-    If (AnyWindowOpen && thisfunc)
+    If (AnyWindowOpen=6)
+    {
+       BtnCloseWindow()
+       Sleep, 5
+       PanelEnableFilesFilter("rebuild")
+    } Else If (AnyWindowOpen && thisfunc)
     {
        BtnCloseWindow()
        Sleep, 5
