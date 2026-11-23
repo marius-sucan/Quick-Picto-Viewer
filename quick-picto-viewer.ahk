@@ -28637,13 +28637,16 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
             dataColumn := "imgmedian"
          }
 
+         ; the rows count Round(value*256) above the low bound [the first row from 0] up to the high one [the last row to 258],
+         ; in PopulateImagesIndexStatsInfos() and retrieveHistoGroupSQLimgInfos()
+         lowR := (minRange>0) ? minRange + 1 : 0
+         highR := (maxRange>=255) ? 258 : maxRange
          userFilterInvertThis := userFilterDoString := 0
          FilteruMinRange := Round(minRange)
-         FilteruMaxRange := Round(maxRange)
-         minRange := Round((minRange + 1)/256, 3)
-         maxRange := Round((maxRange + 1)/256, 3)
-         theQuery := "WHERE Round(" dataColumn ", 2) BETWEEN " minRange " AND " maxRange
-         theQueryNonDB := "QPV::query::" dataColumn "::" minRange "::" maxRange
+         FilteruMaxRange := (maxRange>=255) ? 255 : Round(maxRange) - 1
+         theQuery := "WHERE Round(" dataColumn "*256) BETWEEN " lowR " AND " highR
+         ; the values are stored with 5 decimals: these limits fall between two of them
+         theQueryNonDB := "QPV::query::" dataColumn "::" Round(Max(0, Ceil((lowR - 0.5)*100000/256))/100000, 5) "::" Round(Floor((highR + 0.5)*100000/256)/100000, 5)
       }
    } Else
    {
