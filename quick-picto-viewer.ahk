@@ -33193,8 +33193,8 @@ PanelEnableFilesFilter(modus:="") {
     strModesList := (SLDtypeLoaded=3) ? "Anywhere`nBegins with`nEnds with" : "Anywhere`nBegins with`nEnds with`nRegEx"
     GuiAddDropDownList("y+7 w" btnWid " gupdateUIFiltersPanel AltSubmit Choose" userFilterStringPos " vuserFilterStringPos", strModesList, "String filter matching mode")
     GuiAddDropDownList("x+2 w" btnWid " gupdateUIFiltersPanel AltSubmit Choose" userFilterWhat " vuserFilterWhat", "Full paths`nFolder paths`nFile names`nParent folders", "Apply filter based on")
+    Gui, Add, Button, x+5 vbtnFldr hp w%btnWid% gEraseFilterzHisto, Erase &history
     Gui, Add, Checkbox, xs y+7 gupdateUIFiltersPanel Checked%userFilterStringIsNot% vuserFilterStringIsNot, &Must not contain the given string
-    Gui, Add, Button, xs y+7 vbtnFldr h%thisBtnHeight% w%btnWid% gEraseFilterzHisto, Erase &history
     Gui, Add, Text, xs y+15 vbtnFldr2, You can use | for OR and the *, ? wildcards in the filter`nto match more files.
     Gui, Tab, 2
     Gui, Add, Text, x+15 y+15 Section, Please choose the type of criteria and`nset minimum and maximum range.
