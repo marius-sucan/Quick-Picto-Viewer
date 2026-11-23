@@ -33339,11 +33339,11 @@ updateUIFiltersPanel(dummy:=0) {
    If (userFilterDoString=1 && SLDtypeLoaded=3)
    {
       thisStringFilter := SQLlikeClauseFromFilter(UsrEditFilter, userFilterWhat, userFilterStringPos, userFilterStringIsNot)
-   } Else If (userFilterDoString=1)
+   } Else If (userFilterDoString=1 && UsrEditFilter!="")
    {
       ; the «i» joins options of its own, as in «i)…»: «i)i)…» does not compile
       ; options alone, as in «i)», are not joined: «i)i)» fails the checks
-      If (userFilterStringPos=4 && StrLen(UsrEditFilter)>1)
+      If (userFilterStringPos=4)
       {
          pku := RegExMatch(UsrEditFilter, "^[[:alnum:] \t]*\)(?!\s*$)") ? "i" : "i)"
          thisStringFilter := pku UsrEditFilter
@@ -33351,7 +33351,7 @@ updateUIFiltersPanel(dummy:=0) {
          thisStringFilter := "i)(" JEE_StrRegExLiteral(UsrEditFilter) ")$"
       Else If (userFilterStringPos=2)
          thisStringFilter := "i)^(" JEE_StrRegExLiteral(UsrEditFilter) ")"
-      Else If (UsrEditFilter!="")
+      Else
          thisStringFilter := "i)(" JEE_StrRegExLiteral(UsrEditFilter) ")"
    }
 
@@ -33429,7 +33429,7 @@ updateUIFiltersPanel(dummy:=0) {
 
    ; live check: in «RegEx» matching mode a malformed pattern is flagged in the query
    ; box here and blocked on Apply, so it never reaches RegExMatch to throw [isValidRegEx()]
-   regexBad := (userFilterDoString=1 && userFilterStringPos=4 && SLDtypeLoaded!=3 && StrLen(UsrEditFilter)>1 && !isValidRegEx(thisStringFilter)) ? 1 : 0
+   regexBad := (userFilterDoString=1 && userFilterStringPos=4 && SLDtypeLoaded!=3 && UsrEditFilter!="" && !isValidRegEx(thisStringFilter)) ? 1 : 0
    If (dummy!="external")
    {
       ; an active filter the fields cannot rebuild stays in the query box until a field is changed
@@ -33469,15 +33469,13 @@ quickFindSeenImages(dummy:=0) {
 
 BtnApplyFilesFilter() {
    Gui, SettingsGUIA: Default
-   GuiControlGet, UsrEditFilter
-   GuiControlGet, userFilterInvertThis
-   newFilter := updateUIFiltersPanel()
    Gui, SettingsGUIA: Submit, NoHide
+   newFilter := updateUIFiltersPanel()
    If updateUIFiltersPanel("keeps")
       Return msgBeepTimer("WARNING: No filter option was changed.`nThe active files list filter was left in place.")
 
    pku := RegExMatch(UsrEditFilter, "^[[:alnum:] \t]*\)(?!\s*$)") ? "i" : "i)"
-   If (userFilterDoString=1 && userFilterStringPos=4 && SLDtypeLoaded!=3 && StrLen(UsrEditFilter)>1 && !isValidRegEx(pku UsrEditFilter))
+   If (userFilterDoString=1 && userFilterStringPos=4 && SLDtypeLoaded!=3 && UsrEditFilter!="" && !isValidRegEx(pku UsrEditFilter))
       Return msgBeepTimer("WARNING: The regular expression you provided is invalid.`nPlease correct the pattern before applying the filter.")
 
    If !newFilter
@@ -36238,10 +36236,10 @@ retrieveAlreadySeenImageFromCurrentList(keepFilter:=0) {
       Return 0
    }
 
-   If (userFilterDoString=1)
+   If (userFilterDoString=1 && UsrEditFilter!="")
    {
       ; the «i» joins options of its own, as in «i)…»: «i)i)…» does not compile
-      If (userFilterStringPos=4 && StrLen(UsrEditFilter)>1)
+      If (userFilterStringPos=4)
       {
          pku := RegExMatch(UsrEditFilter, "^[[:alnum:] \t]*\)") ? "i" : "i)"
          thisStringFilter := pku UsrEditFilter
@@ -36249,7 +36247,7 @@ retrieveAlreadySeenImageFromCurrentList(keepFilter:=0) {
          thisStringFilter := "i)(" JEE_StrRegExLiteral(UsrEditFilter) ")$"
       Else If (userFilterStringPos=2)
          thisStringFilter := "i)^(" JEE_StrRegExLiteral(UsrEditFilter) ")"
-      Else If (UsrEditFilter!="")
+      Else
          thisStringFilter := "i)(" JEE_StrRegExLiteral(UsrEditFilter) ")"
    }
 
