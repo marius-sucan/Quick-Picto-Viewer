@@ -33199,7 +33199,7 @@ PanelEnableFilesFilter(modus:="") {
     Gui, Tab, 2
     Gui, Add, Text, x+15 y+15 Section, Please choose the type of criteria and`nset minimum and maximum range.
     GuiAddDropDownList("xs y+7 w" btnWid " gupdateUIFiltersPanel AltSubmit Choose" userFilterProperty " vuserFilterProperty", "No criteria defined`nFile size`nModified date`nCreated date`nMegapixels`nWidth`nHeight`nAspect ratio`nFrames`nDPI`nAverage`nMedian`nPeak range`nMinimum range`nTotal range`nMode`nMinimum`nStandard deviation`nSelected files`nAlready seen", "Filter criteria")
-    Gui, Add, Text, x+5 wp hp +0x200 vFilterTypeu, -
+    Gui, Add, Text, % "x+5 w" (EditWid - btnWid - 5) " hp +0x200 vFilterTypeu", -
     GuiAddEdit("xs y+5 w" btnWid " number limit5 gupdateUIFiltersPanel vFilteruMinRange", FilteruMinRange, "Minimum")
     GuiAddEdit("x+5 w" btnWid " number limit5 gupdateUIFiltersPanel vFilteruMaxRange", FilteruMaxRange, "Maximum")
     GuiAddDropDownList("x+5 wp gupdateUIFiltersPanel AltSubmit Choose" userFilterSizeProperty " vuserFilterSizeProperty", "Kilobytes`nMegabytes", "File size unit")
@@ -33345,6 +33345,9 @@ updateUIFiltersPanel(dummy:=0) {
       If isInRange(userFilterProperty, 2, 4)
       {
          GuiControl, SettingsGUIA:, FilterTypeu, File property
+      } Else If (userFilterProperty=8)
+      {
+         GuiControl, SettingsGUIA:, FilterTypeu, Ratio x 10: 15 means 1.5
       } Else If isInRange(userFilterProperty, 5, 10)
       {
          GuiControl, SettingsGUIA:, FilterTypeu, Image property
@@ -33352,7 +33355,7 @@ updateUIFiltersPanel(dummy:=0) {
       {
          ; FilteruMaxRange := Round(FilteruMaxRange*1.05)
          ; FilteruMinRange := Round(FilteruMinRange*1.05)
-         GuiControl, SettingsGUIA:, FilterTypeu, Histogram details
+         GuiControl, SettingsGUIA:, FilterTypeu, % "Histogram levels: 0 to " ((userFilterProperty=18) ? 128 : 255)
       } Else
       {
          GuiControl, SettingsGUIA:, FilterTypeu, -
@@ -33413,8 +33416,10 @@ updateUIFiltersPanel(dummy:=0) {
          maxRange := Round(maxRange/10, 1)
       } Else If (userFilterProperty>10)
       {
-         minRange := Round(clampInRange(minRange, 1, 256)/256, 5)
-         maxRange := Round(clampInRange(maxRange, 1, 256)/256, 5)
+         ; the fields hold levels; all but the standard deviation are stored as (level + 1)/256
+         lvlOffset := (userFilterProperty=18) ? 0 : 1
+         minRange := Round((clampInRange(minRange, 0, 255) + lvlOffset)/256, 5)
+         maxRange := Round((clampInRange(maxRange, 0, 255) + lvlOffset)/256, 5)
       }
 
       If (SLDtypeLoaded=3)
