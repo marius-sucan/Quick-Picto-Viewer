@@ -29,7 +29,7 @@
 #include <new>      // std::bad_alloc, thrown by the candidate-set allocation
 #include <numeric>
 #include <algorithm>
-#include <immintrin.h> // SSE2/AVX2 intrinsics for blend modes and duplicate search
+#include <emmintrin.h> // SSE2 intrinsics for CalculateNewBlendModes
 #if defined(_MSC_VER)
 #include <intrin.h>
 #endif

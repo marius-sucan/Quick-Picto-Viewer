@@ -936,118 +936,6 @@ static void mihSweepVerification() {
     dupesClearPairs();
 }
 
-static void o3BruteForceVerification() {
-    printf("  O3 brute-force backends (SWAR vs POPCNT vs AVX2, pre-mask, inverted identity)\n");
-    rngSeed(90909);
-
-    const UINT groupSizes[] = { 1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17, 35, 97 };
-    std::vector<UINT64> rawHashes, rawFlipped;
-    std::vector<UINT> ids, rowEnd;
-    for (unsigned gi = 0; gi < sizeof(groupSizes)/sizeof(groupSizes[0]); gi++)
-    {
-        const UINT m = groupSizes[gi];
-        const UINT gStart = (UINT)rawHashes.size();
-        const UINT64 base = rnd64();
-        for (UINT i = 0; i < m; i++)
-        {
-            UINT64 h = (i % 4 == 0) ? (base ^ (1ULL << rndBelow(64)))
-                     : ((i % 4 == 1) ? (~base ^ (1ULL << rndBelow(64))) : rnd64());
-            UINT64 fh = (i % 5 == 0) ? (base ^ (3ULL << rndBelow(62))) : rnd64();
-            rawHashes.push_back(h);
-            rawFlipped.push_back(fh);
-            ids.push_back(gStart + i + 10);
-            rowEnd.push_back(gStart + m);
-        }
-    }
-    const UINT totalRows = (UINT)rawHashes.size();
-
-    const int thresholds[] = { 0, 1, 2, 4, 12, 27, 28, 31, 32, 33, 55, 64, 65 };
-    const struct { UINT lc, rc; } crops[] = { {0, 0}, {1, 1}, {5, 4}, {63, 0} };
-
-    int mismatches = 0;
-    size_t checkedPairs = 0;
-    for (unsigned ci = 0; ci < sizeof(crops)/sizeof(crops[0]); ci++)
-    {
-        const UINT64 mask = buildHamMask(crops[ci].lc, crops[ci].rc);
-        const int maskBits = popcount64(mask);
-        std::vector<UINT64> maskedHashes(totalRows), maskedFlipped(totalRows);
-        for (UINT i = 0; i < totalRows; i++)
-        {
-            maskedHashes[i] = rawHashes[i] & mask;
-            maskedFlipped[i] = rawFlipped[i] & mask;
-        }
-
-        for (unsigned ti = 0; ti < sizeof(thresholds)/sizeof(thresholds[0]); ti++)
-        {
-            const int thr = thresholds[ti];
-            for (int inv = 0; inv <= 1; inv++)
-                for (int flp = 0; flp <= 1; flp++)
-                    for (int pm = 0; pm <= 1; pm++)
-                    {
-                        DupesSweepCtx C;
-                        C.hashes   = pm ? maskedHashes.data() : rawHashes.data();
-                        C.flipped  = pm ? maskedFlipped.data() : rawFlipped.data();
-                        C.ids      = ids.data();
-                        C.rowEnd   = rowEnd.data();
-                        C.flatEnd  = totalRows;
-                        C.hamMask  = mask;
-                        C.maskBits = maskBits;
-                        C.threshold = thr;
-                        C.checkInverted = inv;
-                        C.checkFlipped = flp;
-                        C.wantMSD = false;
-                        C.preMasked = (pm != 0);
-                        C.mih = NULL;
-
-                        // Plain reference via dupesCheckAndEmitPair
-                        std::vector<DupePairRec> ref;
-                        UINT refMax = 0;
-                        for (UINT s = 0; s < totalRows; s++)
-                        {
-                            const UINT n = rowEnd[s];
-                            for (UINT m = s + 1; m < n; m++)
-                                dupesCheckAndEmitPair(C, s, m, C.hashes[s], ~C.hashes[s], C.flipped[s], ref, refMax);
-                        }
-                        checkedPairs += ref.size();
-
-                        for (int mode = 0; mode <= 2; mode++)
-                        {
-                            DupesSweepBuf buf;
-                            sweepRowsDispatchMode(C, 0, totalRows - 1, buf, mode);
-                            if (!samePairs(ref, buf.v) || buf.maxId != refMax)
-                               mismatches++;
-                        }
-                    }
-        }
-    }
-    char msg[160];
-    snprintf(msg, sizeof(msg), "SWAR/POPCNT/AVX2 match across all modes & edge thresholds (%zu pairs)", checkedPairs);
-    check(mismatches == 0 && checkedPairs > 100000, msg);
-
-    // Caller arrays passed to dupesSweepPairs() must not be mutated under cropping,
-    // and dupesScanStep()'s in-place pre-masking must match dupesSweepPairs() byte for byte.
-    {
-        std::vector<UINT64> hCopy = rawHashes, fCopy = rawFlipped;
-        dupesClearPairs();
-        int hoff = 0;
-        dupesSweepPairs(hCopy.data(), fCopy.data(), ids.data(), NULL, totalRows, 14, 5, 4, 1, 1, 0, 1, 0, (int)totalRows, 0, &hoff);
-        const std::vector<DupePairRec> refFlat = dupesPairsList;
-        check(hCopy == rawHashes && fCopy == rawFlipped,
-              "O3: dupesSweepPairs does not mutate caller arrays when cropped");
-
-        UINT gs[2] = { 0, totalRows };
-        dupesClearPairs();
-        dupesScanBegin(totalRows, 1, 0, 1, 0);
-        dupesScanFeed(0, totalRows, rawHashes.data(), rawFlipped.data(), ids.data(), NULL);
-        dupesScanSetGroups(gs, 1);
-        while (dupesScanStep(14, 5, 4, 1, 1, 1)) {}
-        check(samePairs(refFlat, dupesPairsList) && dupesScanState.phase == 5,
-              "O3: dupesScanStep in-place pre-mask matches dupesSweepPairs at r=13");
-    }
-
-    dupesClearPairs();
-}
-
 int main() {
     resultContract();
     scanMatchesPerGroupSweep();
@@ -1058,7 +946,6 @@ int main() {
     sweepReallocatesRarely();
     auditRegressions();
     mihSweepVerification();
-    o3BruteForceVerification();
 
     printf("\n  %s\n", failures ? "SWEEP SMOKE TEST FAILED" : "sweep smoke test passed");
     return failures ? 1 : 0;

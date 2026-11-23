@@ -39,7 +39,7 @@ int main() {
     std::vector<unsigned char> pix((size_t)nImg * stride);
     for (size_t i = 0; i < pix.size(); i++) pix[i] = (unsigned char)(rng() % 256);
 
-    double bestDisp = 1e30, bestSSE = 1e30, bestScalar = 1e30;
+    double bestSSE = 1e30, bestScalar = 1e30;
     volatile int sink = 0;
 
     for (int run = 0; run < 7; run++) {
@@ -49,16 +49,6 @@ int main() {
                 sink += msdScore(&pix[(size_t)i * stride], &pix[(size_t)(i+1) * stride], stride, 1);
         auto t1 = std::chrono::steady_clock::now();
         double ns = std::chrono::duration<double, std::nano>(t1 - t0).count() / (iters * (nImg - 1));
-        if (ns < bestDisp) bestDisp = ns;
-
-        t0 = std::chrono::steady_clock::now();
-        for (int it = 0; it < iters; it++)
-            for (int i = 0; i + 1 < nImg; i++) {
-                const INT64 s = msdSumSquaresSSE2(&pix[(size_t)i * stride], &pix[(size_t)(i+1) * stride], stride);
-                sink += (int)floor(sqrt((double)s / ((double)stride / 2.0)) + 0.5);
-            }
-        t1 = std::chrono::steady_clock::now();
-        ns = std::chrono::duration<double, std::nano>(t1 - t0).count() / (iters * (nImg - 1));
         if (ns < bestSSE) bestSSE = ns;
 
         t0 = std::chrono::steady_clock::now();
@@ -70,10 +60,8 @@ int main() {
         if (ns < bestScalar) bestScalar = ns;
     }
 
-    printf("  msdScore (%s)  %8.1f ns/pair   (%.2fx vs SSE2, %.1fx vs scalar)\n",
-           qpvHasAvx2 ? "AVX2" : "SSE2", bestDisp, bestSSE / bestDisp, bestScalar / bestDisp);
     printf("  msdScore (SSE2)  %8.1f ns/pair\n", bestSSE);
-    printf("  scalar loop      %8.1f ns/pair\n", bestScalar);
-    printf("  pairs per second (%s): %.1f million\n", qpvHasAvx2 ? "AVX2" : "SSE2", 1000.0 / bestDisp);
+    printf("  scalar loop      %8.1f ns/pair   (%.1fx)\n", bestScalar, bestScalar / bestSSE);
+    printf("  pairs per second (SSE2): %.1f million\n", 1000.0 / bestSSE);
     return sink == 0x7fffffff;
 }

@@ -79,7 +79,6 @@ struct SQLiteAPI {
     int          (__cdecl *column_type)(sqlite3_stmt*, int) = NULL;
     sqlite3_int64(__cdecl *column_int64)(sqlite3_stmt*, int) = NULL;
     double       (__cdecl *column_double)(sqlite3_stmt*, int) = NULL;
-    const unsigned char* (__cdecl *column_text)(sqlite3_stmt*, int) = NULL;
     const void*  (__cdecl *column_text16)(sqlite3_stmt*, int) = NULL;
     int          (__cdecl *column_bytes16)(sqlite3_stmt*, int) = NULL;
     const void*  (__cdecl *column_blob)(sqlite3_stmt*, int) = NULL;
@@ -128,7 +127,6 @@ static void bindSQLiteOnce() {
         BINDSQ(column_type,       "sqlite3_column_type");
         BINDSQ(column_int64,      "sqlite3_column_int64");
         BINDSQ(column_double,     "sqlite3_column_double");
-        BINDSQ(column_text,       "sqlite3_column_text");
         BINDSQ(column_text16,     "sqlite3_column_text16");
         BINDSQ(column_bytes16,    "sqlite3_column_bytes16");
         BINDSQ(column_blob,       "sqlite3_column_blob");
@@ -153,7 +151,7 @@ static void bindSQLiteOnce() {
         // run on unbound (NULL) parameters, match no row, still report SQLITE_DONE, and
         // hand the same rows back on every batch forever.
         SQ.ok = (SQ.open_v2 && SQ.close_v2 && SQ.prepare16_v2 && SQ.step && SQ.reset && SQ.finalize
-              && SQ.column_type && SQ.column_int64 && SQ.column_double && SQ.column_text && SQ.column_text16
+              && SQ.column_type && SQ.column_int64 && SQ.column_double && SQ.column_text16
               && SQ.column_bytes16 && SQ.column_blob && SQ.column_bytes && SQ.column_count && SQ.interrupt
               && SQ.bind_int64 && SQ.bind_text16);
 

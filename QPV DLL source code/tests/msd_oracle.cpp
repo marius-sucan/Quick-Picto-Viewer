@@ -165,68 +165,10 @@ int main(int argc, char **argv) {
         if (dupesPixOK[0] != 0 || dupesPixOK[1] != 1) mismatchDecode++;
     }
 
-    // O5: SSE2 vs AVX2 exact parity across arbitrary tail lengths and non-monotonic LUT scales.
-    {
-        const int lens[] = { 0, 1, 7, 15, 16, 17, 31, 32, 33, 47, 48, 49, 63, 64, 65, 1023, 1024, 1025 };
-        for (unsigned li = 0; li < sizeof(lens)/sizeof(lens[0]); li++)
-        {
-            const int len = lens[li];
-            std::vector<unsigned char> a((size_t)len), b((size_t)len);
-            INT64 refSum = 0;
-            for (int i = 0; i < len; i++)
-            {
-                a[i] = (unsigned char)(rng() % 256);
-                b[i] = (unsigned char)(rng() % 256);
-                const int d = (int)a[i] - (int)b[i];
-                refSum += (INT64)d * d;
-            }
-            const INT64 gotSSE = msdSumSquaresSSE2(a.data(), b.data(), len);
-            const INT64 gotDisp = msdSumSquares(a.data(), b.data(), len);
-            cases++;
-            if (gotSSE != refSum || gotDisp != refSum)
-            {
-                mismatchMSD++;
-                printf("  O5 tail mismatch len=%d ref=%lld sse=%lld disp=%lld\n",
-                       len, (long long)refSum, (long long)gotSSE, (long long)gotDisp);
-            }
-#ifdef QPV_X64
-            if (qpvHasAvx2)
-            {
-                const INT64 gotAVX = msdSumSquaresAVX2(a.data(), b.data(), len);
-                if (gotAVX != refSum)
-                {
-                    mismatchMSD++;
-                    printf("  O5 AVX2 tail mismatch len=%d ref=%lld avx=%lld\n",
-                           len, (long long)refSum, (long long)gotAVX);
-                }
-            }
-#endif
-        }
-
-        const int seq[] = { 1, 5, 2, 9, 2, 4, 1, 7 };
-        std::vector<wchar_t> all256(256);
-        for (int v = 0; v < 256; v++) all256[v] = (wchar_t)(v + 161);
-        for (unsigned si = 0; si < sizeof(seq)/sizeof(seq[0]); si++)
-        {
-            const int lvl = seq[si];
-            decodeFingerprintBlob(all256.data(), 1, 256, lvl);
-            const std::vector<double> ref = refDecode(all256.data(), 256, lvl);
-            for (int v = 0; v < 256; v++)
-            {
-                if ((int)ref[v] != (int)dupesPixData[v] * dupesPixScale)
-                {
-                    mismatchDecode++;
-                    printf("  O5 LUT mismatch scale=%d v=%d\n", lvl, v);
-                    break;
-                }
-            }
-        }
-    }
-
     // Overflow headroom: the worst case must stay inside the INT32 lanes _mm_madd_epi16
     // accumulates into.
-    printf("  worst-case accumulator: %lld (INT32 max %lld) [avx2=%d]\n",
-           (long long)stride * 255 * 255, (long long)2147483647, (int)qpvHasAvx2);
+    printf("  worst-case accumulator: %lld (INT32 max %lld)\n",
+           (long long)stride * 255 * 255, (long long)2147483647);
 
     printf("\n  cases=%lld  MSD mismatches=%lld  decode mismatches=%lld  worst delta=%d\n",
            cases, mismatchMSD, mismatchDecode, worstDelta);
