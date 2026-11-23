@@ -33488,13 +33488,16 @@ quickFindUnseenImages() {
 }
 
 quickFindSeenImages(dummy:=0) {
+   InitialFilterSettingsPanel(1)
    UsrEditFilter := "||Already-Seen-Images||"
    userFilterDoString := 0
    userFilterProperty := 20
    userFilterInvertThis := (dummy="unseen") ? 1 : 0
    updateUIFiltersPanel("external")
-   retrieveAlreadySeenImageFromCurrentList(1)
-   InitialFilterSettingsPanel(1)
+   If (retrieveAlreadySeenImageFromCurrentList(1)=1)
+      InitialFilterSettingsPanel(1)
+   Else
+      InitialFilterSettingsPanel(0)   ; no «Already seen» filter resulted: the settings go back
 }
 
 BtnApplyFilesFilter() {
@@ -36263,6 +36266,7 @@ findFavesInList(modus:=0, doSel:=0) {
 
 retrieveAlreadySeenImageFromCurrentList(keepFilter:=0) {
 ; keepFilter=1: the caller left the list as it was, so an active filter stays when no records are found
+; returns 1 when the «Already seen» filter was applied, -1 when no records were found
    ; Critical, on
    stopSlideshow()
    initSeenImagesListDB()
@@ -36415,6 +36419,7 @@ retrieveAlreadySeenImageFromCurrentList(keepFilter:=0) {
       showDelayedTooltip("Finished the identification process of " friendly2 " images`n" groupDigits(countSeen) " images were found in the initial files list" etaTime)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
       quickBarLater("Remove filter,,MenuRemNowFilesListFilter")
+      Return 1
    }
 }
 
