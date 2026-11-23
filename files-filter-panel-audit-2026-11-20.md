@@ -56,6 +56,11 @@ Findings 15 and 16 were not run again, and their status is the one at `0b6cb07`.
 thing 16.5 and «Seen in passing» B changed all the same, as the runs of findings 1 to 6 showed.
 Small thing 16.11 and «Seen in passing» E are new, from the runs of findings 12 and 14.
 
+«Seen in passing» A, C, D and E were checked at `ebfb650`, after Marius's commits of the same
+evening. A is fixed by him in `ebfb650`. C does not hold: the static folders panel asks the save
+question when it opens. D and E held, on more cases than written, and are fixed in `7a508cb` and
+`e9e0da5` with his answers. Their notes cite lines at `e9e0da5`.
+
 Each of sections 1 to 14 ends with what was run again and, where fixed, a note on what the code does
 now. Those additions cite lines at `bdc80f1` in sections 1 to 7 and at `25429a9` in sections 8 to 14;
 the other line numbers stay those of `0b6cb07`. Two
@@ -799,7 +804,9 @@ as levels, and the scale is shown.
 
 - **Levels.** The two fields are clamped to 0-255. The seven criteria stored as (level + 1)/256 add
   the 1, and the standard deviation does not (:33419-33422). A typed number is that level, as in the
-  rows of the Statistics panels, and a deviation of 0 can be asked for.
+  rows of the Statistics panels, and a deviation of 0 can be asked for. Those rows count each
+  value at its nearest whole level, so for averages a row and its two numbers typed here can differ
+  by half a level at each end («Seen in passing» E, fixed in `e9e0da5`).
 - **The scale.** The text beside the criterion list reads «Ratio x 10: 15 means 1.5» for «Aspect
   ratio», «Histogram levels: 0 to 255» for the histogram criteria, and «Histogram levels: 0 to 128»
   for the standard deviation (:33350, :33358). The other criteria keep «File property» and «Image
@@ -879,24 +886,81 @@ QPV's rule: a selection of exactly one file does not count, and `getSelectedFile
 
 ✅ marks a fixed one.
 
-- **A. The Search panel's «Filter list» drops the active search.** `OpenFilterPanelBTNaction()` empties
-  `userSearchString` (:47953), so F3 has nothing to search for afterwards (read).
+- ✅ **A. The Search panel's «Filter list» drops the active search.** `OpenFilterPanelBTNaction()` empties
+  `userSearchString` (:47953), so F3 has nothing to search for afterwards (read). Fixed in `ebfb650`, by
+  Marius: the line is gone.
 - ✅ **B. Ctrl+Space shares findings 1 and 2a**, through the same `remFilesListFilter()`. Finding 1 was
   run for it (C2b); 2a was read. Fixed in `68d5511`, by Marius, with the two findings; both were run
   for it (H1b, HDb).
 - **C. The static folders routes remove the filter without the save question.**
   `LoadStaticFoldersCached()` (:35544) and `regenerateStaticFoldersList()` (:35571) call
   `remFilesListFilter()` themselves, so an edited image goes as in finding 1 (read; lines at `bdc80f1`).
-- **D. The «already seen» quick actions share route b of finding 2.** `quickFindSeenImages()` (:33460)
+
+  **Does not hold**, run at `ebfb650` (XC). Both routes run only inside the static folders panel,
+  and `PanelStaticFolderzManager()` asks the save question when the panel opens: «…if any action
+  will be performed in the invoked panel» (:95627).
+  - «Cancel» and «Save» leave the panel closed; the edits and the filter stay.
+  - After «Discard» the panel opens. «Yes» to «This folders list was not yet generated», or «Regenerate
+    this folders list», then removes the filter, and the edits go with it, as the answer allowed.
+  - The panel's menu is built only while the panel is open, and Quick search does not index it.
+
+  That the filter goes without a word, with or without an edited image, is a note of the 11-10
+  folders panel report (`static-folders-panel-audit-2026-11-10.md`). Left as it is, his answer.
+- ✅ **D. The «already seen» quick actions share route b of finding 2.** `quickFindSeenImages()` (:33460)
   calls the same function, with the 1 since `886cdfb`. With fewer than two seen records the active
   filter now stays, but the settings the action wrote are not put back: «Already seen», and its own
   text in the string field. The panel's query box then keeps the active filter (finding 3) (read;
   lines at `bdc80f1`).
-- **E. A histogram row of the Statistics panel rounds its two limits to three decimals**
+
+  Run at `ebfb650` (XD, XD6): on more cases than written. Both quick actions, «Identify already seen
+  images» and its «never seen» twin, change the settings before they run. They untick the string
+  box, set «Already seen» (and «Invert filter» for «never seen») and put `||Already-Seen-Images||`
+  in place of the typed text. That stays when no «Already seen» filter results:
+  - no seen record (XD1, both actions);
+  - «Cancel» at the save question (XD2);
+  - one file listed, where nothing runs and nothing is said (XD3; small thing 16.7);
+  - no filter active (XD4);
+  - two seen records, none of them in the list, where the active filter is removed (XD6; small
+    thing 16.4).
+
+  **Fixed in `7a508cb`**, with Marius's answer. The quick actions remember the settings first and put
+  them back unless the «Already seen» filter was applied (:33493-33504). On success they set the
+  «Already seen» settings and the marker text, as before. For that,
+  `retrieveAlreadySeenImageFromCurrentList()` returns 1 when it applied the filter (:36425).
+
+  Run on the fix (XD, XD6): XD1 to XD4 and XD6 leave the settings as they were; after XD1 to XD3
+  the reopened panel shows the active filter's own fields. XD5 and XD7 (filters applied) are as before. Small
+  things 16.4 and 16.7 stay open: XD6 still removes the filter, and XD3 still says nothing.
+- ✅ **E. A histogram row of the Statistics panel rounds its two limits to three decimals**
   (`BtnIndexStatsToList()` :28643-28644), while the values are stored with five. The row «100-150»
   asks for 0.395 to 0.590, so an average between level 100 and 100.1 is left out (W14: the row's
   query; the gap is read from the numbers). This panel asks for 0.39453 to 0.58984 for the same two
   numbers (lines at `25429a9`).
+
+  Run at `ebfb650` (XE, XF): worse than written, as a row's list matches neither its own count nor
+  this panel. The rows count each value at its nearest whole level, `Round(value*256)`, above the
+  row's low bound and up to its high one (`PopulateImagesIndexStatsInfos()`,
+  `retrieveHistoGroupSQLimgInfos()`). For whole levels that is the low bound to the high one minus 1.
+  - Five files at the average levels 99.6, 100.05, 120, 150.02 and 151.2. The row «100-150» counts
+    the first three. Clicked, it lists 120 and 150.02 on a plain list. On a database list it lists
+    120, 150.02 and 151.2, because its query also rounds the stored value to two decimals
+    (`Round(imgavg, 2)`). This panel, with 100 and 150, lists 100.05 and 120.
+  - The averages row «0-50» counts two files. On a database list it finds «No records» (XF2).
+  - The medians row «100-150» counts the levels 100, 120 and 149, and lists 120, 149 and 150.
+
+  **Fixed in `e9e0da5`**, with Marius's answers: a row lists the images it counts (:28640-28649).
+  - Database lists ask `Round(column*256) BETWEEN` the row's bounds, low + 1 and high (0 for the
+    first row, 258 for the last), as the count does.
+  - Plain lists get the two five-decimal limits that fall between the stored values on each side
+    of those bounds.
+  - The row writes its low bound and its high bound minus 1 into «Minimum» and «Maximum»; «200-255»
+    writes 200 and 255. For whole levels (medians, peaks, lows, ranges) this panel then rebuilds
+    the row's list. For averages the two can differ by half a level at each end.
+
+  Run on the fix (XF): the averages rows «0-50», «100-150» and «200-255» and the medians row
+  «100-150» each list what they count, on both kinds of list. The medians row, opened in this
+  panel and applied again, lists the same three files. The averages row «200-255» applied again
+  from this panel loses the file at 199.6, by that half level.
 
 ---
 
@@ -1050,6 +1114,21 @@ Decisions 1 to 14 are settled; decision 15 is open.
     the same.
 
   Each of the six commits loads on the stock AutoHotkey 1.1.37.02 (`/iLib`, then in full).
+- **The check of «Seen in passing» A, C, D and E, on 2026-11-23**, at `ebfb650`, with the batches in
+  `test-ff-w.ahk`:
+  - XC: the static folders panel opened with an edited image and an active filter, each answer to
+    its question, its first generation, «Regenerate this folders list»;
+  - XD and XD6: the two quick actions on each route, the panel opened and closed after each;
+  - XE and XF: rows of the averages and medians lists of «Indexed images statistics», on a plain list
+    and a database list. The values are set by the test; the counts are read from the panel.
+- **The fixes of D and E**: XD, XD6 and XF on the fixed text, then H4, H5, V2, V3, P and W14 at
+  `ebfb650` and on the fixed text.
+  - Against the runs at `ebfb650`, the logs of H4, H5, V2 and P are the same. V3 differs only in
+    where the random image of the database list lands. W14 differs only in its row case: the row
+    «100-150» lists the files at 99.5 and 120, both of which it counts, and writes 100 and 149.
+    Applied again from this panel, it lists the file at 120.
+
+  Both commits load on the stock AutoHotkey 1.1.37.02 (`/iLib`, then in full).
 - **Kit**: `.claude/scratch/files-filter-panel-2026-11-20/app/`.
   - `run-ff.sh <tag> testFfA|testFfB|testFfB4|testFfC|testFfD|testFfE|testFfK|testFfP [revision]`
     (stock interpreter; `QPV_SRC=<file>` runs a modified source).
@@ -1067,3 +1146,7 @@ Decisions 1 to 14 are settled; decision 15 is open.
     `b-head3`, `p-head3` and `w9-head` to `w15-head` (at `8cdff2b`); `w8-fix` to `w15-fix`, and
     `a-fix2` to `v3-fix2` for the twelve earlier batches (the fixed text). `../commits2/stage.py`
     rebuilds the six fixes from the text of `8cdff2b`.
+  - The batches XC, XD, XD6, XE and XF are at the end of `test-ff-w.ahk`. Their logs: `xc-head`,
+    `xd-head`, `xd6-head`, `xe-head`, `xf-head` (at `ebfb650`); `xd-fix`, `xd6-fix`, `xf-fix` (the
+    fixed text); `h4-ebf` to `w14-ebf` and `h4-de` to `w14-de` for the six earlier batches.
+    `../commits3/stage.py` rebuilds the two fixes from the text of `ebfb650`.
