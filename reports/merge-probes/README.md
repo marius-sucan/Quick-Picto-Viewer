@@ -1,6 +1,6 @@
 # Merge probes (Phase P)
 
-Probes for the interfaceThread merge (see interface-thread-merge-plan.md). Run on Windows
+Probes for the interfaceThread merge (see ../interface-thread-merge-plan.md). Run on Windows
 with **stock AutoHotkey v1.1 (U64)** — NOT AHK_H — because they establish what the merged,
 de-H app can rely on. Each shows its verdict in a MsgBox; no files are written.
 
