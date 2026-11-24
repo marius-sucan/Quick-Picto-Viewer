@@ -44442,6 +44442,12 @@ PanelSetThumbColumnOptions() {
     If (minimizeMemUsage=1)
        GuiControl, SettingsGUIA: Disable, UIimgFxMode
 
+    If (imgFxMode<=1)
+       GuiControl, SettingsGUIA: Disable, btnFldr1
+
+    If (usrColorDepth<=1)
+       GuiControl, SettingsGUIA: Disable, ColorDepthDithering
+
     Gui, Add, Button, xs y+25 w%thisW% h%thisBtnHeight% Default gBtnCloseWindow, &Close
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Thumbnails options: " appTitle, winPos)
