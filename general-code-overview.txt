@@ -16,7 +16,7 @@ Table of contents:
    o) Search menu options [omnibox] and the folders tree (soon)
 
 
-Deniere mise à jour: mercredi 12 août 2026.
+Dernière mise à jour: mercredi 12 août 2026.
 =====================================================================
 
 -) Introduction
@@ -27,7 +27,7 @@ Deniere mise à jour: mercredi 12 août 2026.
    of me having no prior experience in coding such large projects.
    It is a miracle it all works... ^_^ I should have used classes 
    to define objects such as «file list», «indexed item», «viewport
-   image», et cetera, and have constructors for the different kind of
+   image», et cetera, and have constructors for the different kinds of
    tools. This document is meant to help people get their mittens into
    the code of Quick Picto Viewer by offering pointers to the main
    functions and how things connect / work.
@@ -35,10 +35,10 @@ Deniere mise à jour: mercredi 12 août 2026.
    Another big problem of the project is the reliance on GDI+. This 
    hinders the performance of the application. I should have used 
    Direct2D and shaders. In addition to this, I find it likely there
-   are better image libraries than FreeImage, eg., OpenCV perhaps.
+   are better image libraries than FreeImage, eg. OpenCV perhaps.
 
-   And finally, AHK v1.1 is fundamentally not a wise choice to be
-   coding such a big application, even if I would have used classes 
+   And finally, AHK v1.1 is fundamentally not a wise choice for
+   coding such a big application, even had I used classes 
    to better structure the code. AHK's loops are utterly slow, 
    rendering any processing of large amounts of data... a pain.
    I circumvented this by creating my own DLL in C++ which I rely 
@@ -48,84 +48,84 @@ Deniere mise à jour: mercredi 12 août 2026.
    full support for images above 536 megapixels (the limit of GDI+),
    through FreeImage. Most of the image editing tools work with such
    images - through my own DLL: qpvmain.dll. In 2026, another major
-   development drive was possible with AI. Using Gemini and Claude
+   development drive was possible with AI. Using Gemini and Claude,
    I optimized and overhauled various parts of QPV. Multi-threaded 
-   thumbnails generation and image duplicates detection were
-   reimplemented with C++. Many image editing tools are now much
+   thumbnail generation and image duplicates detection were
+   reimplemented in C++. Many image editing tools are now much
    more efficient.
 
    I use a custom build of the FreeImage.DLL. Because the developer 
-   behind Freeimage rarely updates the library, I decided to make my 
+   behind FreeImage rarely updates the library, I decided to make my 
    own version. It has multiple fixes and improvements. It can be 
-   found on Github:
+   found on GitHub:
    https://github.com/marius-sucan/FreeImage-library/tree/qpv
 
 
 a) How Quick Picto Viewer initializes
 =====================================================================
 
-  QPV checks in the registry if another instance started before,
-  if it did less than 600 miliseconds ago, it exits; this is meant
-  to prevent excessive spawn of multiple instances.
+  QPV checks in the registry whether another instance started before;
+  if it did less than 600 milliseconds ago, it exits. This is meant
+  to prevent a profusion of instances.
 
-  It first loads settings or stores default settings [if first start].
+  It first loads settings or stores default settings [on first start].
    - loadMainSettings() or writeMainSettings(). These two functions
   load and write only the core settings in an INI: quick-picto-viewer.ini.
   Each panel [or tool] within QPV loads and stores settings that
-  pertain only to that specific, in the registry. Such functions are
+  pertain only to it, in the registry. Such functions are
   named using this pattern: "ReadSettings*Panel".
 
-  If "Running" is set to 2 in the Registry by, supposedly, another
+  If "Running" is set to 2 in the registry by, supposedly, another
   QPV instance, it will start as an aid for batch processing
   image files. When it finishes, it exits. If it is not set to 2,
   it continues the auto-exec part.
 
   QPV initializes the external UI thread and various GDI+ objects
   related to it. If something fails, QPV will ask the user to
-  attempt again to initialise or exit.
+  retry the initialization or to exit.
 
-  intializeWithGivenArguments() function processes all the command
-  line given arguments. The user can set global variables using
+  initializeAppWithGivenArguments() processes all the arguments
+  given on the command line. The user can set global variables using
   set_GlobalVar and invoke functions that take no parameters with
   call_funcName(). Examples:
 
       qpv.exe "fd=C:\example folder\tempus"
-      Add a pipe "|" after equal "=" to have images loaded recursively.
+      Add a pipe "|" after equal "=" to have images loaded non-recursively.
 
       qpv.exe call_ToggleThumbsMode() "fd=C:\folder\tempus"
 
       qpv.exe set_IMGresizingMode=3 set_vpIMGrotation=45 "C:\folder\this-image.png"
   
-  If an image file is given as command line argument, it is
+  If an image file is given as a command line argument, it is
   opened with OpenArgFile(). If a .SLD or a .SLDB file is fed,
-  OpenSLD() function is used to load the files index. Folders 
+  OpenSLD() is used to load the files index. Folders 
   are opened using OpenFolders().
 
-  If no argument given, it draws a random pattern image using
+  If no argument is given, it draws a random pattern image using
   drawWelcomeImg(). This function can generate up to 10 distinct
   patterns, each randomized in its own way.
 
-  On 32 bits, the following settings are in effect by default:
+  In the 32-bit edition, the following settings are in effect by default:
      allowMultiCoreMode := 0
      minimizeMemUsage := 1
      maxUndoLevels := 2
      These are meant to limit memory usage as much as possible.
 
-     Side note: the 32 bits edition is no longer actively tested.
+     Side note: the 32-bit edition is no longer actively tested.
 
 
 b) How a files list index is created
 =====================================================================
 
-  If a single file is loaded, QPV will set internally the variable
-  "mustOpenStartFolder" to the folder path where the image is from.
+  If a single file is loaded, QPV internally sets the variable
+  "mustOpenStartFolder" to the path of the image's folder.
 
   If the aforementioned variable is set, various user actions will
   trigger the indexation of the files found in the folder using
   doOpenStartFolder(). Examples of such actions: toggle thumbnails
   mode, search, attempt to go to the next or previous image, and so on.
 
-  Once the folder is indexed, "mustOpenStartFolder" is set empty.
+  Once the folder is indexed, "mustOpenStartFolder" is emptied.
 
   Users can open a folder using the open file/folder dialogs:
   OpenDialogFiles() or OpenFolders(). Both functions, and 
@@ -134,7 +134,7 @@ b) How a files list index is created
   coreOpenFolder() takes as argument the folder to index files
   from. If the folder string contains a pipe "|", the files will
   not be indexed recursively. The function renews / clears 
-  previous files list with renewCurrentFilesList() and then
+  the previous files list with renewCurrentFilesList() and then
   it proceeds to scan for the files using GetFilesList().
 
   In essence, coreOpenFolder() is a wrapper for GetFilesList(),
@@ -182,17 +182,17 @@ b) How a files list index is created
   already loaded, detectFileID(imgPath) is used to identify and
   set the initial file index to the image already loaded.
 
-  If a slideshow database is already opened, GetFilesList() will
+  If a slideshow database is already open, GetFilesList() will
   automatically add the files into the database using addSQLdbEntry().
   In this context, the file names are converted to lower case.
 
-  The file details related properties are optional, as previously indicated.
+  The properties holding file details are optional, as previously indicated.
   They are filled by GetFilesList() or collectFileInfosNow() and are used
-  as caches by SortFilesList(), files statistics panel and
+  as caches by SortFilesList(), the files statistics panel and
   QPV_listThumbnailsGridMode(). The collectImageInfosNow() function fills
   the members of the object with details about images and their main 
-  histogram points. These details, once cached are used for files sorting
-  file statistics panel and finding image duplicates.
+  histogram points. These details, once cached, are used for sorting files,
+  by the file statistics panel and for finding image duplicates.
 
   GenerateRandyList() is called to generate a randomized array
   of file index numbers from 1 to "maxFilesIndex", non-repetitive.
@@ -200,7 +200,7 @@ b) How a files list index is created
   through the indexed files.
 
   The current position within the index list is held by
-  "currentFileIndex" and the total indexed files in "maxFilesIndex".
+  "currentFileIndex" and the number of indexed files in "maxFilesIndex".
   The current «random» position is "RandyIMGnow".
 
   Internally, "CurrentSLD" holds what folder or slideshow file 
@@ -216,7 +216,7 @@ b) How a files list index is created
   sldGenerateFilesList() parses plain-text files and it loads
   INI-like saved settings using readSlideSettings().
 
-  sldDataBaseOpen() opens SQLlite3 databases and reads the 
+  sldDataBaseOpen() opens SQLite3 databases and reads the 
   settings using IniSLDBreadAll().
 
 
@@ -252,16 +252,16 @@ c) Files index filtering
    example: SQL::query::WHERE fmodified LIKE '20200607%' .
 
    If the user does not work with an SQL database, another type
-   of queries can be used to filter the files list: «QPV:query:»
+   of query can be used to filter the files list: «QPV::query::»
    These are structured as follows:
-   QPV:query:what:minRange:maxRange:optionalString
+   QPV::query::what::minRange::maxRange::optionalString
 
    Example: QPV::query::fsize::100002::250001::string
 
    When such queries are performed, Quick Picto Viewer uses cached
    data when available, otherwise it will extract image or file
    details. The collected data is cached in memory for subsequent
-   queries or index sort operations. If an SQL database is opened, 
+   queries or index sort operations. If an SQL database is open, 
    the data will be stored in the database as well.
    
    The function FilterFilesListuIndex() ends by invoking
@@ -281,7 +281,7 @@ d) How an image is loaded and displayed on screen
    set to 1.
 
    ShowTheImage() is called with the full file path by IDshowImage().
-   This function is a wrapper for coreShowTheImage() to allow the user 
+   This function is a wrapper for coreShowTheImage() to let the user 
    quickly skim through indexed files without loading and displaying
    each of them. It takes into account how fast the user changes
    between images and how fast they are rendered on screen. If the 
@@ -297,8 +297,8 @@ d) How an image is loaded and displayed on screen
    and invoking UpdateThumbsScreen() if the user is in thumbnails
    mode. Otherwise, it continues by invoking ResizeImageGDIwin().
 
-   coreShowTheImage() also checks for file existence and can throw
-   message errors to users.
+   coreShowTheImage() also checks for file existence and can show
+   error messages to users.
 
    ResizeImageGDIwin() and coreShowTheImage() keep track of the 
    currently loaded image file and previous one, to help decide 
@@ -316,7 +316,7 @@ d) How an image is loaded and displayed on screen
    CloneMainBMP() manages «original» image caching and pre-processes
    images for display: rotate, convert depth modes. It caches only
    two images at a time. This function can abort image processing
-   if the user attempts to change image before it finishes. It
+   if the user attempts to change the image before it finishes. It
    communicates with the interface thread by retrieving
    "canCancelImageLoad". When it is set to 4, it means abort.
 
@@ -327,10 +327,10 @@ d) How an image is loaded and displayed on screen
    LoadBitmapForScreen() is called by CloneMainBMP(). This is
    the function that accesses files. It is a wrapper for three
    functions that return a GDI+ bitmap:
-      - LoadWICscreenImage()- loads images through Windows Imaging Component
-                              it is the prefered loader since v5.6.0
+      - LoadWICscreenImage()- loads images through Windows Imaging Component;
+                              it has been the preferred loader since v5.6.0
       - LoadFimFile()       - used to load additional file formats
-                            - this function converts any image to 24 or
+                            - this function converts any image to a 24 or
                               32 bits depth and then to a GDI+ bitmap object
       - LoadFileWithGDIp()  - loads GDI+ supported files
       - LoadFileWithWIA()   - the fallback function of LoadFileWithGDIp()
@@ -340,9 +340,9 @@ d) How an image is loaded and displayed on screen
    LoadWICscreenImage() calls DLL functions found in qpvmain.dll: 
    WICpreLoadImage(), WICgetRectImage() and WICdestroyPreloadedImage().
    WICpreLoadImage() returns the handle and properties of the image to
-   be loaded. WICgetRectImage() return a GDI+ bitmap object. It is
+   be loaded. WICgetRectImage() returns a GDI+ bitmap object. It is
    invoked only if the image does not exceed the GDI+ limit of 536 mgpx.
-   When the image exceeds 536 megapixels, it is transfered to FreeImage
+   When the image exceeds 536 megapixels, it is transferred to FreeImage
    using teleportWICtoFIM().
 
    LoadWICscreenImage() and LoadFimFile() can return to LoadBitmapForScreen()
@@ -353,10 +353,10 @@ d) How an image is loaded and displayed on screen
 
    LoadBitmapForScreen() returns a GDI+ bitmap handle on success.
    When it is invoked by CloneMainBMP(), it has as argument
-   "allowCaching" set to 1 which allows this function to hold 
-   in cache the previously opened file, unprocessed by CloneMainBMP().
-   And it also fills-in properties for currIMGdetails[], which
-   holds various details about the image about to be displayed.
+   "allowCaching" set to 1 which allows this function to cache 
+   the previously opened file, unprocessed by CloneMainBMP().
+   It also fills in the properties of currIMGdetails[], which
+   holds various details of the image about to be displayed.
 
    When CloneMainBMP() finishes loading and processing the image,
    in ResizeImageGDIwin() the GDI+ bitmap dimensions and user 
@@ -373,12 +373,12 @@ d) How an image is loaded and displayed on screen
    then drawn by GDI+. If no bitmap is returned, Gdip_DrawImage()
    scales the image for that frame.
 
-   High quality frames use the area interpolation when the image is
+   High-quality frames use the area interpolation when the image is
    shown smaller than it is, and the cubic one when it is enlarged.
-   Low quality frames use nearest neighbour. These are drawn while
+   Low-quality frames use nearest neighbour. These are drawn while
    the user pans or zooms, when "userImgQuality" is set to 0, when
    an image editing tool is active and at zoom levels above 1000%.
-   A high quality frame follows a low quality one after a delay,
+   A high-quality frame follows a low-quality one after a delay,
    unless the view itself calls for low quality.
 
    QPV_ShowImgonGui() can also generate reduced copies of the image.
@@ -392,19 +392,19 @@ d) How an image is loaded and displayed on screen
    it is used only while the image is shown at the size of the copy
    or smaller.
 
-   The frame rendered, without color effects and without flips, is
+   The frame rendered, without colour effects and without flips, is
    held in the variable named "ViewPortBMPcache". It is drawn again
    for as long as the image, its position and its size on screen are
-   the same. The color effects and the flips are applied on it.
+   the same. The colour effects and the flips are applied on it.
 
    If the image loaded exceeds 536 megapixels, the reduced copies
    are not created: gdiBMPvPsize, gdiBitmapSmall. QPV_ShowImgonGui()
    calls retrieveQPVscreenImgSection() instead. This function renders
-   and displays very large images. Internally, it caches a viewport
-   sized image.
+   and displays very large images. Internally, it caches a
+   viewport-sized image.
 
    decideGDIPimageFX() is used to obtain GDI+ objects that can alter 
-   the display of colors: a color matrix and an Effects object.
+   the display of colours: a colour matrix and an Effects object.
 
    drawHUDelements() is the function that renders the scroll bars, 
    current frame index (visual indicator), the grid ( drawVPgridsNow() )
@@ -416,8 +416,8 @@ d) How an image is loaded and displayed on screen
    additionalHUDelements() is often invoked in the code to update the
    selection area and/or other HUD elements.
 
-   QPV_ShowImgonGui() tracks how fast the render on screen is and
-   adaptively chooses between low and high quality frames.
+   QPV_ShowImgonGui() tracks how fast the rendering on screen is and
+   adaptively chooses between low- and high-quality frames.
 
    Internally, QPV uses the 32-ARGB pixel format: the DLL functions
    lock the bitmaps in it, so GDI+ converts nothing on a lock. The
@@ -426,14 +426,14 @@ d) How an image is loaded and displayed on screen
    An image held in another format is converted when an edit begins,
    by editedImageToCoreFormat(): UserMemBMP is always 32-ARGB.
 
-   There are four EX_LAYERED windows: "hGDIthumbsWin", "hGDIwin"
+   There are four EX_LAYERED windows: "hGDIthumbsWin", "hGDIwin",
    "hGDIselectWin", "hGDIinfosWin". There are two global GDI+
    Graphics, with their own HDCs and GDI hBitmaps: glPG / glHDC
    and 2NDglPG / 2NDHDC. These are recreated upon window resize
    events. These windows are created by BuildGUI() found in
    "module-interface.ahk". The GDI+ canvases are created by
    createGDIPcanvas() found in the main QPV.ahk file. Auxiliary
-   GDI+ are created in initGDIPstuff().
+   GDI+ objects are created in initGDIPstuff().
 
    See section g) for more details on what windows are created.
 
@@ -451,7 +451,7 @@ e) General considerations
    is called.
 
    The main thread regularly checks the other thread for specific
-   variables to see if the user intentions changed, to abort
+   variables to see whether the user's intentions changed, to abort
    the current operation[s] or continue.
 
    One cannot have the interface thread ping the main thread
@@ -478,7 +478,7 @@ f) How slideshows happen
    for toggling the slideshow.
 
    The whole slideshow «business» is convoluted. The purpose 
-   was to obtain an easy to stop slideshow in any circumstance,
+   was to obtain an easy-to-stop slideshow in any circumstance,
    even if it is running very fast or the user loads very large 
    images and applies all the possible real-time effects.
 
@@ -501,24 +501,24 @@ f) How slideshows happen
 
    [ side note: notice the ping-pongs between the threads ^_^ ]
 
-   "SlideHowMode" is the variable desginating the slideshow mode
+   "SlideHowMode" is the variable designating the slideshow mode
    and "slideShowDelay" is the delay used for the aforementioned
-   timer, in miliseconds. "slideShowRunning" is a boolean. These 
+   timer, in milliseconds. "slideShowRunning" is a boolean. These 
    variables and additional ones are used in both threads and 
    often synchronized...
 
    Things get even uglier with GIF animations...
    autoChangeDesiredFrame() is used for animated GIFs and it is 
    run with the first parameter set to "start" only from 
-   QPV_ShowImgonGuiPrev(). And it is also invoked as a timer.
+   QPV_ShowImgonGui() and restartGIFplayback(). It is also invoked as a timer.
 
    Because I wanted users to have the option to allow GIFs to 
    play entirely before going to the next slide, the main thread
-   sets "allowNextSlide" to 0 while the GIF plays and when the 
-   first loop is done, it is set to 1 and theSlideShowCore()
-   function is called from the UI thread, and
-   invokeExternalSlideshowHandler() to set there the timer
-   for the next slide.
+   sets "allowNextSlide" to 0 while the GIF plays. When the 
+   first loop is done, it is set to 1, theSlideShowCore()
+   is called from the UI thread, and so is
+   invokeExternalSlideshowHandler(), which sets the timer
+   for the next slide there.
 
 
 g) Windows, AHK GUIs, Menus, Toolbar
@@ -529,10 +529,10 @@ g) Windows, AHK GUIs, Menus, Toolbar
    dedicated to the user interface: "module-interface.ahk".
    In the main file, the interface thread is simply referenced
    as an object named "interfaceThread". This separation was made 
-   to provide users an optimal experience when using QPV, to
+   to provide users with an optimal experience when using QPV, to
    avoid unnecessary stalling or freezes of the application.
 
-   The following is a list, a summary, of what functions, found
+   The following is a list, a summary, of which functions, found
    in the main thread, draw what and on which window(s).
    All the windows are owned by the "PVhwnd" window.
    These are created in the interface thread, from BuildGUI().
@@ -586,10 +586,10 @@ g) Windows, AHK GUIs, Menus, Toolbar
    the mouse is located.
 
    If the aforementioned windows, from 0 to 4, fail to be created,
-   Quick Picto Viewer will throw a warning and offers to exit or
-   continue as options.
+   Quick Picto Viewer shows a warning and offers to exit or to
+   continue.
 
-   The main thread creates on user demand the following AHK windows:
+   The main thread creates the following AHK windows on demand:
 
    1. PanelFoldersTree() - folders tree navigation and manager
       hfdTreeWinGui, fdTreeGuia
@@ -600,7 +600,7 @@ g) Windows, AHK GUIs, Menus, Toolbar
       It can also function as a folders manager and navigation tool,
       if a folder path is provided, instead of keywords.
 
-   3. createSettingsGUI() - generalized panel, it is used by most
+   3. createSettingsGUI() - a generalized panel used by most
    of the panels users can see in QPV. Each panel has an ID,
    assigned to the "AnyWindowOpen" variable.
       hSetWinGui, SettingsGUIA
@@ -610,9 +610,9 @@ g) Windows, AHK GUIs, Menus, Toolbar
       simple panels.
 
       repositionWindowCenter() is called after any panel is created. 
-      This function repositions the window in the center of the
-      screen where the main QPV is found. It also applies the dark
-      mode theme on all its controls.
+      This function repositions the window in the centre of the
+      screen where the main QPV window is. It also applies the dark
+      mode theme to all its controls.
 
    4. msgBoxWrapper() - custom message boxes of all kinds
       MsgBox2hwnd, WinMsgBox
@@ -627,7 +627,7 @@ g) Windows, AHK GUIs, Menus, Toolbar
       toolbar.
 
    7. CreateCollapsedPanelWidget() - collapsed panel widget
-      collapseWidgetGUIA, collapseWidgetGUIA
+      hCollapseWidget, collapseWidgetGUIA
       It is invokable by collapsing the panel of a live tool.
 
 
@@ -636,7 +636,7 @@ g) Windows, AHK GUIs, Menus, Toolbar
 
    The main GUI of the QPV window, created in BuildGUI(),
    contains multiple static text controls. These are used
-   as place holders. They are updated with texts pertaining
+   as placeholders. They are updated with texts pertaining
    to the various viewport elements. The functions that
    update the controls are uiAccess*(). They are invoked from
    the main thread by drawHUDelements() or other associated
@@ -649,7 +649,7 @@ g) Windows, AHK GUIs, Menus, Toolbar
 
    \\Contexts:
    Toolbar and menu related functions decide what options to display
-   based on the app/user context and user settings. Broadly speaking
+   based on the app/user context and user settings. Broadly speaking,
    there are several modes and their associated global variables:
      - thumbnails list view
        var: thumbsDisplaying = 1
@@ -683,28 +683,28 @@ g) Windows, AHK GUIs, Menus, Toolbar
    \\The menus:
    The main thread creates all the context menus via
    InitGuiContextMenu(), InitSecondMenu() and others. The menus are
-   displayed with showThisMenu() from the main thread, The menu bar
+   displayed with showThisMenu() from the main thread. The menu bar
    itself is created in the interface thread, but it is a dummy, fake.
    The menu bar items invoke functions from the main thread that display 
    the sub-menu itself. ShowThisMenu() identifies the position of the
-   menu bar clicked item and positions the menu to be displayed. The 
+   clicked menu bar item and positions the menu to be displayed. The 
    menu bar functions in the main file begin with "InvokeMenuBar*".
    The menu bar in the interface thread is generated with BuildMenuBar().
-   Why did I do it like this? I found no way to dynamically attach from 
-   the main thread the menus to the interface thread window. I hate 
+   Why did I do it like this? I found no way to attach the menus dynamically 
+   from the main thread to the interface thread's window. I hate 
    when apps display all kinds of pointless options that are not
-   relevant to the current context, e.g., Text menu in Affinity Photo
-   when no text object is manipulated. It is all a clutter. As such,
-   I find it is imperative to generate the list of menus and sub-menus
+   relevant to the current context, e.g., the Text menu in Affinity Photo
+   when no text object is manipulated. It is all clutter. As such,
+   I find it imperative to generate the list of menus and sub-menus
    dynamically, to only display what is relevant. 
 
    All the menus, and the context menus, are created with the standard 
-   Menu command of AHK, however I created a wrapper function for it.
+   Menu command of AHK; however, I created a wrapper function for it.
    The list of menus is generated on the go, on demand, based on 
    app/user context[s]. The wrapper helps keep track of the menus
    generated: kMenu(). It records menu names, states and keywords.
       objuA - menu items by index with properties objuA[menuIndex] := [prop1, prop2,... etc]
-      objuB - maps menu-names with menu items pairs to indexexes of objuA; objuB[menu "-" label] := menuIndex
+      objuB - maps menu-name and menu-item pairs to indexes of objuA; objuB[menu "-" label] := menuIndex
       objuC - menu-names and their properties objuC[menu] := [menu-name, container-menu, accelerator-key]
 
    The menus are searchable via PanelQuickSearchMenuOptions() -->
@@ -718,8 +718,8 @@ g) Windows, AHK GUIs, Menus, Toolbar
 
    \\The toolbar:
    The GUI of the toolbar is created by CoreGUItoolbar().
-   createGUItoolbar() is a wrapper that minimizes that filters the 
-   calls to the main function and loads the toolbar settings.
+   createGUItoolbar() is a wrapper that filters the calls to the 
+   main function, to minimize them, and loads the toolbar settings.
 
    CoreGUItoolbar() holds the list of possible toolbar icons and 
    their properties in the form of:
@@ -733,24 +733,24 @@ g) Windows, AHK GUIs, Menus, Toolbar
    using the ImageButton class. It is a class that assigns ImageLists
    to push buttons using the ImageList_Create Win32 API function.
 
-   The toolbar can be customized by users via PanelCustomizeToolbar()
+   The toolbar can be customized by users via PanelCustomizeToolbar().
    The custom toolbar is loaded only if userCustomizedToolbar equals 1.
    "userThumbsToolbarList" and "userImgViewToolbarList" hold the lists
-   of user customized toolbar for thumbnails list and image view.
+   of the user's customized toolbars for the thumbnails list and the image view.
    The other modes cannot be customized.
 
    WM_MOUSEMOVE() from the main thread invokes tlbrDecideTooltips() 
    to dynamically display tooltips for the toolbar buttons, which 
    can change based on the context.
 
-   The toolbar buttons actions are invoked via tlbrInvokeFunction() -
-   a wrapper that utilized "tlbrIconzList" to decide what function 
+   The toolbar buttons' actions are invoked via tlbrInvokeFunction() -
+   a wrapper that utilizes "tlbrIconzList" to decide what function 
    has to be called. The decision is made primarily in
    processToolbarFunctions().
 
    The buttons can have left and right click actions associated.
    Some of them invoke CreateSoloSliderWidgetWin(), eg.,
-   tlbrFloodFillSlidersInvoker(). These are pop-up sliders. Others,
+   tlbrFloodFillSlidersInvoker(). These are pop-up sliders. Others
    allow users to click and drag to adjust a value, eg.,
    tlbrChangeStuffRotation().
 
@@ -759,15 +759,15 @@ h) Input responses
 =====================================================================
 
    All keyboard shortcuts are «registered» through WM_KEYDOWN and
-   WM_SYSKEYDOWN. Both, the main thread and the interface one, register
+   WM_SYSKEYDOWN. Both the main thread and the interface one register
    these Window Messages. The function invoked when the messages are
    issued is, in both threads, WM_KEYDOWN(). The function is meant to
-   finish execution as soon as possible. constructKbdKey() is called to\
-   convert the virtual keys into readable form. In KeyboardResponder(),
-   main thread, is where each keyboard shortcut is actually registered,
+   finish execution as soon as possible. constructKbdKey() is called to
+   convert the virtual keys into a readable form. KeyboardResponder(),
+   in the main thread, is where each keyboard shortcut is actually registered,
    where the code decides what functions to call based on the keyboard
-   input, and the user context, in-app conditions. QPV allows custom
-   defined keyboard shortcuts. These are stored as an object:
+   input, and the user context, in-app conditions. QPV allows
+   custom-defined keyboard shortcuts. These are stored as an object:
    "userCustomKeysDefined". The object is initialized by
    loadCustomUserKbds(). In KeyboardResponder(), if the user-pressed
    key is not customized [or defined] in the aforementioned object,
@@ -782,8 +782,8 @@ h) Input responses
    Mouse input is mostly handled in the interface thread.
    The Window Messages for mouse buttons (e.g., WM_LBUTTONUP)
    are registered and, broadly speaking, invoke WinClickAction(),
-   which is a wrapper to the function with the same name from
-   the main thread. The function handles most of the imagined
+   which is a wrapper for the function with the same name from
+   the main thread. The function handles most of the envisaged
    responses to mouse clicks, based on user context. Several
    examples:
      - thumbsListClickResponder()
@@ -793,16 +793,16 @@ h) Input responses
      - updateTinyPreviewArea()
      ... and many more: WinClickAction() has over 700 lines...
 
-   WM_MOUSEMOVE message is registered in the interface thread 
+   The WM_MOUSEMOVE message is registered in the interface thread 
    and it is associated with the function WM_MOUSEMOVE().
-   This function changes mouse cursor to different states,
+   This function changes the mouse cursor to different states,
    based on the user context and calls MouseMoveResponder()
-   from the main thread. which handles live viewport updates
+   from the main thread, which handles live viewport updates
    related to hover actions.
 
-   WM_MOUSEMOVE message is registered in the main thread 
+   The WM_MOUSEMOVE message is registered in the main thread 
    as well, associated with WM_MOUSEMOVE(). Most importantly, 
-   it displays tooltips when users hover icons in the QPV toolbar, 
+   it displays tooltips when users hover over icons in the QPV toolbar, 
    if it is visible. The toolbar is created by createGUItoolbar(),
    if "ShowAdvToolbar" equals 1.
 
@@ -812,7 +812,7 @@ i) Image live editing
 
    The tool panels are created using createSettingsGUI() with the
    parameter "isImgLiveEditor" set to 1. If the panel does indeed open,
-   then "imgEditPanelOpened" global variable is set to 1. These can be
+   then the "imgEditPanelOpened" global variable is set to 1. These can be
    invoked by keyboard shortcuts, menus or via the toolbar.
 
    When a live editor panel is opened, it can be collapsed into a small
@@ -823,8 +823,8 @@ i) Image live editing
 
    Such panels have their controls attached via g-labels to a
    function prefixed with "updateUI*", eg. updateUIfillPanel(). Such
-   functions update the status of the different available controls: hides,
-   shows, disables, or enables controls.
+   functions update the status of the different available controls: they hide,
+   show, disable or enable controls.
 
    The Apply button in these panels is usually attached to
    applyIMGeditFunction(). The function is just a wrapper which invokes 
@@ -836,33 +836,33 @@ i) Image live editing
    The live preview in the viewport is handled by
    corelivePreviewsImageEditing(). This is another wrapper that handles 
    how the live preview is drawn on screen and other things. It invokes 
-   specific function for each tool, eg. livePreviewInsertTextinArea().
+   a specific function for each tool, eg. livePreviewInsertTextinArea(),
    based on the "AnyWindowOpen" value. Most live preview functions 
    that render the preview on screen have this prefix: "livePreview*".
 
    Dedicated efforts have been put into generating live previews that do
-   not exceed the viewport area, in order to maintain the performance 
-   within acceptable levels, while maintaining fidelity as much as possible 
-   with the final output when the apply button is pushed by users. Many 
+   not exceed the viewport area, to keep the performance acceptable 
+   while staying as faithful as possible to the final output users 
+   get when they press Apply. Many 
    functions cache generated bitmaps to avoid re-rendering everything, 
-   e.g., generateAlphaMaskBitma() will reuse the cached bitmap when the
+   e.g., generateAlphaMaskBitmap() will reuse the cached bitmap when the
    preview relies on the same alpha mask options.
 
-   When viewport color adjustments are activated 
+   When viewport colour adjustments are active, 
    mergeViewPortEffectsImgEditing() is called first, before the actual 
    function of the tool that applies the modifications to the main bitmap.
 
-   Flood fill and the brush tool, even if labeled as live tools, they do 
+   Flood fill and the brush tool, though labelled as live tools, do 
    not have live preview functions. The actions are live themselves.
    The functions are: ActFloodFillNow() and ActPaintBrushNow().
 
    Some tools allow users to paint in the alpha mask, eg., fill selected
    area. When the user activates this option, toggleAlphaPaintingMode()
    is called. The live brush response during painting is handled by
-   ActDrawAlphaMaskBrushNow() together with  the specific live preview
+   ActDrawAlphaMaskBrushNow() together with the specific live preview
    function of the active tool. In this mode, one undo level is recorded.
 
-   When drawing tools are used: "liveDrawingBrushTool" is set to 1.
+   When drawing tools are used, "liveDrawingBrushTool" is set to 1.
 
    The aforementioned functions, ActDrawAlphaMaskBrushNow(), ActFloodFillNow()
    and ActPaintBrushNow() are invoked by WinClickAction() when users click 
@@ -882,15 +882,15 @@ i) Image live editing
    through FreeImage and most of the tools have counterparts that work
    on the FreeImage bitmap. "UserMemBMP" and "gdiBitmap" are not used.
    The array "undoLevelsArray" is also not used with such large bitmaps.
-   The image data is accessible via "viewportQPVimage.imgHandle"
-   property and the methods of "screenQPVimage" class. The image editing
+   The image data is accessible via the "viewportQPVimage.imgHandle"
+   property and the methods of the "screenQPVimage" class. The image editing
    functions that rely on FreeImage, for very large images, begin with
    the prefix "HugeImages*".
 
    For images under 536 megapixels, the entire image is recorded for
-   every undo level and is always on 32-bits RGBA. But for bigger images,
+   every undo level and is always 32-bit RGBA. But for bigger images,
    only a subsection of the image is recorded, when possible, and it can
-   be at a color depth of 24-bits or 32-bits.
+   be at a colour depth of 24 or 32 bits.
 
    Many of the image editing tools rely on C++ functions invoked via
    DLL calls from "qpvmain.dll" written by me.
@@ -904,7 +904,7 @@ j) How to enable alpha masking for an image editing live tool
 =====================================================================
 
    1. Add the window ID to isAlphaMaskWindow().
-      Window ID is "AnyWindowOpen". The panels are created using
+      The window ID is "AnyWindowOpen". The panels are created using
       createSettingsGUI().
  
    2. Add uiADDalphaMaskTabs(tab-ID-A, tab-ID-B, funcUIpanel) in the
@@ -916,14 +916,14 @@ j) How to enable alpha masking for an image editing live tool
       used to update the user interface elements and the viewport,
       eg., updateUIfillPanel().
  
-   3. Add in UItriggerBrushUpdate() a pointer to "funcUIpanel"(),
+   3. In UItriggerBrushUpdate(), add a pointer to "funcUIpanel"(),
    as explained previously, based on the "AnyWindowOpen" value.
    Do the same in BtnToggleBrushColors().
  
-   4. Add in "funcUIpanel"() calls to updateUIalphaMaskStuff(1) and 
+   4. In "funcUIpanel"(), add calls to updateUIalphaMaskStuff(1) and 
    updateUIalphaMaskStuff(2) based on the "CurrentPanelTab". This
-   will make the alpha mask controls' options to show or hide
-   as expected by users.
+   makes the alpha mask controls show or hide
+   as users expect.
  
    5. Define the "viewportDynamicOBJcoords" object properties: x, y,
    w, h and zl. It must be defined inside the live preview drawing
@@ -954,9 +954,9 @@ k) Vector shapes drawing mode
    area has a vector shape already defined, resumeCustomShapeSelection()
    is invoked to convert the points data to the edit mode data.
 
-   At every mouse move drawLiveCreateCustomShape() is invoked by 
+   At every mouse move, drawLiveCreateCustomShape() is invoked by 
    additionalHUDelements() to refresh the window. The function
-   caches the points data. When the data is cached. it is rendered
+   caches the points data. When the data is cached, it is rendered
    by drawVisibleVectorPoints() invoked from drawLiveCreateCustomShape(). 
 
    When the user clicks in the viewport, WinClickAction() invokes 
@@ -974,12 +974,12 @@ k) Vector shapes drawing mode
 
    \\Technicalities:
    
-   The points in are stored in an array object:
+   The points are stored in an array object:
    customShapePoints[index] := [x, y]
 
-   The data is held in pixels units when user edits the shape, but
-   outside the edit mode, the values are relative to a rect bound box
-   with values from 0 to 1. In both cases X and Y are floating points.
+   The data is held in pixel units while the user edits the shape, but
+   outside the edit mode, the values are relative to a bounding box
+   with values from 0 to 1. In both cases, X and Y are floating-point numbers.
 
    "prevDestPosX" and "prevDestPosY" define where the image was last
    painted in the viewport. It is the top/left anchor point of the image.
@@ -989,12 +989,12 @@ k) Vector shapes drawing mode
 
    Outside edit mode:
    The vector points are used to calculate the coordinates of the points
-   for GDI+, based on the width and height of the viewport selectionn area
+   for GDI+, based on the width and height of the viewport selection area
    bounding box. One of the relevant functions is 
    convertCustomShape2givenArea() called by createImgSelPath().
 
-   In the same format, the points are stored when a user chooses to save
-   to disk a vector shape via saveCurrentVectorShape().
+   The points are stored in the same format when a user chooses to save
+   a vector shape to disk via saveCurrentVectorShape().
 
 
 l) List view and thumbnails list (soon)
@@ -1019,18 +1019,18 @@ l) List view and thumbnails list (soon)
    What actually runs in parallel, and what does not. WIC has no global engine lock, so the image
    decoding and the Fant scaling run concurrently, one decoder chain per worker; a single
    image is still decoded by one thread. FreeImage is likewise safe for distinct FIBITMAPs.
-   GDI+ does hold process wide locks. SVG rendering uses a Direct2D factory per worker,
+   GDI+ does hold process-wide locks. SVG rendering uses a Direct2D factory per worker,
    created SINGLE_THREADED on first use, because the shared pD2D1Factory is MULTI_THREADED
    and that flag means "locked", not "parallel". PDFium has global state and no thread
-   safety at all; it stays serialised behind tpPdfMutex, so PDF thumbnails are built
+   safety at all; it stays serialized behind tpPdfMutex, so PDF thumbnails are built
    one at a time.
 
-   Both pools try the loaders in one order: SVG and PDF to the renderer of their own,
+   Both pools try the loaders in one order: SVG and PDF to their own renderers,
    then FreeImage for the extensions it claims [RegExFIMformPtrn], then WIC for the ones
    it declares [RegExWICfmtPtrn, minus svg and pdf], then GDI+ [tpGDIPload()] for what is
    left over - EMF, WMF and the GIFs FreeImage refuses and WIC cannot decode, which is
    what LoadFileWithGDIp() ends up drawing in the viewport - and for anything the loader
-   that did claim the file failed to open. That last one inherits the process wide GDI+
+   that did claim the file failed to open. That last one inherits the process-wide GDI+
    locks, so a folder full of them decodes with far less overlap than a folder of JPEGs;
    it is also the loader that hands back a copy and disposes the file-backed bitmap,
    because GDI+ keeps the file mapped until it goes.
@@ -1049,7 +1049,7 @@ m) Image duplicates identification (soon)
 
    QPV can identify identical or similar images by comparing file properties, aspect
    ratios, histogram data, or perceptual content hashes (dHash, pHash, lHash). It
-   requires saving the current files list as an SQLite database, a SLD file.
+   requires saving the current files list as an SQLite database, an SLDB file.
 
    PanelFindDupes() creates and displays the panel for managing duplicate detection.
    It lets users configure detection presets, hashing precision, threshold distances,
@@ -1058,7 +1058,7 @@ m) Image duplicates identification (soon)
    PanelAutoSelectDupes() launches a GUI panel allowing users to automatically
    mark duplicates for removal based on rules (e.g. smallest file size, smallest
    resolution, or folder path keyword matches). This panel is accessible only if
-   a list of duplicates is opened, via testIsDupesList().
+   a list of duplicates is open, via testIsDupesList().
 
    autoSelectDupesInGroups()
    retrieveDupesByProperties()
@@ -1079,8 +1079,8 @@ m) Image duplicates identification (soon)
 n) How to add a new panel/tool
 =====================================================================
 
-   Assign a unique window ID for the new panel (e.g., IDwin := 99). This value
-   represents the active panel ID and is assigned to "AnyWindowOpen" variable.
+   Assign a unique window ID to the new panel (e.g., IDwin := 99). This value
+   represents the active panel ID and is assigned to the "AnyWindowOpen" variable.
    The IDs are allocated by hand and there is no central table of them. You can
    do a grep for createSettingsGUI( and fakeWinCreator( to find one that is
    still free.
@@ -1096,7 +1096,7 @@ n) How to add a new panel/tool
    Add the user interface elements inside the AHK GUI named "SettingsGUIA". You can
    add custom controls I created by calling functions such as GuiAddEdit(), 
    GuiAddDropDownList(), GuiAddCheckBox(), GuiAddButton() or GuiAddSlider().
-   At the end of the PanelMyNewTool() function, to center and display the window
+   At the end of the PanelMyNewTool() function, to centre and display the window,
    invoke repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Panel title").
    "hSetWinGui" is a global variable, the handle of the panel window.
    Read g) for more details regarding windows and GUIs.
@@ -1115,18 +1115,18 @@ n) How to add a new panel/tool
    isAlphaMaskWindow() and in PanelMyNewTool() invoke uiADDalphaMaskTabs() to add 
    the panel alpha masking settings.
 
-   The image data processing should happen inside C/C++ functions, inside the qpvmain.dll
+   The image data processing should happen in C/C++ functions, inside qpvmain.dll,
    or via GDI+. Most of the image editing tools in Quick Picto Viewer rely on the DLL.
 
-   The image processing function meant to be executed on Apply, should be registered
+   The image processing function meant to be executed on Apply should be registered
    in applyIMGeditFunction().
 
    To store settings, create corresponding functions: ReadSettingsMyNewToolPanel()
-   and WriteSettingsMyNewToolPanel(). It is recommended to store the data to the
+   and WriteSettingsMyNewToolPanel(). It is recommended to store the data in the
    registry for settings that do not pertain to the image viewer functions.
-   Call for each global variable RegAction() or IniAction() to store or load it.
+   Call RegAction() or IniAction() for each global variable to store or load it.
 
-   You can register a keyboard shortcut to the panel in processDefaultKbdCombos().
+   You can register a keyboard shortcut for the panel in processDefaultKbdCombos().
    You can add a menu item to open the panel in one of the many functions that begin
    with createMenu*(). Use the kMenu() helper function to have it automatically indexed
    by the search menu options panel.
@@ -1165,7 +1165,7 @@ n) How to add a new panel/tool
    Optionally, to give the panel its own toolbar launcher icon, register it inside
    CoreGUItoolbar(): add another button to the list of static objects named BTN*
    and to the "btnzList" string. In CoreGUItoolbar() add a call to tlbrAddNewIcon()
-   with the newly defined static button object then wire its click behaviour in
+   with the newly defined static button object, then wire its click behaviour in
    processToolbarFunctions(). See section g) for more details on the toolbar internals.
 
 
