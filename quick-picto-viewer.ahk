@@ -42,8 +42,8 @@
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
 ;@Ahk2Exe-UpdateManifest 0, Quick Picto Viewer
 ;@Ahk2Exe-SetOrigFilename Quick-Picto-Viewer.exe
-;@Ahk2Exe-SetVersion 6.3.00
-;@Ahk2Exe-SetProductVersion 6.3.00
+;@Ahk2Exe-SetVersion 6.3.50
+;@Ahk2Exe-SetProductVersion 6.3.50
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2026)
 ;@Ahk2Exe-SetCompanyName https://marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -223,7 +223,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
    , PDFpwdsCache := [], multiCoreThumbsInitGood := "n", thumbsPoolState := 0
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := A_IsCompiled ? "" : "(dev) "
-   , appVersion := "6.3.00", vReleaseDate := "2026/08/31" ; yyyy-mm-dd
+   , appVersion := "6.3.50", vReleaseDate := "2026/11/28" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
