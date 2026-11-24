@@ -400,6 +400,8 @@ d) How an image is loaded and displayed on screen
    Internally, QPV uses the 32-ARGB pixel format: the DLL functions
    lock the bitmaps in it, so GDI+ converts nothing on a lock. The
    thumbnails made by the DLL workers are 32-PARGB; they are only drawn.
+   An image held in another format is converted when an edit begins,
+   by editedImageToCoreFormat(): UserMemBMP is always 32-ARGB.
 
    There are four EX_LAYERED windows: "hGDIthumbsWin", "hGDIwin"
    "hGDIselectWin", "hGDIinfosWin". There are two global GDI+

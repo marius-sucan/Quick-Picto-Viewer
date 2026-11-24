@@ -16715,14 +16715,9 @@ destroyGDIfileCache(remAll:=1, makeBackup:=0) {
        If InStr(gdiBitmapIDcall, "a1" MD5name imgPath)
        {
           If (makeBackup=1)
-          {
-             mainCall := SubStr(gdiBitmapIDcall, 3)
-             gdiBitmapIDcall := "a0" . mainCall
-             xBitmap := cloneGDItoMem(A_ThisFunc, gdiBitmap)
+             mainCall := detachGdiBitmapFromFile()
+          Else
              gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
-             gdiBitmap := xBitmap
-             gdiBitmapIDentire := gdiBitmapIDcall xBitmap
-          } Else gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
        }
 
        If InStr(BprevImgCall, "1" MD5name imgPath)
@@ -16791,6 +16786,17 @@ destroyGDIfileCache(remAll:=1, makeBackup:=0) {
        }
 
     }
+}
+
+detachGdiBitmapFromFile() {
+   ; the viewport bitmap redrawn in memory, in the core format; its ID no longer says it is tied to the file
+   mainCall := SubStr(gdiBitmapIDcall, 3)
+   gdiBitmapIDcall := "a0" . mainCall
+   xBitmap := cloneGDItoMem(A_ThisFunc, gdiBitmap)
+   gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
+   gdiBitmap := xBitmap
+   gdiBitmapIDentire := gdiBitmapIDcall xBitmap
+   Return mainCall
 }
 
 discardSRCfileCaches() {
@@ -16877,6 +16883,8 @@ wrapRecordUndoLevelNow(newBitmap, allowRecord:=1) {
       Return
    }
 
+   ; a paste or a new image arrives without the tools' preparation step
+   editedImageToCoreFormat()
    recordUndoLevelNow("init", 0)
    UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
    gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
@@ -25436,15 +25444,7 @@ corePasteClipboardImg(modus, imgW, imgH, allowFilesPaste) {
     If !validBMP(clipBMP)
        Return
 
-    If (Gdip_GetImagePixelFormat(clipBMP, 1)!="0x26200A") ; PixelFormat32bppARGB
-    {
-       krpBmp := Gdip_CloneBmpCoreArea(A_ThisFunc, clipBMP)
-       If validBMP(krpBmp)
-       {
-          trGdip_DisposeImage(clipBMP, 1)
-          clipBMP := krpBmp
-       }
-    }
+    convertBmpToCoreFormat(A_ThisFunc, clipBMP)
     ; MsgBox, % Gdip_GetImagePixelFormat(clipBMP, 1)
     Return clipBMP
 }
@@ -25472,7 +25472,8 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
        }
 
        clipBMP := corePasteClipboardImg(1, ResolutionWidth*2, Round(ResolutionHeight*4.3), 1)
-    }
+    } Else
+       convertBmpToCoreFormat(A_ThisFunc, clipBMP)
 
     If !validBMP(clipBMP)
     {
@@ -40940,6 +40941,7 @@ DeletePicture(dummy:=0) {
   {
      prevDelFileIndex := currentFileIndex
      UserMemBMP := cloneGDItoMem(A_ThisFunc, gdiBitmap)
+     convertBmpToCoreFormat(A_ThisFunc, UserMemBMP)
   } If (thumbsDisplaying=1 && undoLevelsRecorded<2)
      terminateIMGediting()
 
@@ -77752,6 +77754,20 @@ Gdip_CloneBmpCoreArea(funcu, pBitmap, x:="", y:="", w:=0, h:=0, PixelFormat:=0, 
    Return newBitmap
 }
 
+convertBmpToCoreFormat(funcu, ByRef pBitmap) {
+   ; the clone takes the place of a bitmap that is in another pixel format
+   If (!validBMP(pBitmap) || Gdip_GetImagePixelFormat(pBitmap, 1)=coreDesiredPixFmt)
+      Return 0
+
+   newBitmap := Gdip_CloneBmpCoreArea(funcu, pBitmap)
+   If !validBMP(newBitmap)
+      Return 0
+
+   trGdip_DisposeImage(pBitmap, 1)
+   pBitmap := newBitmap
+   Return 1
+}
+
 generalInternalErrorMsgBox(err, baseMsg, silentMode:=0) {
    Static forceSilent := 0
 
@@ -78098,14 +78114,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
         rBitmap := zBitmap
         zE := Gdip_BitmapSetColorDepth(rBitmap, "BW", 1)
         If !zE
-        {
-           zBitmap := Gdip_CloneBmpCoreArea(A_ThisFunc, rBitmap)
-           If validBMP(zBitmap)
-           {
-              trGdip_DisposeImage(rBitmap)
-              rBitmap := zBitmap
-           }
-        }
+           convertBmpToCoreFormat(A_ThisFunc, rBitmap)
         currIMGdetails.HasAlpha := 0
      }
   } Else If (usrColorDepth>1)
@@ -78118,14 +78127,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
         zE := Gdip_BitmapSetColorDepth(rBitmap, internalColorDepth, ColorDepthDithering)
 
      If !zE
-     {
-        zBitmap := Gdip_CloneBmpCoreArea(A_ThisFunc, rBitmap)
-        If validBMP(zBitmap)
-        {
-           trGdip_DisposeImage(rBitmap)
-           rBitmap := zBitmap
-        }
-     }
+        convertBmpToCoreFormat(A_ThisFunc, rBitmap)
 
      currIMGdetails.HasAlpha := 0
   }
@@ -80471,7 +80473,20 @@ decideAlphaMaskingFeaseable(userBias, doLimits:=0) {
    Return allowAlphaMasking
 }
 
+editedImageToCoreFormat() {
+   ; edits are made on 32-ARGB bitmaps, whatever format the image was loaded in
+   If (viewportQPVimage.imgHandle || thumbsDisplaying=1)
+      Return
+
+   If (validBMP(gdiBitmap) && SubStr(gdiBitmapIDcall, 1, 2)="a1" && Gdip_GetImagePixelFormat(gdiBitmap, 1)!=coreDesiredPixFmt)
+      detachGdiBitmapFromFile()
+
+   convertBmpToCoreFormat(A_ThisFunc, gdiBitmap)
+   convertBmpToCoreFormat(A_ThisFunc, UserMemBMP)
+}
+
 mergeViewPortRotationImgEditing() {
+   editedImageToCoreFormat()
    If ((usrColorDepth>1 || vpIMGrotation>0) && !viewportQPVimage.imgHandle && validBMP(useGdiBitmap()))
    {
       wrapRecordUndoLevelNow(trGdip_CloneBitmap(A_ThisFunc, useGdiBitmap()))
