@@ -282,6 +282,247 @@ DLL_API int DLL_CALLCONV openCVresizeBitmapExtended(unsigned char *imageData, un
   return 1;
 }
 
+// 1 when a pixel of these 32-bit rows is not fully opaque
+static int gdipRowsNotOpaque(const unsigned char *data, INT64 stride, int w, int h) {
+    int found = 0;
+    #pragma omp parallel for reduction(|:found)
+    for (int y = 0; y < h; y++)
+    {
+        const unsigned char *row = data + (INT64)y * stride;
+        __m128i acc = _mm_set1_epi32(-1);
+        int x = 0;
+        for ( ; x + 4 <= w; x += 4)
+            acc = _mm_and_si128(acc, _mm_loadu_si128((const __m128i*)(row + (INT64)x * 4)));
+
+        // bits 3, 7, 11 and 15: the alpha bytes of the four pixels
+        int opaque = ((_mm_movemask_epi8(_mm_cmpeq_epi8(acc, _mm_set1_epi32(-1))) & 0x8888)==0x8888) ? 1 : 0;
+        for ( ; x < w; x++)
+        {
+            if (row[(INT64)x * 4 + 3]!=255)
+               opaque = 0;
+        }
+
+        if (opaque==0)
+           found |= 1;
+    }
+    return found;
+}
+
+// straight BGRA rows into premultiplied ones, rounded to nearest; dst may be src
+static void gdipPremultiplyRows(const unsigned char *src, INT64 srcStride, unsigned char *dst, INT64 dstStride, int w, int h) {
+    #pragma omp parallel for schedule(static)
+    for (int y = 0; y < h; y++)
+    {
+        const unsigned char *s = src + (INT64)y * srcStride;
+        unsigned char *d = dst + (INT64)y * dstStride;
+        for (int x = 0; x < w; x++, s += 4, d += 4)
+        {
+            const unsigned int a = s[3];
+            if (a==255)
+            {
+               d[0] = s[0];
+               d[1] = s[1];
+               d[2] = s[2];
+               d[3] = 255;
+            } else if (a==0)
+            {
+               d[0] = d[1] = d[2] = d[3] = 0;
+            } else
+            {
+               d[0] = (unsigned char)((s[0] * a + 127u) / 255u);
+               d[1] = (unsigned char)((s[1] * a + 127u) / 255u);
+               d[2] = (unsigned char)((s[2] * a + 127u) / 255u);
+               d[3] = (unsigned char)a;
+            }
+        }
+    }
+}
+
+static void gdipOpaqueRows(unsigned char *data, INT64 stride, int w, int h) {
+    #pragma omp parallel for schedule(static)
+    for (int y = 0; y < h; y++)
+    {
+        unsigned char *row = data + (INT64)y * stride;
+        for (int x = 0; x < w; x++)
+            row[(INT64)x * 4 + 3] = 255;
+    }
+}
+
+// no channel above its alpha, as a premultiplied pixel requires
+static void gdipClampToAlpha(unsigned char *data, INT64 stride, int w, int h) {
+    #pragma omp parallel for schedule(static)
+    for (int y = 0; y < h; y++)
+    {
+        unsigned char *px = data + (INT64)y * stride;
+        for (int x = 0; x < w; x++, px += 4)
+        {
+            const unsigned char a = px[3];
+            if (px[0]>a)
+               px[0] = a;
+            if (px[1]>a)
+               px[1] = a;
+            if (px[2]>a)
+               px[2] = a;
+        }
+    }
+}
+
+// The pixels of cur resized into dst [32-bit, premultiplied]. alphaKind: 0 = cur has no alpha,
+// 1 = straight alpha, 2 = premultiplied; bottomUp=1: its rows are stored last to first.
+static void gdipResizeToPremultiplied(cv::Mat cur, cv::Mat &dst, int interpolation, int alphaKind, int bottomUp) {
+    const int nw = dst.cols, nh = dst.rows;
+    int straightAlpha = (alphaKind==1) ? 1 : 0;
+    if (straightAlpha==1 && gdipRowsNotOpaque(cur.data, (INT64)cur.step, cur.cols, cur.rows)==0)
+       alphaKind = straightAlpha = 0;
+
+    // exact halvings ahead of an area reduction: the x2 case is by far the fastest one cv::resize() has;
+    // an odd last column or row of the image is left out, which is under one pixel of the result
+    while (interpolation==cv::INTER_AREA && cur.cols>=nw*2 && cur.rows>=nh*2)
+    {
+        const int hw = cur.cols/2, hh = cur.rows/2;
+        const int firstRow = (bottomUp==1) ? cur.rows - hh*2 : 0;
+        cv::Mat half(hh, hw, cur.type());
+        if (straightAlpha==1)
+        {
+           // premultiplied band by band: the only full-size copy is the halved one
+           const int bandRows = 128;
+           cv::Mat band(bandRows, hw*2, cur.type());
+           for (int y = 0; y < hh*2; y += bandRows)
+           {
+               const int rows = min(bandRows, hh*2 - y);
+               gdipPremultiplyRows(cur.data + (INT64)(firstRow + y) * (INT64)cur.step, (INT64)cur.step, band.data, (INT64)band.step, hw*2, rows);
+               cv::Mat bandPart = band(cv::Rect(0, 0, hw*2, rows));
+               cv::Mat halfPart = half(cv::Rect(0, y/2, hw, rows/2));
+               cv::resize(bandPart, halfPart, halfPart.size(), 0, 0, cv::INTER_AREA);
+           }
+           straightAlpha = 0;
+        } else
+        {
+           cv::Mat evenPart = cur(cv::Rect(0, firstRow, hw*2, hh*2));
+           cv::resize(evenPart, half, half.size(), 0, 0, cv::INTER_AREA);
+        }
+        cur = half;
+    }
+
+    // nearest neighbour and a same-size copy pick whole pixels, which can be premultiplied afterwards;
+    // anything that mixes pixels needs them premultiplied beforehand
+    const bool picksPixels = (interpolation==cv::INTER_NEAREST || interpolation==cv::INTER_NEAREST_EXACT || (cur.cols==nw && cur.rows==nh));
+    if (straightAlpha==1 && !picksPixels)
+    {
+       cv::Mat premultiplied(cur.rows, cur.cols, cur.type());
+       gdipPremultiplyRows(cur.data, (INT64)cur.step, premultiplied.data, (INT64)premultiplied.step, cur.cols, cur.rows);
+       cur = premultiplied;
+       straightAlpha = 0;
+    }
+
+    if (cur.channels()==3)
+    {
+       cv::Mat rgb(nh, nw, cur.type());
+       cv::resize(cur, rgb, rgb.size(), 0, 0, interpolation);
+       cv::cvtColor(rgb, dst, cv::COLOR_BGR2BGRA);
+    } else
+       cv::resize(cur, dst, dst.size(), 0, 0, interpolation);
+
+    if (straightAlpha==1)
+       gdipPremultiplyRows(dst.data, (INT64)dst.step, dst.data, (INT64)dst.step, nw, nh);
+    else if (alphaKind!=0 && (interpolation==cv::INTER_CUBIC || interpolation==cv::INTER_LANCZOS4))
+       gdipClampToAlpha(dst.data, (INT64)dst.step, nw, nh);    // their negative lobes overshoot
+}
+
+// The rect [rx, ry, rw, rh] of a GDI+ bitmap resized to nw x nh. The result is a new 32-PARGB bitmap,
+// meant to be drawn. The bitmap is locked in its own pixel format: GDI+ converts nothing for 24-RGB,
+// 32-RGB, 32-ARGB and 32-PARGB bitmaps. interpolation follows cv::resize(): 0 = nearest neighbour,
+// 1 = linear, 2 = cubic, 3 = area, 4 = Lanczos, 5 = linear [bit exact], 6 = nearest neighbour on pixel centres.
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV openCVresizeGdipBitmap(Gdiplus::GpBitmap *pBitmap, int rx, int ry, int rw, int rh, int nw, int nh, int interpolation) {
+    if (pBitmap==NULL || nw<1 || nh<1)
+       return NULL;
+
+    // a metafile handed to GdipBitmapLockBits() would be read as if it were a bitmap
+    Gdiplus::ImageType imgType = Gdiplus::ImageTypeUnknown;
+    if (Gdiplus::DllExports::GdipGetImageType(pBitmap, &imgType)!=Gdiplus::Ok || imgType!=Gdiplus::ImageTypeBitmap)
+       return NULL;
+
+    UINT imgW = 0, imgH = 0;
+    Gdiplus::PixelFormat srcFormat = 0;
+
+    if (Gdiplus::DllExports::GdipGetImageWidth(pBitmap, &imgW)!=Gdiplus::Ok
+    ||  Gdiplus::DllExports::GdipGetImageHeight(pBitmap, &imgH)!=Gdiplus::Ok
+    ||  Gdiplus::DllExports::GdipGetImagePixelFormat(pBitmap, &srcFormat)!=Gdiplus::Ok
+    ||  imgW<1 || imgH<1 || imgW>0x7FFFFFFFu || imgH>0x7FFFFFFFu)
+       return NULL;
+
+    rx = max(0, min(rx, (int)imgW - 1));
+    ry = max(0, min(ry, (int)imgH - 1));
+    if (rw<1 || rw>(int)imgW - rx)
+       rw = (int)imgW - rx;
+    if (rh<1 || rh>(int)imgH - ry)
+       rh = (int)imgH - ry;
+    if (interpolation<cv::INTER_NEAREST || interpolation>cv::INTER_NEAREST_EXACT)
+       interpolation = cv::INTER_LINEAR;
+
+    Gdiplus::PixelFormat lockFormat = srcFormat;
+    if (srcFormat!=PixelFormat24bppRGB && srcFormat!=PixelFormat32bppRGB && srcFormat!=PixelFormat32bppARGB && srcFormat!=PixelFormat32bppPARGB)
+    {
+       // any other format is converted by GDI+ while locking
+       if (srcFormat & PixelFormatPAlpha)
+          lockFormat = PixelFormat32bppPARGB;
+       else
+          lockFormat = (srcFormat & (PixelFormatAlpha | PixelFormatIndexed)) ? PixelFormat32bppARGB : PixelFormat24bppRGB;
+    }
+
+    Gdiplus::BitmapData srcData;
+    Gdiplus::Rect srcRect(rx, ry, rw, rh);
+    if (Gdiplus::DllExports::GdipBitmapLockBits(pBitmap, &srcRect, Gdiplus::ImageLockModeRead, lockFormat, &srcData)!=Gdiplus::Ok)
+    {
+       QPV_DBG("openCVresizeGdipBitmap: failed to lock the bitmap");
+       return NULL;
+    }
+
+    Gdiplus::GpBitmap *newBitmap = NULL;
+    Gdiplus::BitmapData newData;
+    int newLocked = 0, good = 0;
+    try
+    {
+        Gdiplus::Rect newRect(0, 0, nw, nh);
+        if (Gdiplus::DllExports::GdipCreateBitmapFromScan0(nw, nh, 0, PixelFormat32bppPARGB, NULL, &newBitmap)==Gdiplus::Ok && newBitmap!=NULL)
+           newLocked = (Gdiplus::DllExports::GdipBitmapLockBits(newBitmap, &newRect, Gdiplus::ImageLockModeWrite, PixelFormat32bppPARGB, &newData)==Gdiplus::Ok) ? 1 : 0;
+
+        if (newLocked==1 && newData.Stride>0 && srcData.Stride!=0)
+        {
+           // a negative stride means bottom-up rows: resized as a flipped image, flipped back at the end
+           const bool bottomUp = (srcData.Stride<0);
+           const INT64 srcStride = bottomUp ? -(INT64)srcData.Stride : (INT64)srcData.Stride;
+           unsigned char *srcBase = (unsigned char*)srcData.Scan0 + (bottomUp ? (INT64)(rh - 1) * srcData.Stride : 0);
+           cv::Mat src(rh, rw, (lockFormat==PixelFormat24bppRGB) ? CV_8UC3 : CV_8UC4, srcBase, (size_t)srcStride);
+           cv::Mat dst(nh, nw, CV_8UC4, newData.Scan0, (size_t)newData.Stride);
+           const int alphaKind = (lockFormat==PixelFormat32bppARGB) ? 1 : (lockFormat==PixelFormat32bppPARGB) ? 2 : 0;
+           gdipResizeToPremultiplied(src, dst, interpolation, alphaKind, bottomUp ? 1 : 0);
+           if (lockFormat==PixelFormat32bppRGB)
+              gdipOpaqueRows(dst.data, (INT64)dst.step, nw, nh);
+           if (bottomUp)
+              cv::flip(dst, dst, 0);
+
+           // cv::resize() must have written into the GDI+ buffer, not into one of its own
+           good = (dst.data==(unsigned char*)newData.Scan0) ? 1 : 0;
+        }
+    } catch (...)
+    {
+        good = 0;
+    }
+
+    if (newLocked==1)
+       Gdiplus::DllExports::GdipBitmapUnlockBits(newBitmap, &newData);
+    Gdiplus::DllExports::GdipBitmapUnlockBits(pBitmap, &srcData);
+    if (good!=1)
+    {
+       QPV_DBG("openCVresizeGdipBitmap: failed to resize " + std::to_string(rw) + " x " + std::to_string(rh) + " to " + std::to_string(nw) + " x " + std::to_string(nh));
+       if (newBitmap!=NULL)
+          Gdiplus::DllExports::GdipDisposeImage(newBitmap);
+       newBitmap = NULL;
+    }
+    return newBitmap;
+}
+
 static int coreOpenCVapplyToneMappingAlgos(float* hdrData, int hStride, int width, int height, unsigned char* ldrData, int lStride, int algo, float paramA, float paramB, float paramC, float addExposure, int altModeExposure) {
 // the tone-mapping algorithms do not give correct results with 4 channels [RGBA]
 

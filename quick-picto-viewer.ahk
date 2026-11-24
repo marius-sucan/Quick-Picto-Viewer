@@ -15436,6 +15436,31 @@ OpenCV_FimResizeBitmap(hFIFimgA, resizedW, resizedH, rx, ry, rw, rh, Interpolati
     Return hFIFimgX
 }
 
+OpenCV_GdipResizeBitmap(funcu, pBitmap, resizedW, resizedH, rx, ry, rw, rh, InterpolationMode) {
+; The given rect of a GDI+ bitmap resized with OpenCV; rw or rh set to 0 means up to the bitmap's edge.
+; It returns a new 32-PARGB bitmap, meant to be drawn, not edited. The DLL locks pBitmap in its own
+; pixel format, so GDI+ converts no pixels for 24-RGB and 32-bit bitmaps.
+; InterpolationMode, as in cv::resize(): 0 = nearest neighbour, 1 = linear, 2 = cubic, 3 = area, 4 = Lanczos,
+; 6 = nearest neighbour on pixel centres.
+
+    If !validBMP(pBitmap)
+    {
+       addJournalEntry(A_ThisFunc "(): ERROR. Invalid bitmap to resize, function invoked by " funcu "(). pBitmap = " pBitmap)
+       Return
+    }
+
+    initQPVmainDLL()
+    If qpvMainDll
+       r := DllCall("qpvmain.dll\openCVresizeGdipBitmap", "UPtr", pBitmap, "Int", rx, "Int", ry, "Int", rw, "Int", rh, "Int", resizedW, "Int", resizedH, "Int", InterpolationMode, "UPtr")
+
+    If (StrLen(r)>2)
+       recordGdipBitmaps(r, A_ThisFunc "<-" funcu)
+    Else
+       addJournalEntry(A_ThisFunc "() invoked by " funcu "() failed to resize pBitmap = " pBitmap " to W" resizedW " - H" resizedH)
+
+    Return r
+}
+
 OpenCV_FimToneMapping(hFIFimgA, algo, paramA, paramB, paramC, paramD, altExpo) {
 ; apply tone mapping on HDR image using OpenCV instead of FreeImage. It is much faster.
 
@@ -77198,10 +77223,13 @@ determineGDIsmallCacheSize(mainWidth, mainHeight) {
   Resized.Small := Round((ResizedW * ResizedH)/1000000, 2)
   Resized.Main := Round((imgW * imgH)/1000000, 2)
   Resized.Screen := Round((Floor(mainWidth*1.15) * Floor(mainHeight*1.15))/1000000, 2)
+  calcIMGdimensions(imgW, imgH, Floor(mainWidth*1.15), Floor(mainHeight*1.15), ResizedW, ResizedH)
+  Resized.Wscreen := ResizedW
+  Resized.Hscreen := ResizedH
   Return Resized
 }
 
-RescaleBMPtiny(imgPath, mainWidth, mainHeight) {
+RescaleBMPtiny(imgPath, mainWidth, mainHeight, onlyIfMade:=0) {
   Critical, on
   Static prevImgID
   trGdip_GetImageDimensions(useGdiBitmap(), fimgW, fimgH)
@@ -77212,6 +77240,9 @@ RescaleBMPtiny(imgPath, mainWidth, mainHeight) {
   If (validBMP(gdiBitmapSmall) && prevImgID=gdiBitmapIDentire && InStr(gdiBitmapIDentire, thisID))
      Return gdiBitmapSmall
 
+  If (onlyIfMade=1)
+     Return
+
   gdiBitmapSmall := trGdip_DisposeImage(gdiBitmapSmall, 1)
   Resized := determineGDIsmallCacheSize(mainWidth, mainHeight)
   If validBMP(gdiBMPvPsize)
@@ -77220,39 +77251,40 @@ RescaleBMPtiny(imgPath, mainWidth, mainHeight) {
      vpIMGres := Round((otherW * otherH)/1000000)
   }
 
-  thisImgQuality := (userimgQuality=1) ? 3 : 5
-  If (minimizeMemUsage=1)
-     thisImgQuality := ""
-
+  ; cv::resize() modes: 1 = linear, which needs no buffer of its own; 3 = area
+  thisImgQuality := (minimizeMemUsage=1) ? 1 : 3
   changeMcursor()
   whichBitmap := (validBMP(gdiBMPvPsize) && vpIMGres>Resized.Small*1.01) ? gdiBMPvPsize : gdiBitmap
-  gdiBitmapSmall := trGdip_ResizeBitmap(A_ThisFunc, whichBitmap, Resized.Wsmall, Resized.Hsmall, 0, thisImgQuality, -1)
-  ; gdiBitmapSmall := Gdi_ResizeBitmap(whichBitmap, Resized.W, Resized.H, 0, 4)
+  gdiBitmapSmall := OpenCV_GdipResizeBitmap(A_ThisFunc, whichBitmap, Resized.Wsmall, Resized.Hsmall, 0, 0, 0, 0, thisImgQuality)
   gdiBitmapIDentire := SubStr(gdiBitmapIDentire, 1, InStr(gdiBitmapIDentire, "|==|") - 1) . partID
   prevImgID := gdiBitmapIDentire
   If validBMP(gdiBitmapSmall)
      Return gdiBitmapSmall
 }
 
-RescaleBMPtinyVPsize(imgPath, GuiW, GuiH) {
+RescaleBMPtinyVPsize(imgPath, GuiW, GuiH, onlyIfMade:=0) {
   Critical, on
 
-  Static prevImgID
+  Static prevImgID, prevSize
   trGdip_GetImageDimensions(useGdiBitmap(), fimgW, fimgH)
   o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
   trGdip_GetImageDimensions(useGdiBitmap(), fimgW, fimgH)
   partID := "|==|" totalFramesIndex currentUndoLevel undoLevelsRecorded fimgW fimgH useGdiBitmap()
   thisID := resultedFilesList[currentFileIndex, 1] o_bwDithering ColorDepthDithering vpIMGrotation userHQraw userPerformColorManagement cmrRAWtoneMapAlgo allowToneMappingImg cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapAltExpo desiredFrameIndex
-  If (validBMP(gdiBMPvPsize) && prevImgID=gdiBitmapIDentire && InStr(gdiBitmapIDentire, thisID))
+  Resized := determineGDIsmallCacheSize(GuiW, GuiH)
+  thisSize := Resized.Wscreen "x" Resized.Hscreen
+  If (validBMP(gdiBMPvPsize) && prevImgID=gdiBitmapIDentire && InStr(gdiBitmapIDentire, thisID) && prevSize=thisSize)
      Return gdiBMPvPsize
 
-  gdiBMPvPsize := trGdip_DisposeImage(gdiBMPvPsize, 1)
-  thisImgQuality := (userimgQuality=1) ? 6 : 5
-  If (minimizeMemUsage=1)
-     thisImgQuality := ""
+  If (onlyIfMade=1)
+     Return
 
+  gdiBMPvPsize := trGdip_DisposeImage(gdiBMPvPsize, 1)
+  ; cv::resize() modes: 1 = linear, which needs no buffer of its own; 3 = area
+  thisImgQuality := (minimizeMemUsage=1) ? 1 : 3
   changeMcursor()
-  gdiBMPvPsize := trGdip_ResizeBitmap(A_ThisFunc, gdiBitmap, Floor(GuiW*1.15), Floor(GuiH*1.15), 0, thisImgQuality, -1)
+  gdiBMPvPsize := OpenCV_GdipResizeBitmap(A_ThisFunc, gdiBitmap, Resized.Wscreen, Resized.Hscreen, 0, 0, 0, 0, thisImgQuality)
+  prevSize := thisSize
   gdiBitmapIDentire := SubStr(gdiBitmapIDentire, 1, InStr(gdiBitmapIDentire, "|==|") - 1) . partID
   ; ToolTip, % gdiBitmapIDentire "`n" prevImgPath , , , 2
   prevImgID := gdiBitmapIDentire
@@ -84328,113 +84360,57 @@ dummyRefreshImgSelectionWindow(mm:=0) {
      }
 }
 
-drawVPpartialIMGsection(brickVPx, brickVPy, brickVPw, brickVPh, DestPosX, DestPosY, newW, newH, whichBitmap, Gu, dpX, dpY, kW, kH, imageAttribs, clrMatrix, pEffect, rImgW, rImgH, thisUSRimgQuality, simpleMode:=0) {
-    MouseCoords2Image(brickVPx, brickVPy, 1, DestPosX, DestPosY, newW, newH, brickIMGx, brickIMGy, whichBitmap, 0, rimgW, rimgH)
-    MouseCoords2Image(brickVPx + brickVPw, brickVPy + brickVPh, 1, DestPosX, DestPosY, newW, newH, brickIMGxz, brickIMGyz, whichBitmap, 0, rimgW, rimgH)
-    brickIMGw := brickIMGxz - brickIMGx
-    brickIMGh := brickIMGyz - brickIMGy
-    If (simpleMode=1)
+snapImgEdgeToVPpixel(edge, scale, stepu, limitu) {
+; The pixel column or row, from edge onward in the direction of stepu, that lands closest to a whole viewport
+; pixel: a rect cut there is drawn where it belongs, so the picture does not shift by a fraction as it is panned.
+    best := edge
+    bestOff := 1
+    Loop, % clampInRange(Ceil(8/scale), 3, 48)
     {
-       r1 := trGdip_DrawImage(A_ThisFunc, Gu, whichBitmap, brickVPx, brickVPy, brickVPw, brickVPh, brickIMGx, brickIMGy, brickIMGw, brickIMGh, clrMatrix, 2, imageAttribs)
-       if r1
-          fnOutputDebug("an error occurred drawing bitmap in " A_ThisFunc)
+        thisEdge := edge + (A_Index - 1)*stepu
+        If (thisEdge<0 || thisEdge>limitu)
+           Break
+
+        thisOff := Abs(thisEdge*scale - Round(thisEdge*scale))
+        If (thisOff<bestOff)
+        {
+           best := thisEdge
+           bestOff := thisOff
+        }
+
+        If (thisOff<0.02)
+           Break
     }
-
-    ; kBitmap := Gdip_CloneBmpCoreArea(A_ThisFunc, whichBitmap, brickIMGx, brickIMGy, brickIMGw, brickIMGh, 0, 0, 1, 0)
-    If (brickVPx<dpX)
-    {
-       brickVPw -= dpX - brickVPx
-       brickVPx := dpX
-    }
-
-    If (brickVPy<dpY)
-    {
-       brickVPh -= dpY - brickVPy
-       brickVPy := dpY
-    }
-
-    If (brickVPw + brickVPx>kW + dpX)
-       brickVPw -= brickVPw + brickVPx - (kW + dpX)
-    If (brickVPh + brickVPy>kH + dpY)
-       brickVPh -= brickVPh + brickVPy - (kH + dpY)
-
-    totalVPsize := Round((brickVPw * brickVPh)/1000000)
-    totalIMGsize := Round((brickIMGw * brickIMGh)/1000000)
-    If (brickVPw>0 && brickVPh>0) && (brickIMGw>0 && brickIMGh>0)
-    {
-       thisQuality := (thisUSRimgQuality=1) ? 7 : 5
-       kBitmap := trGdip_CloneBitmapArea(A_ThisFunc, whichBitmap, brickIMGx, brickIMGy, brickIMGw, brickIMGh)
-       If (validBMP(kBitmap) && (totalIMGsize + 2>totalVPsize) && imageAttribs)
-       {
-          zBitmap := trGdip_ResizeBitmap(A_ThisFunc, kBitmap, brickVPw, brickVPh, 0, thisQuality, -1)
-          If validBMP(zBitmap)
-             kBitmap := trGdip_DisposeImage(kBitmap)
-       }
-       aBmp := validBMP(zBitmap) ? zBitmap : kBitmap
-       If (pEffect && validBMP(aBmp))
-          Gdip_BitmapApplyEffect(aBmp, pEffect)
-    }
-
-    If (validBMP(zBitmap) || validBMP(kBitmap))
-    {
-       If validBMP(zBitmap)
-       {
-          r1 := trGdip_DrawImage(A_ThisFunc, Gu, zBitmap, brickVPx, brickVPy, brickVPw, brickVPh, 0, 0, brickVPw, brickVPh, clrMatrix, 2, imageAttribs)
-          trGdip_DisposeImage(zBitmap)
-       } Else
-       {
-          r1 := trGdip_DrawImage(A_ThisFunc, Gu, kBitmap, brickVPx, brickVPy, brickVPw, brickVPh, 0, 0, brickIMGw, brickIMGh, clrMatrix, 2, imageAttribs)
-          trGdip_DisposeImage(kBitmap)
-       }
-       If r1
-          fnOutputDebug("an error occurred drawing bitmap in " A_ThisFunc)
-    } Else 
-       fnOutputDebug("invalid bitmap after resize, an error occurred in " A_ThisFunc)
-
-    ; ToolTip, % brickVPx "=" brickVPy "`n" brickVPw "==" brickVPh , , , 2
+    Return best
 }
 
 QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceIMGload, hasFullReloaded, gdiBMPchanged) {
     Critical, on
-    Static prevImgAlphaChn, prevVPcacheIMGid, lastZeitLowQuality, prevDelayu
-         , prevVPcachePos, prevVPcacheZoom :=[], prevVPcacheHadpartialFX, prevVPcacheIDfx, prevNewW, prevNewH
+    Static prevVPcacheID, prevVPcacheLowQ := 0, lastZeitLowQuality, prevDelayu, prevNewW, prevNewH
 
     prevLoadedImageIndex := currentFileIndex
     createGDIPcanvas(mainWidth, mainHeight)
     If (CountGIFframes>1 && !AnyWindowOpen && (animGIFsSupport=1 || forcedAnimPlayPath=imgPath) && prevAnimGIFwas!=imgPath)
        mustPlayAnim := 1
 
+    freePanning := (IMGresizingMode=4 && allowFreeIMGpanning=1) ? 1 : 0
     liveBrushModeUpdates := (liveDrawingBrushTool=1 && whileLoopExec=1 && AnyWindowOpen) ? 1 : 0
-    If (mustPlayAnim=1 || IMGresizingMode=4 && allowFreeIMGpanning=1 || liveBrushModeUpdates=1)
-    {
-       ; with (IMGresizingMode=4 && allowFreeIMGpanning=1), everything goes bonkers
-       prevVPcacheZoom[1] := 0
-       allowVPcacheOptimizations := 0
-    } Else
+    mustGenerate := 0
+    If (mustPlayAnim!=1 && freePanning=0 && liveBrushModeUpdates=0)
     {
        stopGIFsPlayback()
+       ; a reduced copy of the image serves the picture only while it is shown at the copy's size or smaller
        gdiSmallSize := determineGDIsmallCacheSize(mainWidth, mainHeight)
-       totalNewSize := Round((newW * newH)/1000000, 2)
-       If (IMGresizingMode=3 || zoomLevel=1)
+       If (IMGresizingMode=3 || zoomLevel=1 || userimgQuality!=1)
           mustGenerate := 0
-       Else If isInRange(totalNewSize, 0, gdiSmallSize.Small + 0.09)
+       Else If (newW<=gdiSmallSize.Wsmall && newH<=gdiSmallSize.Hsmall && gdiSmallSize.Small<gdiSmallSize.Main)
           mustGenerate := 2
-       Else If isInRange(totalNewSize, gdiSmallSize.Small + 0.08, gdiSmallSize.Screen + 2.0)
+       Else If (newW<=gdiSmallSize.Wscreen && newH<=gdiSmallSize.Hscreen && gdiSmallSize.Screen + 1<gdiSmallSize.Main)
           mustGenerate := 1
-       Else
+
+       If (minimizeMemUsage=1 && (mustGenerate=1 || usePrevious!=1))
           mustGenerate := 0
-
-       If (mustGenerate=1) ; do not resize to screen size if it is already at screen size
-          mustGenerate := (gdiSmallSize.Screen + 2.0<gdiSmallSize.Main + 1) || (gdiSmallSize.Screen//3>gdiSmallSize.Main) ? 1 : 0
-
-       If (mustGenerate=1 && minimizeMemUsage=1 && usePrevious=1)
-          mustGenerate := 2
-
-       allowVPcacheOptimizations := (userimgQuality=1) ? 1 : 0
     }
-
-    If (minimizeMemUsage=1 && usePrevious!=1 || mustPlayAnim=1 || allowVPcacheOptimizations=0)
-       mustGenerate := 0
 
     mustGoIntoLowQuality := 0
     sizeChanged := (prevNewW!=newW || prevNewH!=newH) ? 1 : 0
@@ -84445,48 +84421,14 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     If ((liveDrawingBrushTool=1 || imgEditPanelOpened=1 || drawingShapeNow=1) && userimgQuality=1)
        mustGoIntoLowQuality := 2
 
-    If (mustGoIntoLowQuality=1 && minimizeMemUsage!=1 && mustGenerate=0 && usePrevious!=2 && mustPlayAnim!=1 && imgFxMode>1 && vpImgPanningNow!=2)
-       forcedSmallSize := mustGenerate := 1
-
-    ; allowVPcacheOptimizations := 0, mustGoIntoLowQuality := 1
-    If !(viewportQPVimage.imgHandle)
-    {
-       If (liveBrushModeUpdates=1)
-          whichBitmap := gdiBitmap
-       Else If (mustGenerate=1) ; window size
-          whichBitmap := RescaleBMPtinyVPsize(imgPath, mainWidth, mainHeight)
-       Else If (mustGenerate=2) ; very small
-          whichBitmap := RescaleBMPtiny(imgPath, mainWidth, mainHeight)
-       Else ; original image
-          whichBitmap := gdiBitmap
-    } Else whichBitmap := gdiBitmap
-
-    If !validBMP(whichBitmap)
+    If !validBMP(gdiBitmap)
        Return "invalid screen bitmap"
 
-    ; ToolTip, % "resized cache = " mustGenerate " | " oldZoomLevel "==" zoomLevel  , , , 2
     prevNewW := newW, prevNewH := newH
-    canCancelImageLoad := 0
     startZeit := A_TickCount
     oldZoomLevel := ""
-    thisVPpanningNow := (vpImgPanningNow=2) ? 1 : 0
-    trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     calcIMGcoordsInVP(mainWidth, mainHeight, newW, newH, zoomLevel, IMGdecalageX, IMGdecalageY, DestPosX, DestPosY, IMGdecalageX, IMGdecalageY)
-    If (!validBMP(ViewPortBMPcache) || mustPlayAnim=1)
-    {
-       thisVPpanningNow := diffuDestPosX := diffuDestPosY := 0
-    } Else If (allowVPcacheOptimizations=1)
-    {
-       diffuDestPosX := diffIMGdecX ? DestPosX - prevDestPosX : 0   ; has panned on X
-       diffuDestPosY := diffIMGdecY ? DestPosY - prevDestPosY : 0   ; has panned on Y
-       If (Abs(diffuDestPosY)>mainHeight - 1) || (Abs(diffuDestPosX)>mainWidth - 1)
-       {
-          thisVPpanningNow := 0
-          diffuDestPosX := diffuDestPosY := 0
-          ViewPortBMPcache := trGdip_DisposeImage(ViewPortBMPcache, 1)
-       }
-    }
-
+    hasPanned := (diffIMGdecX || diffIMGdecY) ? 1 : 0
     prevDestPosX := DestPosX
     prevDestPosY := DestPosY
     diffIMGdecX := diffIMGdecY := 0
@@ -84494,311 +84436,132 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     {
        If (mustRecordSeenImgs=1 && gdiBMPchanged=1 && !InStr(r, "error"))
           recordSeenIMGdbEntry(imgPath, currentFileIndex)
-       prevVPcacheIMGid := ""
-       prevVPcacheHadpartialFX := prevVPcacheIDfx := prevNewW := prevNewH := ""
-       prevVPcachePos := "", prevVPcacheZoom := []
+       prevVPcacheID := prevNewW := prevNewH := ""
        Return r
     }
 
-    ; calculate in viewport coords
-    errMargin := (mustPlayAnim=1) ? 0 : 5
-    dpX := (allowFreeIMGpanning=1 && IMGresizingMode=4) ? DestPosX`: clampInRange(DestPosX, 0 - errMargin, mainWidth + errMargin*2)
-    dpY := (allowFreeIMGpanning=1 && IMGresizingMode=4) ? DestPosY`: clampInRange(DestPosY, 0 - errMargin, mainHeight + errMargin*2)
-    kW := (allowFreeIMGpanning=1 && IMGresizingMode=4) ? newW`: clampInRange(newW, 0 - errMargin, mainWidth + errMargin*2)
-    kH := (allowFreeIMGpanning=1 && IMGresizingMode=4) ? newH`: clampInRange(newH, 0 - errMargin, mainHeight + errMargin*4)
-    ; If (kH<mainHeight)
-       ; ToolTip, % "kWH = mWH = newWH`nW=" kW "=" mainWidth "=" newW "`nH=" kH "=" mainHeight "=" newH , , , 2
-    errMargin := Ceil(zoomLevel + 1)
-    If diffuDestPosX
-    {
-       ; calculate the new visible rect
-       AdpX := (diffuDestPosX<0) ? diffuDestPosX + mainWidth - errMargin : -errMargin*1.5
-       AdpX := clampInRange(AdpX, -errMargin*1.5, mainWidth)
-       AkW := Abs(diffuDestPosX) + errMargin*2
-       AkW := clampInRange(AkW, 0, mainWidth + errMargin*2)
-    }
+    ; the picture's rect in the viewport
+    dpX := (freePanning=1) ? DestPosX : clampInRange(DestPosX, 0, mainWidth)
+    dpY := (freePanning=1) ? DestPosY : clampInRange(DestPosY, 0, mainHeight)
+    kW := (freePanning=1) ? newW : clampInRange(newW, 0, mainWidth)
+    kH := (freePanning=1) ? newH : clampInRange(newH, 0, mainHeight)
+    isAlphaMaskMode := (currIMGdetails.HasAlpha=1 && imgFxMode=8 && ForceNoColorMatrix=0) ? 1 : 0
+    clrMatrix := (IntensityAlphaChannel>1 && imgFxMode>1 && imgFxMode!=8 && currIMGdetails.HasAlpha=1) ? IntensityAlphaChannel : 1
+    If (AnyWindowOpen!=74)
+       decideGDIPimageFX(matrix, imageAttribs, pEffect)
 
-    If diffuDestPosY
+    ; ViewPortBMPcache holds the frame as drawn below: background and picture, no colour effects, no flips.
+    ; It is reused while nothing it shows has changed, unless it was drawn in a lower quality than the one wanted now.
+    wantsLowQ := (userimgQuality!=1 || mustGoIntoLowQuality>0) ? 1 : 0
+    thisVPcacheID := "a" gdiBitmap "|" currentFileIndex "|" imgPath "|" desiredFrameIndex "|" currentUndoLevel "|" UserMemBMP "|" undoLevelsRecorded "|" UserVPalphaBgrStyle "|" WindowBgrColor "|" newW "|" newH "|" DestPosX "|" DestPosY "|" mainWidth "|" mainHeight "|" clrMatrix "|" isAlphaMaskMode
+    qualityChanged := (prevVPcacheLowQ=1 && wantsLowQ=0 || prevVPcacheLowQ=0 && userimgQuality!=1) ? 1 : 0
+    If (thisVPcacheID!=prevVPcacheID || qualityChanged=1 || gdiBMPchanged=1 || liveBrushModeUpdates=1 || !validBMP(ViewPortBMPcache))
     {
-       ; calculate the new visible rect
-       AdpY := (diffuDestPosY<0) ? diffuDestPosY + mainHeight - errMargin : -errMargin
-       AdpY := clampInRange(AdpY, -errMargin, mainHeight)
-       AkH := Abs(diffuDestPosY) + errMargin*2
-       AkH := clampInRange(AkH, 0, mainHeight + errMargin*2)
-    }
+       ; a reduced copy is made when the picture changes size on screen; one already made is used as it is
+       whichBitmap := gdiBitmap
+       onlyIfMade := (wantsLowQ=0 && sizeChanged=1 && gdiBMPchanged!=1) ? 0 : 1
+       If (mustGenerate=1)
+          thisBitmap := RescaleBMPtinyVPsize(imgPath, mainWidth, mainHeight, onlyIfMade)
+       Else If (mustGenerate=2)
+          thisBitmap := RescaleBMPtiny(imgPath, mainWidth, mainHeight, onlyIfMade)
 
-    thisUSRimgQuality := userimgQuality
-    allowForceIMGload := (thisVPpanningNow=1) ? ForceIMGload : 0
-    thisVPcacheIMGid := "a" gdiBitmap currentFileIndex imgPath allowForceIMGload whichBitmap desiredFrameIndex currentUndoLevel UserMemBMP undoLevelsRecorded UserVPalphaBgrStyle
-    thisVPcachePos := "a" newW newH zoomLevel allowForceIMGload DestPosX DestPosY thisVPcacheIMGid
-    thisVPcacheIDfx := (AnyWindowOpen=74) ? "-" : decideGDIPimageFX(matrix, imageAttribs, pEffect)
-    forceNoFXcaching := (thisVPcachePos=prevVPcachePos && prevVPcacheHadpartialFX=2 && thisVPpanningNow=0) ? 1 : 0
-    thisThingMatrix := (IntensityAlphaChannel>1 && imgFxMode>=2 && imgFxMode!=8 && currIMGdetails.HasAlpha=1) ? 1 : 0
-    isAlphaMaskMode := (currIMGdetails.HasAlpha=1 && imgFxMode=8 && ForceNoColorMatrix=0) ? 1 :0 
-    thisImgAlphaChn := "a" IntensityAlphaChannel thisThingMatrix isAlphaMaskMode
-    trGdip_GetImageDimensions(whichBitmap, rImgW, rImgH)
-    ; ToolTip, % forceNoFXcaching "==" vpImgPanningNow "|" allowVPcacheOptimizations "`n" thisVPcachePos "`n" prevVPcachePos , , , 2
-    If (thisVPcachePos!=prevVPcachePos || thisVPcacheIDfx!=prevVPcacheIDfx || forceNoFXcaching=1 || !validBMP(ViewPortBMPcache) || thisImgAlphaChn!=prevImgAlphaChn || liveBrushModeUpdates=1)
-    {
-       If (mustGoIntoLowQuality>0)
+       If validBMP(thisBitmap)
+          whichBitmap := thisBitmap
+
+       trGdip_GetImageDimensions(whichBitmap, rImgW, rImgH)
+       If (whichBitmap!=gdiBitmap && (rImgW<newW || rImgH<newH))
        {
-          lastZeitLowQuality := A_TickCount
-          lastWasLowQuality := 1
-          thisUSRimgQuality := 0
-          Gdip_SetInterpolationMode(glPG, 5)
+          whichBitmap := gdiBitmap
+          trGdip_GetImageDimensions(whichBitmap, rImgW, rImgH)
        }
- 
-       If (thisVPcacheIMGid!=prevVPcacheIMGid && thisVPpanningNow=0 || thisImgAlphaChn!=prevImgAlphaChn)
-       {
-          ; if the image has changed, no cached section must be used
-          forceNoFXcaching := prevVPcacheHadpartialFX := AdpX := AdpY := diffuDestPosX := diffuDestPosY := 0
-          ViewPortBMPcache := trGdip_DisposeImage(ViewPortBMPcache, 1)
-          prevVPcacheZoom[1] := 0
-       }
-
-       windowScreenMGPX := Ceil((mainWidth * mainHeight)/1000000)
-       azW := prevVPcacheZoom[8] , azH := prevVPcacheZoom[9]
-       prevIMGrectMGPX := Round((azW * azH)/1000000) - 1
-       If (prevIMGrectMGPX<windowScreenMGPX//4.5 || liveBrushModeUpdates=1)        ; no need to slice and dice images when the rect we need is much smaller than the viewport
-          hasPanned := thisVPpanningNow := AdpX := AdpY := diffuDestPosX := diffuDestPosY := 0
 
        Gdip_SetClipRect(glPG, 0, 0, mainWidth, mainHeight)
-       ; ToolTip, % mainWidth "|" gdiBMPchanged , , , 2
        If (mustPlayAnim!=1 || gdiBMPchanged=1)
        {
-          Gdip_SetClipRect(glPG, dpX + errMargin, dpY + errMargin, kW - errMargin*2, kH - errMargin*2, 4)
+          ; the window colour goes around the picture; 4 = CombineModeExclude
+          Gdip_SetClipRect(glPG, dpX + 2, dpY + 2, kW - 4, kH - 4, 4)
           Gdip_GraphicsClear(glPG, "0xFF" WindowBgrColor)
           If (isAlphaMaskMode=1 || gdiBMPchanged=1)
           {
-             Gdip_SetClipRect(glPG, dpX + errMargin, dpY + errMargin, kW - errMargin*2, kH - errMargin*2)
+             Gdip_SetClipRect(glPG, dpX + 2, dpY + 2, kW - 4, kH - 4)
              Gdip_GraphicsClear(glPG, "0xFF000000")
           }
-       } Else If (desiredFrameIndex=0 || gdiBMPchanged=1)
+       } Else If (desiredFrameIndex=0)
           Gdip_GraphicsClear(glPG, "0xFF" WindowBgrColor)
 
        Gdip_ResetClip(glPG)
-
-       ; errMargin := Ceil(zoomLevel*70) + 2
        If (currIMGdetails.HasAlpha=1 && imgFxMode!=8 && mustPlayAnim!=1)
        {
-          ; draw image background - if it has an alpha channel
+          ; the background of an image that has an alpha channel
           hRgnB := Gdi_CreateRectRegion(dpX, dpY, dpX + kW, dpY + kH)
           Gdi_FillRegion(glHDC, hRgnB, useGdiHatchedBrush("vp"))
           Gdi_DeleteObject(hRgnB)
        }
-       ; Gdip_GraphicsClear(glPG, "0xFf" WindowBgrColor)
-       ; gp := Gdip_GetImagePixelFormat(ViewPortBMPcache, 2) 
-       ; ToolTip, % gp , , , 2
-       thisAllowed := (allowVPcacheOptimizations=1 || diffuDestPosX || diffuDestPosY) ? 1 : 0
-       thisImageAttribs := (imageAttribs && ((forceNoFXcaching=0 && thisAllowed=1 && currIMGdetails.HasAlpha!=1) || (isAlphaMaskMode=1))) ? imageAttribs : 0
-       clrMatrix := (thisImageAttribs=0 && IntensityAlphaChannel>1 && imgFxMode>1 && imgFxMode!=8 && currIMGdetails.HasAlpha=1) ? IntensityAlphaChannel : 1
-       thisPeffect := (pEffect && forceNoFXcaching=0 && thisAllowed=1 && isAlphaMaskMode!=1) ? pEffect : 0
-       If diffuDestPosX
+
+       If (rImgW>0 && rImgH>0 && newW>0 && newH>0 && DestPosX<mainWidth && DestPosY<mainHeight && DestPosX + newW>0 && DestPosY + newH>0)
        {
-          ; resize and draw the new visible rect if panned on the X axis
-          errMargin := (diffuDestPosX<0) ? Ceil(zoomLevel) : zoomLevel//2
-          errMargin := errMargin//4
-          drawVPpartialIMGsection(AdpX - errMargin, dpY, AkW + errMargin, kH, DestPosX, DestPosY, newW, newH, whichBitmap, glPG, dpX, dpY, kW + errMargin*2, kH, thisImageAttribs, clrMatrix, thisPeffect, rImgW, rImgH, thisUSRimgQuality)
-          prevVPcacheZoom[1] := 0
+          ; the visible part of the picture: whole pixels of whichBitmap, at least two more on each side for
+          ; the interpolation's neighbours, and the viewport rect those pixels land on
+          scaleX := newW/rImgW
+          scaleY := newH/rImgH
+          sX := snapImgEdgeToVPpixel(max(Floor((max(DestPosX, 0) - DestPosX)/scaleX) - 2, 0), scaleX, -1, rImgW)
+          sY := snapImgEdgeToVPpixel(max(Floor((max(DestPosY, 0) - DestPosY)/scaleY) - 2, 0), scaleY, -1, rImgH)
+          sW := snapImgEdgeToVPpixel(min(Ceil((min(DestPosX + newW, mainWidth) - DestPosX)/scaleX) + 2, rImgW), scaleX, 1, rImgW) - sX
+          sH := snapImgEdgeToVPpixel(min(Ceil((min(DestPosY + newH, mainHeight) - DestPosY)/scaleY) + 2, rImgH), scaleY, 1, rImgH) - sY
+          dX := DestPosX + Round(sX*scaleX)
+          dY := DestPosY + Round(sY*scaleY)
+          dW := DestPosX + Round((sX + sW)*scaleX) - dX
+          dH := DestPosY + Round((sY + sH)*scaleY) - dY
        }
 
-       If diffuDestPosY
+       If (sW>0 && sH>0 && dW>0 && dH>0)
        {
-          ; resize and draw the new visible rect if panned on the Y axis
-          If !AdpX
-             AdpX := 0
+          ; cv::resize() modes: 6 = nearest neighbour on pixel centres, 2 = cubic, 3 = area
+          If (wantsLowQ=1)
+             thisInterpolation := 6
+          Else
+             thisInterpolation := (dW<sW || dH<sH) ? 3 : 2
 
-          tdpX := (diffuDestPosX<0) ? 0 : Round(AkW) + 1
-          tdpW := (diffuDestPosX<0) ? tdpX - 2 : Round(AkW) + 2
-          drawVPpartialIMGsection(dpX + tdpX, AdpY, kW - tdpW, AkH, DestPosX, DestPosY, newW, newH, whichBitmap, glPG, dpX, dpY, kW, kH, thisImageAttribs, clrMatrix, thisPeffect, rImgW, rImgH, thisUSRimgQuality)
-          ; ToolTip, % tdpX "=" tdpW "`n" AkW "=" AkH "`n" AdpX "=" AdpY "`n" diffuDestPosX "=" diffuDestPosY, , , 2
-          prevVPcacheZoom[1] := 0
-       }
-       ; ToolTip, % diffuDestPosX "==" diffuDestPosY "|" thisVPpanningNow , , , 2
-       If ((diffuDestPosX || diffuDestPosY || thisVPpanningNow=1 && allowVPcacheOptimizations=1) && validBMP(ViewPortBMPcache))
-       {
-          ; draw the cached section on image panning
-
-          ; Gdip_SetClipRect(glPG, diffuDestPosX - errX, diffuDestPosY - errY, mainWidth, mainHeight)
-          hasPanned := 1
-          thisuAttribs := (!diffuDestPosX && !diffuDestPosY) || (isAlphaMaskMode=1) ? 0 : thisImageAttribs
-          thisuAttribs := (prevVPcacheHadpartialFX!=2 && (thisuAttribs || clrMatrix>1) && forceNoFXcaching=0) ? thisuAttribs : 0
-          thisuClrMatrix := (prevVPcacheHadpartialFX!=2 && (thisuAttribs || clrMatrix>1) && forceNoFXcaching=0) ? clrMatrix : 1
-          thisuEffectu := (!diffuDestPosX && !diffuDestPosY) || (isAlphaMaskMode=1) ? 0 : thisPeffect
-          thisuEffectu := (prevVPcacheHadpartialFX!=2 && thisuEffectu && forceNoFXcaching=0) ? thisuEffectu : 0
-          ; If (prevVPcacheHadpartialFX!=2 && (thisuAttribs || clrMatrix>1) && forceNoFXcaching=0)
-          ; {
-             brickIMGx := (diffuDestPosX<0) ? Abs(diffuDestPosX) : 0
-             brickIMGy := (diffuDestPosY<0) ? Abs(diffuDestPosY) : 0
-             brickVPx := (diffuDestPosX<0) ? 0 : Abs(diffuDestPosX)
-             brickVPy := (diffuDestPosY<0) ? 0 : Abs(diffuDestPosY)
-             brickIMGw := mainWidth - Abs(diffuDestPosX)
-             brickIMGh := mainHeight - Abs(diffuDestPosY)
-             If (brickIMGw && brickIMGh)
-                kBitmap := trGdip_CloneBitmapArea(A_ThisFunc, ViewPortBMPcache, brickIMGx, brickIMGy, brickIMGw, brickIMGh)
-
-             If validBMP(kBitmap)
-             {
-                If thisuEffectu
-                   Gdip_BitmapApplyEffect(kBitmap, thisuEffectu)
-
-                r2 := trGdip_DrawImage(A_ThisFunc, glPG, kBitmap, brickVPx, brickVPy, brickIMGw, brickIMGh, 0, 0, brickIMGw, brickIMGh, thisuClrMatrix, 2, thisuAttribs)
-                kBitmap := trGdip_DisposeImage(kBitmap, 1)
-             }
-
-             ; r2 := trGdip_DrawImage(A_ThisFunc, glPG, ViewPortBMPcache, diffuDestPosX, diffuDestPosY, mainWidth, mainHeight,,,,, thisuClrMatrix, 2, thisuAttribs)
-
-          If (!diffuDestPosX && !diffuDestPosY)
+          thisImageAttribs := (isAlphaMaskMode=1) ? imageAttribs : 0
+          zBitmap := OpenCV_GdipResizeBitmap(A_ThisFunc, whichBitmap, dW, dH, sX, sY, sW, sH, thisInterpolation)
+          If validBMP(zBitmap)
           {
-             Gdip_DisposeEffect(pEffect)
-             Gdip_DisposeImageAttributes(imageAttribs)
-             thisImageAttribs := thisPeffect := pEffect := imageAttribs := ""
-          }
-          ; ToolTip, % r2 "==" diffuDestPosX "==" diffuDestPosY "`n"  brickIMGx "=" brickIMGy "`n" brickIMGw "==" brickIMGh , , , 2
-       }
-
-       If (!diffuDestPosX && !diffuDestPosY && hasPanned!=1)
-       {
-          ; draw and calculate the image visible rect if image was not panned
-          zX := prevVPcacheZoom[2] , zY := prevVPcacheZoom[3]
-          zW := prevVPcacheZoom[4] , zH := prevVPcacheZoom[5]
-          sameNess := (dpX=zX && dpY=zY && zW=kW && zH=kH && prevVPcacheZoom[11]=DestPosX && prevVPcacheZoom[12]=DestPosY) ? 1 : 0
-          ; ToolTip, % "l=" sameNess "`n" DestPosX "==" DestPosY "`n" prevVPcacheZoom[11] "==" prevVPcacheZoom[12] , , , 2
-          If ((sameNess=1 || prevVPcacheZoom[1]>zoomLevel) && (prevIMGrectMGPX>windowScreenMGPX//2) && IMGresizingMode=4 && validBMP(ViewPortBMPcache) && whichBitmap=gdiBitmap && allowVPcacheOptimizations=1)
+             ; already at its size on screen: 5 = InterpolationModeNearestNeighbor copies it pixel for pixel
+             Gdip_SetInterpolationMode(glPG, 5)
+             trGdip_DrawImage(A_ThisFunc, glPG, zBitmap, dX, dY, dW, dH, 0, 0, dW, dH, clrMatrix, 2, thisImageAttribs)
+             trGdip_DisposeImage(zBitmap, 1)
+          } Else
           {
-             ; on zoom out, reuse viewport cached image
-             azX := prevVPcacheZoom[6] , azY := prevVPcacheZoom[7]
-             ImageCoords2Window(azX, azY, DestPosX, DestPosY, 0, outXa, outYa, 0, 1)
-             ImageCoords2Window(azX + azW, azY + azH, DestPosX, DestPosY, 0, outXb, outYb, 0, 1)
-             errMargin := 0 ; Ceil(zoomLevel)
-             If (thisUSRimgQuality=1)
-                Gdip_SetInterpolationMode(glPG, 3)
-
-             thisuAttribs := (prevVPcacheHadpartialFX!=2 && thisImageAttribs && forceNoFXcaching=0 && isAlphaMaskMode=0) ? thisImageAttribs : 0
-             thisuEffectu := (prevVPcacheHadpartialFX!=2 && thisPeffect && forceNoFXcaching=0 && isAlphaMaskMode=0) ? thisPeffect : 0
-             If thisuEffectu
-             {
-                thisBMP := trGdip_CloneBitmap(A_ThisFunc, ViewPortBMPcache)
-                If validBMP(thisBMP)
-                   Gdip_BitmapApplyEffect(thisBMP, thisuEffectu)
-             }
-             aBmp := validBMP(thisBMP) ? thisBMP : ViewPortBMPcache
-             r2 := trGdip_DrawImage(A_ThisFunc, glPG, aBmp, outXa - errMargin, outYa - errMargin, outXb - outXa + errMargin*2, outYb - outYa + errMargin*2, zX, zY, zW, zH, clrMatrix, 2, thisuAttribs)
-             thisBMP := trGdip_DisposeImage(thisBMP)
-             If (thisUSRimgQuality=1)
-                Gdip_SetInterpolationMode(glPG, 7)
-
-             If (prevVPcacheZoom[10]=1)
-             {
-                ; if the image is larger than the viewport, and user zooms out
-                ; resize and draw only the newly visible image sections
-                mX := 0, mY := 0
-                mW := mainWidth, mH := mainHeight
-
-                ; left side
-                errMargin := (outXa>0) ? Ceil(zoomLevel) + 4 : 0
-                drawVPpartialIMGsection(mX, mY, outXa + errMargin, mH + errMargin*2, DestPosX, DestPosY, newW, newH, whichBitmap, glPG, dpX, dpY, kW + errMargin, kH + errMargin*2, thisImageAttribs, clrMatrix, thisPeffect, rImgW, rImgH, thisUSRimgQuality)
-
-                ; right side
-                errMargin := Ceil(zoomLevel) + 4
-                tW := mW - outXb, tH := mH
-                tX := mW - tW, tY := mY
-                tW := (tW>0) ? tW + errMargin*2 : 0
-                tH := (tH>0) ? tH + errMargin*2 : 0
-                If (tW>0)
-                   tX -= errMargin
-                drawVPpartialIMGsection(tX, tY, tW, tH, DestPosX, DestPosY, newW, newH, whichBitmap, glPG, dpX, dpY, kW + errMargin, kH + errMargin*2, thisImageAttribs, clrMatrix, thisPeffect, rImgW, rImgH, thisUSRimgQuality)
-
-                ; top side
-                tW := mW - outXa - (mW - outXb), tH := outYa
-                tX := outXa, tY := mY
-                tH := (tH>0) ? tH + errMargin*2 : 0
-                If (tH>0)
-                   tY -= errMargin
-                drawVPpartialIMGsection(tX, tY, tW, tH, DestPosX, DestPosY, newW, newH, whichBitmap, glPG, dpX, dpY, kW + errMargin, kH + errMargin, thisImageAttribs, clrMatrix, thisPeffect, rImgW, rImgH, thisUSRimgQuality)
-
-                ; bottom side
-                tW := mW - outXa - (mW - outXb)
-                tH := mH - outYb
-                tX := outXa, tY := outYb
-                tH := (tH>0) ? tH + errMargin*2 : 0
-                If (tH>0)
-                   tY -= errMargin
-                drawVPpartialIMGsection(tX, tY, tW, tH, DestPosX, DestPosY, newW, newH, whichBitmap, glPG, dpX, dpY, kW + errMargin, kH + errMargin, thisImageAttribs, clrMatrix, thisPeffect, rImgW, rImgH, thisUSRimgQuality)
-             } 
-
-             ; ToolTip,  % zX "==" zY "`n" zW "==" zH "`n" azX "=" azY "`n" azW "=" azH "`n" outXa "==" outYa "`n" outXb "=" outYb , , , 2
-          } Else If (thisVPpanningNow=0 || allowVPcacheOptimizations=0)
-          {
-             ; no cached sections reused
-             If (thisUSRimgQuality=1 && whichBitmap!=gdiBitmap)
-                Gdip_SetInterpolationMode(glPG, 3)
-
-             thisModus := (thisPeffect || thisImageAttribs || thisUSRimgQuality=1 || allowFreeIMGpanning=1 && IMGresizingMode=4) ? 0 : 1
-             ; fnOutputDebug(whichBitmap " not cached  = " thisModus " | " dpX " x " dpY " | " kW "=" kH)
-             drawVPpartialIMGsection(dpX, dpY, kW, kH, DestPosX, DestPosY, newW, newH, whichBitmap, glPG, dpX, dpY, kW, kH, thisImageAttribs, clrMatrix, thisPeffect, rImgW, rImgH, thisUSRimgQuality, thisModus)
-             If (thisUSRimgQuality=1 && whichBitmap!=gdiBitmap)
-                Gdip_SetInterpolationMode(glPG, 7)
+             ; 7 = InterpolationModeHighQualityBicubic
+             Gdip_SetInterpolationMode(glPG, (wantsLowQ=1) ? 5 : 7)
+             trGdip_DrawImage(A_ThisFunc, glPG, whichBitmap, dX, dY, dW, dH, sX, sY, sW, sH, clrMatrix, 2, thisImageAttribs)
           }
        }
-
-       dpX := (allowFreeIMGpanning=1 && IMGresizingMode=4) ? DestPosX`: clampInRange(DestPosX, 0, mainWidth)
-       dpY := (allowFreeIMGpanning=1 && IMGresizingMode=4) ? DestPosY`: clampInRange(DestPosY, 0, mainHeight)
-       kW := (allowFreeIMGpanning=1 && IMGresizingMode=4) ? newW`: clampInRange(newW, 0, mainWidth)
-       kH := (allowFreeIMGpanning=1 && IMGresizingMode=4) ? newH`: clampInRange(newH, 0, mainHeight)
-       MouseCoords2Image(dpX, dpY, 0, DestPosX, DestPosY, newW, newH, sfPosX1, sfPosY1, whichBitmap, 0, rImgW, rImgH)
-       MouseCoords2Image(dpX + kW, dpY + kH, 0, DestPosX, DestPosY, newW, newH, sfPosX2, sfPosY2, whichBitmap, 0, rImgW, rImgH)
-       sfW := sfPosX2 - sfPosX1
-       sfH := sfPosY2 - sfPosY1
 
        ViewPortBMPcache := trGdip_DisposeImage(ViewPortBMPcache, 1)
        ViewPortBMPcache := trGdip_CreateBitmapFromHBITMAP(A_ThisFunc, glHbitmap)
-       prevVPcachePos := thisVPcachePos
-       prevVPcacheIMGid := thisVPcacheIMGid
-       zl := (IMGresizingMode=4 && !AdpX && !AdpY && whichBitmap=gdiBitmap) ? zoomLevel : 0
-       prevVPcacheIDfx := thisVPcacheIDfx
-       prevVPcacheHadpartialFX := thisImageAttribs ? 2 : 0
-       prevImgAlphaChn := thisImgAlphaChn
-       prevVPcacheZoom := [zl, dpX, dpY, kW, kH, sfPosX1, sfPosY1, sfW, sfH, IMGlargerViewPort, DestPosX, DestPosY]
-       If (thisPeffect && pEffect)
-       {
-          Gdip_DisposeEffect(pEffect)
-          pEffect := ""
-       }
-
-       If (thisImageAttribs && imageAttribs)
-       {
-          Gdip_DisposeImageAttributes(imageAttribs)
-          imageAttribs := ""
-       }
-
+       prevVPcacheID := thisVPcacheID
+       prevVPcacheLowQ := wantsLowQ
+       lowQframe := wantsLowQ
        wasVPcached := 0
     } Else
     {
-       ; the entire image visible area is cached, recalculate colour effects if needed
+       lowQframe := prevVPcacheLowQ
        wasVPcached := 1
     }
 
-    ; ToolTip, % wasVPcached "l=" r2 "=" kBitmap "=" ViewPortBMPcache "=" gdipLastError "=" glHbitmap , , , 2
-    confirmTexBGR := isVarEqualTo(vpIMGrotation, 0, 90, 180, 270) && (usrTextureBGR=1 && gdiAmbientalTexBrush && (IMGentirelylargerThanVP!=1 || allowFreeIMGpanning=1 && IMGresizingMode=4)) ? 1 : 0
+    If (isAlphaMaskMode=1)
+    {
+       ; its colour matrix was applied on the picture itself
+       Gdip_DisposeEffect(pEffect)
+       Gdip_DisposeImageAttributes(imageAttribs)
+       pEffect := imageAttribs := ""
+    }
+
+    confirmTexBGR := isVarEqualTo(vpIMGrotation, 0, 90, 180, 270) && (usrTextureBGR=1 && gdiAmbientalTexBrush && (IMGentirelylargerThanVP!=1 || freePanning=1)) ? 1 : 0
     If (FlipImgV=1 || FlipImgH=1 || pEffect || imageAttribs || wasVPcached=1 || isVarEqualTo(UserVPalphaBgrStyle, 2, 4, 5) && currIMGdetails.HasAlpha=1)
     {
-       ; redraw viewport with the activated FX
-       If (prevVPcacheHadpartialFX=2 || isAlphaMaskMode=1)
-       {
-          ; ToolTip, llllllol , , , 2
-          Gdip_DisposeEffect(pEffect)
-          Gdip_DisposeImageAttributes(imageAttribs)
-          imageAttribs := ""
-          pEffect := ""
-       }
-
-       if (imageAttribs || pEffect)
-       {
-          ; ToolTip, nooooooooo , , , 2
-          prevVPcacheHadpartialFX := 0
-       }
-
+       ; the kept frame goes on the canvas again, with the colour effects and the flips
        If ((imageAlignVPtopLeft=1 || allowFreeIMGpanning=1 && imageAlignVPtopLeft=0) && wasVPcached=0 && (FlipImgV=1 || FlipImgH=1))
        {
           If (allowFreeIMGpanning=0)
@@ -84807,12 +84570,11 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
           Gdip_ResetClip(glPG)
        }
 
-       ; flipBitmapAccordingToViewPort(kBitmap, 1)
        setMainCanvasTransform(mainWidth, mainHeight)
        If (wasVPcached=1 && confirmTexBGR=0)
        {
           Gdip_SetClipRect(glPG, 0, 0, mainWidth, mainHeight)
-          Gdip_SetClipRect(glPG, dpX, dpY, kW, kH, 4)
+          Gdip_SetClipRect(glPG, dpX, dpY, kW, kH, 4) ; CombineModeExclude
           Gdip_GraphicsClear(glPG, "0xFF" WindowBgrColor)
           Gdip_ResetClip(glPG)
        }
@@ -84828,11 +84590,15 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
           Gdip_DisposeEffect(pEffect)
 
        aBmp := validBMP(thisBMP) ? thisBMP : ViewPortBMPcache
+       Gdip_SetInterpolationMode(glPG, 5) ; InterpolationModeNearestNeighbor
        r2 := trGdip_DrawImage(A_ThisFunc, glPG, aBmp, dpX, dpY, kW, kH, dpX, dpY, kW, kH,,, imageAttribs)
        Gdip_DisposeImageAttributes(imageAttribs)
        thisBMP := trGdip_DisposeImage(thisBMP, 1)
-    } Else Gdip_ResetClip(glPG)
+    } Else
+       Gdip_ResetClip(glPG)
 
+    ; 7 = InterpolationModeHighQualityBicubic, 5 = InterpolationModeNearestNeighbor
+    Gdip_SetInterpolationMode(glPG, (userimgQuality=1 && mustGoIntoLowQuality!=2) ? 7 : 5)
     If (confirmTexBGR=1)
     {
        Gdip_ResetClip(glPG)
@@ -84840,15 +84606,15 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
        dpX := (FlipImgH=1 && imageAlignVPtopLeft=1) ? mainWidth - kW : dpX
        dpY := (FlipImgV=1 && imageAlignVPtopLeft=1) ? mainHeight - kH : dpY
        hRgnB := Gdi_CreateRectRegion(dpX, dpY, dpX + kW, dpY + kH)
-       Gdi_CombineRegion(hRgnA, hRgnA, hRgnB, 3)
+       Gdi_CombineRegion(hRgnA, hRgnA, hRgnB, 3) ; RGN_XOR
        Gdi_FillRegion(glHDC, hRgnA, gdiAmbientalTexBrush)
        Gdi_DeleteObject(hRgnA)
        Gdi_DeleteObject(hRgnB)
     }
 
-    ; ToolTip, % confirmTexBGR "=" z "=" hRgnA "==" gdiAmbientalTexBrush , , , 2
-    thisModus := (mustPlayAnim!=1 && thisUSRimgQuality=0 && userimgQuality=1 && mustGoIntoLowQuality!=2) ? 2 : 1
-    drawHUDelements(thisModus, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, imgPath)
+    ; a low quality frame on screen is replaced once the user stops, unless low quality is what this view calls for
+    pendingHighQ := (lowQframe=1 && userimgQuality=1 && mustGoIntoLowQuality!=2 && zoomLevel<=10 && mustPlayAnim!=1) ? 1 : 0
+    drawHUDelements((pendingHighQ=1) ? 2 : 1, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, imgPath)
     Gdip_ResetWorldTransform(glPG)
     If (minimizeMemUsage!=1 && slideShowRunning=1 && doSlidesTransitions=1 && slideShowDelay>950 && validBMP(GDIfadeVPcache))
        imageHasFaded := performFadeTransition(imgPath, mustPlayAnim)
@@ -84862,23 +84628,22 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     {
        autoChangeDesiredFrame("start", imgPath)
        SetTimer, autoChangeDesiredFrame, % animPlaybackDelay()
-       If (mustRecordSeenImgs=1 && desiredFrameIndex=2 && gdiBMPchanged=1 && !InStr(r, "error"))
+       If (mustRecordSeenImgs=1 && desiredFrameIndex=2 && gdiBMPchanged=1)
           recordSeenIMGdbEntry(imgPath, currentFileIndex)
     } Else
     {
        autoChangeDesiredFrame("stop")
-       If (mustRecordSeenImgs=1 && gdiBMPchanged=1 && !InStr(r, "error"))
+       If (mustRecordSeenImgs=1 && gdiBMPchanged=1)
           recordSeenIMGdbEntry(imgPath, currentFileIndex)
     }
 
     totalZeit := A_TickCount - startZeitIMGload
-    If (thisUSRimgQuality=0 && userimgQuality=1 && mustGoIntoLowQuality!=2)
+    If (pendingHighQ=1)
     {
        lastWasLowQuality := 1
        If (usePrevious=0)
           lastZeitLowQuality := A_TickCount
-       Gdip_SetInterpolationMode(glPG, 7)
-       prevDelayu := (vpImgPanningNow=2 || hasPanned=1 || totalZeit>100 && hasPanned=1 || sizeChanged=1 || forcedSmallSize=1) ? 850 : 65
+       prevDelayu := (vpImgPanningNow=2 || hasPanned=1 || sizeChanged=1) ? 850 : 65
        SetTimer, wrapResizeImageGDIwin, % -prevDelayu
     } Else
     {
@@ -84886,14 +84651,11 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
        lastWasLowQuality := (mustGoIntoLowQuality=2) ? 1 : 0
     }
 
-    ; Gdip_ResetClip(glPG)
-    thisZeit := A_TickCount - startZeit
     If (totalZeit<155)
        prevFastDisplay := A_TickCount
     Else If (usePrevious!=2)
        lastZeitLowQuality := A_TickCount
 
-    ; prevFullIMGload := A_TickCount
     LastWasFastDisplay := (totalZeit<150 && usePrevious<2) ? 1 : 0
     drawModeAzeit := A_TickCount - startZeit
     If (hasFullReloaded=1 && imageHasFaded!=1)
@@ -84902,7 +84664,6 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
        fullLoadZeit2 := (fullLoadZeit + drawModeCzeit)//2
        drawModeCzeit := max(fullLoadZeit, fullLoadZeit2)
     }
-    ; ToolTip, % fullLoadZeit ", "  thisZeit ", " totalZeit ", " drawModeCzeit ,,,2
     Return r2 ? r2 : "error"
 } ; // QPV_ShowImgonGui
 
