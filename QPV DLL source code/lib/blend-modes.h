@@ -329,7 +329,8 @@ inline RGBAColor CalculateNewBlendModes(
 
     const int sa = Orgb.a;
     const int da = Brgb.a;
-    const int resultA = sa + ((da * (255 - sa)) / 255);
+    // the union, rounded and at least one level above both layers, so that repeated faint paint ends opaque
+    const int resultA = max(sa + ((da * (255 - sa) + 127) / 255), min(max(sa, da) + 1, 255));
     if (resultA == 0)
        return {0, 0, 0, 0};
 
@@ -359,7 +360,7 @@ inline RGBAColor CalculateNewBlendModes(
     // blend against the canvas [Orgb], as unswapped
     const bool keptSwap = do_swap && !mix;
     const RGBAColor under = keptSwap ? Orgb : Brgb;
-    const unsigned int top_scaled = keptSwap ? (da * 65536U) / (da + ((sa * (255 - da)) / 255)) : sa_scaled;
+    const unsigned int top_scaled = keptSwap ? (da * 65536U) / resultA : sa_scaled;
     const unsigned int under_scaled = 65536U - top_scaled;
     const int blend65k = blendMode * 65536;
     if (blendMode == 20 || blendMode == 21)
