@@ -283,7 +283,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , alphaMaskClrAintensity := 0, alphaMaskClrBintensity := 255, closeEditPanelOnApply := 1, FillAreaCurveTension := 2
    , alphaMaskOffsetX := 0, alphaMaskOffsetY := 0, alphaMaskReplaceMode := 0, alphaMaskBMPchannel := 5
    , blurAreaMode := 2, FillAreaBlendMode := 1, PasteInPlaceApplyColorFX := 0, blurAreaPixelizeAmount := 0
-   , dynamicThumbsColumns := 0, thumbsColumns := 8, TextInAreaAutoWrap := 1, histogramMode := 2, cmrRAWtoneMapParamB := 0
+   , dynamicThumbsColumns := 1, thumbsColumns := 8, TextInAreaAutoWrap := 1, histogramMode := 2, cmrRAWtoneMapParamB := 0
    , showHUDnavIMG := 0, HUDnavBoxSize := 75, PrintTxtSize := 300, cmrRAWtoneMapAlgo := 2, cmrRAWtoneMapParamA := 1.85
    , mainWinPos := 0, mainWinMaximized := 2, mainWinSize := 0, UserExternalApp := "", UserExternalEditApp := ""
    , lockSelectionAspectRatio := 1, desiredSelAspectRatio := 0, adjustingSelDotNow := 0, cycleFavesOpenIMG := 0
@@ -27374,6 +27374,10 @@ btnHelpKbdContexts() {
    msgBoxWrapper(appTitle ": HELP", "Users can customize keyboard shortcuts per context in the application, such as image view, files list modes and image editor live tools.`n`nThe same keyboard shortcut can do different things based on the context. Or, the same function, if available in multiple contexts, can have a different shortcut for each context.", -1, 0, 0)
 }
 
+btnHelpThumbsColumns() {
+   msgBoxWrapper(appTitle ": HELP", "You can press the + / - keys or Ctrl + Wheel Up / Down to increase or decrease the number of columns. When «Automatic number of columns» is activated, the number of columns is calculated based on the zoom level and window size.", -1, 0, 0)
+}
+
 btnHelpSettingsPanel() {
    msgBoxWrapper(appTitle ": HELP", "The text style options apply to the On-Screen Display in the viewport. The same text style is used to render text pasted from the clipboard as an image.", -1, 0, 0)
 }
@@ -44409,9 +44413,8 @@ PanelSetThumbColumnOptions() {
     UIvpImgAlignCenter := (imageAlignVPtopLeft=0) ? 1 : 0
     UIthumbsAratio := thumbsAratio
     UIthumbsZoomLevel := Round(thumbsZoomLevel*100)
-    disColumns := (dynamicThumbsColumns=1) ? " Disabled" : ""
-    disZoom := (dynamicThumbsColumns=1) ? "" : " Disabled"
     thisW := (PrefsLargeFonts=1) ? 90 : 65
+    sml := (PrefsLargeFonts=1) ? 40 : 30
     Gui, Add, Text, x15 y15 Section w%txtWid2%, Please note: most of the options listed here are shared with the full image view.
     Gui, Add, Text, xs y+15 w%slideWid2%, Flip thumbnails:
     Gui, Add, Checkbox, x+10 wp-15 gupdateUIthumbsView Checked%FlipImgH% vFlipImgH, &horizontally
@@ -44428,16 +44431,14 @@ PanelSetThumbColumnOptions() {
     Gui, Add, Checkbox, xs y+10 gupdateUIthumbsView Checked%fadeOtherDupeGroups% vfadeOtherDupeGroups, Fade the other groups of image duplicates
     Gui, Add, Checkbox, xs y+10 gupdateUIthumbsView Checked%multilineStatusBar% vmultilineStatusBar, Two-line status bar
     Gui, Add, Checkbox, xs y+10 gupdateUIthumbsView Checked%thumbsModeItemHighlight% vthumbsModeItemHighlight, Solid active item highlighting
-    ; 0x200 = SS_CENTERIMAGE
-    Gui, Add, Text, xs y+15 hp +0x200 w%slideWid2%, Columns:
-    GuiAddEdit("x+10 w70 gupdateUIthumbsView number -multi limit3 veditF5" disColumns, thumbsColumns)
-    Gui, Add, UpDown, gupdateUIthumbsView vthumbsColumns Range2-99 %disColumns%, % thumbsColumns
-    Gui, Add, Checkbox, xs y+10 gupdateUIthumbsView Checked%dynamicThumbsColumns% vdynamicThumbsColumns, &Dynamic number of columns
-    Gui, Add, Text, xs y+10 hp +0x200 w%slideWid2%, Zoom level:
-    GuiAddEdit("x+10 w70 gupdateUIthumbsView number -multi limit3 veditF6" disZoom, UIthumbsZoomLevel)
-    Gui, Add, UpDown, gupdateUIthumbsView vUIthumbsZoomLevel Range35-300 %disZoom%, % UIthumbsZoomLevel
-    Gui, Add, Text, x+5 hp +0x200, `%
-    Gui, Add, Text, xs+15 y+7 w%txtWid2%, You can press the + / - keys or Ctrl + Wheel Up / Down to increase or decrease the number of columns. With a dynamic number of columns, the thumbnails keep their zoom level and the columns follow the window width.
+    Gui, Add, Checkbox, xs y+10 hp gupdateUIthumbsView Checked%dynamicThumbsColumns% vdynamicThumbsColumns, &Automatic number of columns
+    Gui, Add, Text, xs y+10 w%slideWid2% h1 +0x200 vtxtline2,
+    GuiAddEdit("x+5 w60 gupdateUIthumbsView number -multi limit3 veditF5", thumbsColumns)
+    Gui, Add, UpDown, gupdateUIthumbsView vthumbsColumns Range2-99, % thumbsColumns
+    GuiAddButton("x+5 w" sml " hp gbtnHelpThumbsColumns", " ?", "Help")
+    Gui, Add, Text, xs yp w%slideWid2% hp +0x200 vtxtline1, -
+    GuiAddEdit("x+5 w60 gupdateUIthumbsView number -multi limit3 veditF6", UIthumbsZoomLevel)
+    Gui, Add, UpDown, gupdateUIthumbsView vUIthumbsZoomLevel Range35-300, % UIthumbsZoomLevel
 
     If !testIsDupesList()
        GuiControl, SettingsGUIA: Disable, fadeOtherDupeGroups
@@ -44460,11 +44461,13 @@ PanelSetThumbColumnOptions() {
     Gui, Add, Button, xs y+25 w%thisW% h%thisBtnHeight% Default gBtnCloseWindow, &Close
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Thumbnails options: " appTitle, winPos)
+    updateUIthumbsView("init")
 }
 
-updateUIthumbsView() {
+updateUIthumbsView(actu:=0) {
    If (AnyWindowOpen!=40)
       Return
+
 
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: Submit, NoHide
@@ -44477,24 +44480,29 @@ updateUIthumbsView() {
    GuiControl, % act, ColorDepthDithering
    act := (imgFxMode>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % act, btnFldr1
-   act := (dynamicThumbsColumns=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
+   act := (dynamicThumbsColumns=1) ? "SettingsGUIA: Hide" : "SettingsGUIA: Show"
    GuiControl, % act, editF5
    GuiControl, % act, thumbsColumns
-   act := (dynamicThumbsColumns=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+
+   act := (dynamicThumbsColumns=1) ? "Zoom level (`%):" : "Layout columns:"
+   GuiControl,, txtline1, % act
+
+   act := (dynamicThumbsColumns=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
    GuiControl, % act, editF6
    GuiControl, % act, UIthumbsZoomLevel
    If (UIthumbsZoomLevel!=Round(thumbsZoomLevel*100))
       thumbsZoomLevel := clampInRange(UIthumbsZoomLevel/100, 0.35, 3)
 
-   ; thumbsColumns := editF5
-   imageAlignVPtopLeft := (UIvpImgAlignCenter=1) ? 0 : 1
-   thumbsAratio := clampInRange(UIthumbsAratio, 1, 3)
-   defineColorDepth()
-   recalculateThumbsSizes()
-   ForceRefreshNowThumbsList()
-   dummyTimerDelayiedImageDisplay(50)
-   ; SetTimer, DeepRefreshThumbsNow, -50
-   SetTimer, WriteThumbnailsSettingsPanel, -200
+   If (dummy!="init")
+   {
+      imageAlignVPtopLeft := (UIvpImgAlignCenter=1) ? 0 : 1
+      thumbsAratio := clampInRange(UIthumbsAratio, 1, 3)
+      defineColorDepth()
+      recalculateThumbsSizes()
+      ForceRefreshNowThumbsList()
+      dummyTimerDelayiedImageDisplay(50)
+      SetTimer, WriteThumbnailsSettingsPanel, -200
+   }
 }
 
 WriteThumbnailsSettingsPanel() {
