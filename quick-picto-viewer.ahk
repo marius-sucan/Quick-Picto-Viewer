@@ -44464,10 +44464,9 @@ PanelSetThumbColumnOptions() {
     updateUIthumbsView("init")
 }
 
-updateUIthumbsView(actu:=0) {
+updateUIthumbsView(dummy:=0) {
    If (AnyWindowOpen!=40)
       Return
-
 
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: Submit, NoHide
