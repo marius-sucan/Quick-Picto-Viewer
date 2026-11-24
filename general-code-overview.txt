@@ -20,6 +20,7 @@ Deniere mise à jour: mercredi 12 août 2026.
 =====================================================================
 
 -) Introduction
+=====================================================================
 
    The code of QPV is poorly structured and organized. It relies on
    many global variables... and is hard to follow. This is the result
@@ -218,7 +219,10 @@ b) How a files list index is created
   sldDataBaseOpen() opens SQLlite3 databases and reads the 
   settings using IniSLDBreadAll().
 
+
 c) Files index filtering
+=====================================================================
+
    Users can apply a filter on the indexed file list through
    PanelEnableFilesFilter(). It can be a RegEx or a string
    that allows "|" to act as the OR operator.
@@ -366,7 +370,7 @@ d) How an image is loaded and displayed on screen
    openCVresizeGdipBitmap() found in qpvmain.dll. The DLL function
    locks the GDI+ bitmap in its own pixel format, resizes the given
    rect with OpenCV and returns a new 32-PARGB bitmap, which is
-   drawn pixel for pixel. If no bitmap is returned, Gdip_DrawImage()
+   is then drawn by GDI+. If no bitmap is returned, Gdip_DrawImage()
    scales the image for that frame.
 
    High quality frames use the area interpolation when the image is
@@ -396,7 +400,7 @@ d) How an image is loaded and displayed on screen
    If the image loaded exceeds 536 megapixels, the reduced copies
    are not created: gdiBMPvPsize, gdiBitmapSmall. QPV_ShowImgonGui()
    calls retrieveQPVscreenImgSection() instead. This function renders
-   / displays very large images. Internally, it caches a viewport
+   and displays very large images. Internally, it caches a viewport
    sized image.
 
    decideGDIPimageFX() is used to obtain GDI+ objects that can alter 
