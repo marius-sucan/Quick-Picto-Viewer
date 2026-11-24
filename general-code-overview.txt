@@ -108,7 +108,6 @@ a) How Quick Picto Viewer initializes
      allowMultiCoreMode := 0
      minimizeMemUsage := 1
      maxUndoLevels := 2
-     coreDesiredPixFmt := "0x21808" ;  24-RGB
      These are meant to limit memory usage as much as possible.
 
      Side note: the 32 bits edition is no longer actively tested.

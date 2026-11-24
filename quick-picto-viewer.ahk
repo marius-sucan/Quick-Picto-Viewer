@@ -475,7 +475,6 @@ If (A_PtrSize=4)
    allowMultiCoreMode := 0
    minimizeMemUsage := 1
    maxUndoLevels := 2
-   coreDesiredPixFmt := "0x21808"
 }
 
 ; OnMessage(0x205, "WM_RBUTTONUP")
@@ -15841,9 +15840,6 @@ realtimePasteInPlaceAlphaMasker(previewMode, clipBMP, givenID, ByRef newBitmap, 
     }
 
     doMerger := validBMP(initialBitmap) ? 1 : 0
-    If (coreDesiredPixFmt="0x21808" && doMerger=0)
-       Return
-
     newBitmap := ""
     pa := "a"
     trGdip_GetImageDimensions(clipBMP, oImgW, oImgH)
@@ -17398,36 +17394,12 @@ ImgRedoAction(dummy:=0) {
    SetTimer, RemoveTooltip, % -msgDisplayTime//2
 }
 
-ToggleCorePixFmt() {
-   friendly := (A_PtrSize=4 && A_is64BitOS) ? "`n`nPlease use the 64-bits edition of this application to enjoy a better experience for image editing and image viewing." : ""
-   friendly .= "`n`nUpon application restart, the 32-bits RGBA mode will no longer be activated."
-   coreDesiredPixFmt := (coreDesiredPixFmt="0x21808") ? "0x26200A" : "0x21808" ; PixelFormat24bppRGB, PixelFormat32bppARGB
-   If (A_PtrSize=4 && coreDesiredPixFmt="0x26200A")
-      msgBoxWrapper(appTitle ": WARNING", "32-bits RGBA mode is now activated. " appTitle " will now have an increased memory usage. The maximum amount of usable memory on your system is 2 GB." friendly, 0, 0, "exclamation")
-   Else If (A_PtrSize=4 && coreDesiredPixFmt="0x21808")
-      msgBoxWrapper(appTitle ": WARNING", "32-bits RGBA mode is now deactivated. " appTitle " will use less memory, but various image editing options are disabled." friendly, 0, 0, "exclamation")
-   Else If (A_PtrSize=8 && coreDesiredPixFmt="0x21808")
-      msgBoxWrapper(appTitle ": WARNING", "32-bits RGBA mode is now deactivated. Please note, various image editing options are disabled in 24-bits RGB mode, including proper alpha channel support.`n`nUpon application restart, the 32-bits RGBA mode will be reactivated. This option is only meant help reduce memory usage for old systems.", 0, 0, "exclamation")
-
-   RefreshImageFileAction()
-}
-
 alertReduceColorDepth(alertMode:=1) {
    If (validBMP(UserMemBMP) || viewportQPVimage.imgHandle || noQualityWarnings=1)
       Return
 
    pixFmt := currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat
    thisImgBPP := SubStr(pixFmt, 1, InStr(pixFmt, "-") - 1)
-   If (currIMGdetails.HasAlpha=1 && thisImgBPP=32 && coreDesiredPixFmt="0x21808" && liveDrawingBrushTool!=1)
-   {
-      r := msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", "The image you now begin to edit has an alpha channel. However, " appTitle " is set to work in the 24-RGB space, without an alpha channel, to reduce memory usage.  Please activate the 32-RGBA mode to preserve the alpha channel.", "&OK|&Activate 32-RGBA", 1, "exclamation")
-      If InStr(r, "activate")
-      {
-         coreDesiredPixFmt := "0x26200A" ; PixelFormat32bppARGB
-         If !undoLevelsRecorded
-            RefreshImageFileAction()
-      }
-   }
 
    vpFmt := Gdip_GetImagePixelFormat(useGdiBitmap(), 2)
    If (thisImgBPP!=24 && thisImgBPP!=32)
@@ -17465,12 +17437,6 @@ alertReduceSaveColorDepth() {
    msgResult := "continue"
    pixFmt := currIMGdetails.PixelFormat  " | " currIMGdetails.RawFormat
    thisImgBPP := SubStr(pixFmt, 1, InStr(pixFmt, "-") - 1)
-   If (currIMGdetails.HasAlpha=1 && thisImgBPP=32 && coreDesiredPixFmt="0x21808")
-      msgResult := msgBoxWrapper(appTitle ": IMAGE SAVE WARNING", "The image you now begin to edit has an alpha channel. However, " appTitle " is set to work in 24-RGB space, without an alpha channel, to reduce memory usage.  Please activate 32-RGBA mode to preserve the alpha channel before editing or saving the image.", "&Continue|C&ancel", 1, "exclamation")
-
-   If !InStr(msgResult, "continue")
-      Return 1
-
    If (thisImgBPP!=24 && thisImgBPP!=32)
       msgResult := msgBoxWrapper(appTitle ": IMAGE SAVE WARNING", "The image you intend to save is originally at an unsupported image editing color depth: " pixFmt "`n`nThe image will be converted to 24 or 32 bits color depth. Therefore, some color information will probably be lost. ", "&Continue|C&ancel", 1, "exclamation")
    Else If (currIMGdetails.Frames>1)
@@ -18002,8 +17968,6 @@ InsertTextSelectedArea() {
        Return
     }
 
-    o_coreFmt := coreDesiredPixFmt
-    coreDesiredPixFmt := "0x26200A" ; PixelFormat32bppARGB
     o_imgSelPx := imgSelPx, o_imgSelPy := imgSelPy
     o_imgSelW := imgSelW, o_imgSelH := imgSelH
     bgrColor := makeRGBAcolor(TextInAreaBgrColor, TextInAreaBgrOpacity)
@@ -18016,7 +17980,6 @@ InsertTextSelectedArea() {
     }
  
     zz := 0
-    coreDesiredPixFmt := o_coreFmt
     trGdip_GetImageDimensions(textBoxu, nImgW, nImgH)
     thisRotation := (TextInAreaVerticalia=1) ? VPselRotation + 90 : VPselRotation
     Gdip_GetRotatedDimensions(nImgW, nImgH, thisRotation, rrImgW, rrImgH)
@@ -18157,8 +18120,6 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
     calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
     thisPos := (skippedLines>0) ? "a" prevDestPosY zoomLevel : 0
     thisState := "a" UserTextArea TextInAreaAlign TextInAreaValign TextInAreaDoBlurs TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr imgSelW imgSelH mainWidth mainHeight TextInAreaCharSpacing TextInAreaAutoWrap TextInAreaCaseTransform TextInAreaFlipH TextInAreaFlipV userimgGammaCorrect thisW thisH thisPos
-    o_coreFmt := coreDesiredPixFmt
-    coreDesiredPixFmt := "0x26200A" ; PixelFormat32bppARGB
     If (((A_TickCount - lastInvoked < 50) || (thisState=prevState)) && validBMP(prevBMPu))
     {
        textBoxu := trGdip_CloneBitmap(A_ThisFunc, prevBMPu)
@@ -18187,7 +18148,6 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
     }
 
     startZeit := A_TickCount
-    coreDesiredPixFmt := o_coreFmt
     Gdip_SetClipRect(G2, 0, 0, mainWidth, mainHeight)
     trGdip_GetImageDimensions(useGdiBitmap(), thisW, thisH)
     objSel := ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, thisW, thisH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
@@ -25476,7 +25436,7 @@ corePasteClipboardImg(modus, imgW, imgH, allowFilesPaste) {
     If !validBMP(clipBMP)
        Return
 
-    If (Gdip_GetImagePixelFormat(clipBMP, 1)!="0x26200A" && coreDesiredPixFmt="0x26200A") ; PixelFormat32bppARGB
+    If (Gdip_GetImagePixelFormat(clipBMP, 1)!="0x26200A") ; PixelFormat32bppARGB
     {
        krpBmp := Gdip_CloneBmpCoreArea(A_ThisFunc, clipBMP)
        If validBMP(krpBmp)
@@ -48470,13 +48430,6 @@ updateUIpastePanel(actionu:=0, b:=0) {
        Return
     }
 
-    If (coreDesiredPixFmt="0x21808")
-    {
-       alphaMaskingMode := 1
-       GuiControl, Disable, alphaMaskingMode
-       GuiControl, Choose, alphaMaskingMode, 1
-    }
-
     decideCustomShapeStyle()
     If (CurrentPanelTab=1)
     {
@@ -49231,7 +49184,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
     If isWinXP
        PasteInPlaceBlendMode := 1
 
-    If (coreDesiredPixFmt="0x21808" || viewportQPVimage.imgHandle)
+    If (viewportQPVimage.imgHandle)
        alphaMaskingMode := 1
 
     btnWid := 90,  txtWid := 310
@@ -49287,12 +49240,6 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
     Gui, Add, Checkbox, x+5 hp gupdateUIpastePanel Checked%PasteInPlaceBlurEdgesSoft% vPasteInPlaceBlurEdgesSoft, &Soft edges
     Gui, Add, Checkbox, xs y+7 hp gupdateUIpastePanel Checked%forceSlowLivePreviewMode% vforceSlowLivePreviewMode +hwndhTemp, &Force larger than viewport preview
     ToolTip2ctrl(hTemp, "QPV can become utterly slow if this option is activated...")
-    If (coreDesiredPixFmt="0x21808")
-    {
-       Gui, Font, Bold
-       Gui, Add, Text, xs y+10 w%txtWid%, WARNING: 32-bits RGBA mode is not activated. This tool may yield erroneous results.
-       Gui, Font, Normal
-    }
 
     slimeWid := (PrefsLargeFonts=1) ? 215 : 155
     Gui, Tab, 2 ; crop
@@ -52180,9 +52127,6 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     If isWinXP
        FillAreaBlendMode := FillAreaGlassy := 1
 
-    If (coreDesiredPixFmt="0x21808")
-       FillAreaBlendMode := 1
-
     If (viewportQPVimage.imgHandle)
     {
        FillAreaEllipseSection := 1440
@@ -52194,7 +52138,6 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     FillAreaClosedPath := 1
     FillAreaEllipsePie := 0
     userUIshapeCavity := Round((innerSelectionCavityX + innerSelectionCavityY) / 2 * 400)
-    infoBlend := (coreDesiredPixFmt="0x21808") ? "Disabled in 24-RGB mode" : "None"
     ha := (PrefsLargeFonts=1) ? 27 : 18
     bonusTabs := !(viewportQPVimage.imgHandle) ? "|Alpha mask|Paint mask" : ""
     Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Main|Fill|Adjust colors%bonusTabs%
@@ -52228,7 +52171,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     GuiAddCheckbox("x+1 yp hp w26 gupdateUIfillPanel Checked" FillAreaCutGlass " vFillAreaCutGlass", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
     Gui, Add, Text, xs y+7 w%sml% hp +TabStop gBtnResetBlendMode vtxtLine2, Blending mode
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIfillPanel")
-    GuiAddDropDownList("x+1 w" slideWid " gupdateUIfillPanel AltSubmit Choose" FillAreaBlendMode " vFillAreaBlendMode", infoBlend "|" userBlendModesList, "Blending mode")
+    GuiAddDropDownList("x+1 w" slideWid " gupdateUIfillPanel AltSubmit Choose" FillAreaBlendMode " vFillAreaBlendMode", "None|" userBlendModesList, "Blending mode")
 
 
     Gui, Tab, 2 ; colors
@@ -52923,10 +52866,6 @@ PanelSymmetricaImage() {
        Gui, Font, s%LargeUIfontValue%
     }
 
-    infoBlend := (coreDesiredPixFmt="0x21808") ? "Disabled in 24-RGB mode" : "None"
-    If (coreDesiredPixFmt="0x21808")
-       UserSymmetricaBlendMode := 1
-
     ReadSettingsSymmetricaPanel()
     tinyPrevAreaCoordX := lastSymmetryCoords[1] ? lastSymmetryCoords[1] : imgSelX1 + 125
     tinyPrevAreaCoordY := lastSymmetryCoords[2] ? lastSymmetryCoords[2] : imgSelY1 + 125
@@ -52956,7 +52895,7 @@ PanelSymmetricaImage() {
     Gui, Tab, 2
     ml := (PrefsLargeFonts=1) ? 35 : 25
     Gui, Add, Text, x+15 y+15 Section +0x200 gBtnResetBlendMode +TabStop +hwndhTemp, Blending mode: 
-    GuiAddDropDownList("x+10 wp+" ml*2 " gupdateUIsymmetricaPanel AltSubmit Choose" UserSymmetricaBlendMode " vUserSymmetricaBlendMode", infoBlend "|" userBlendModesList, [hTemp])
+    GuiAddDropDownList("x+10 wp+" ml*2 " gupdateUIsymmetricaPanel AltSubmit Choose" UserSymmetricaBlendMode " vUserSymmetricaBlendMode", "None|" userBlendModesList, [hTemp])
     GuiAddFlipBlendLayers("x+1 yp hp w" ml " gupdateUIsymmetricaPanel")
     GuiAddSlider("UserSymmetricaOpacity", 3,255, 255, "Opacity", "updateUIsymmetricaPanel", 1, "xs y+15 w" txtWid - ml - 1 " hp")
     GuiAddCheckbox("x+1 hp w" ml " gupdateUIsymmetricaPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
@@ -53229,8 +53168,7 @@ updateUIfillBehindPanel(actionu:="", b:=0) {
 }
 
 createHatchBrush(thisOpacity) {
-   thisBase := (coreDesiredPixFmt="0x21808") ? "010101" : "FF999999"
-   thisColorA := makeRGBAcolor(thisBase, 255 - thisOpacity)
+   thisColorA := makeRGBAcolor("FF999999", 255 - thisOpacity)
    thisColorB := makeRGBAcolor("111111", 255 - thisOpacity)
    thisBrush := Gdip_BrushCreateHatch(thisColorA, thisColorB, 50)
    Return thisBrush
@@ -53760,10 +53698,6 @@ PanelZoomBlurSelectedArea() {
        Gui, Font, s%LargeUIfontValue%
     Gui, SettingsGUIA: +DPIScale
 
-    infoBlend := (coreDesiredPixFmt="0x21808") ? "Disabled in 24-RGB mode" : "None"
-    If (coreDesiredPixFmt="0x21808")
-       BlurAreaBlendMode := 1
-
     infoMask := defineCurrentAlphaMask()
     If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
        BlurAreaAlphaMask := 0
@@ -53786,7 +53720,7 @@ PanelZoomBlurSelectedArea() {
 
     Gui, Tab, 2
     Gui, Add, Text, x+10 y+10 Section w%thisW% gBtnResetBlendMode +TabStop +hwndhTemp, Blending mode: 
-    GuiAddDropDownList("x+5 wp-27 gupdateUIzoomBlurPanel AltSubmit Choose" BlurAreaBlendMode " vBlurAreaBlendMode", infoBlend "|" userBlendModesList, [hTemp])
+    GuiAddDropDownList("x+5 wp-27 gupdateUIzoomBlurPanel AltSubmit Choose" BlurAreaBlendMode " vBlurAreaBlendMode", "None|" userBlendModesList, [hTemp])
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIzoomBlurPanel")
     Gui, Add, Checkbox, xs y+10 Checked%BlurAreaApplyFX% vBlurAreaApplyFX gupdateUIzoomBlurPanel, &Apply color adjustments
     GuiAddSlider("BlurAreaHue", -180,180, 0, "Hue: $€°", "updateUIzoomBlurPanel", 2, "xs y+10 w" txtWid " hp")
@@ -53852,10 +53786,6 @@ PanelPixelizeSelectedArea() {
     If (PrefsLargeFonts=1)
        Gui, Font, s%LargeUIfontValue%
 
-    infoBlend := (coreDesiredPixFmt="0x21808") ? "Disabled in 24-RGB mode" : "None"
-    If (coreDesiredPixFmt="0x21808")
-       BlurAreaBlendMode := 1
-
     infoMask := defineCurrentAlphaMask()
     If (InStr(infoMask, "inexistent") || InStr(infoMask, "none") || viewportQPVimage.imgHandle)
        BlurAreaAlphaMask := 0
@@ -53894,7 +53824,7 @@ PanelPixelizeSelectedArea() {
     Gui, Tab, 2
     sml := (PrefsLargeFonts=1) ? 30 : 20
     Gui, Add, Text, x+10 y+10 Section w%thisW% gBtnResetBlendMode +TabStop, Blending mode: 
-    GuiAddDropDownList("xs y+10 wp" - sml*2 " gupdateUIblurPanel AltSubmit Choose" BlurAreaBlendMode " vBlurAreaBlendMode", infoBlend "|" userBlendModesList)
+    GuiAddDropDownList("xs y+10 wp" - sml*2 " gupdateUIblurPanel AltSubmit Choose" BlurAreaBlendMode " vBlurAreaBlendMode", "None|" userBlendModesList)
     GuiAddFlipBlendLayers("x+1 hp w" sml " gupdateUIblurPanel")
     GuiAddCheckbox("x+1 hp wp gupdateUIblurPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
     Gui, Add, Checkbox, xs y+10 Checked%BlurAreaApplyFX% vBlurAreaApplyFX gupdateUIblurPanel, &Apply color adjustments
@@ -53960,9 +53890,6 @@ PanelBlurSelectedArea() {
        blurAreaSoftEdges := 0
     }
     
-    If (coreDesiredPixFmt="0x21808")
-       blurAreaSoftEdges := 0
-
     friendly := (isWinXP=1) ? " (unsupported)" : ""
     gW := (PrefsLargeFonts=1) ? 385 : 325
     gH := (PrefsLargeFonts=1) ? 520 : 395
@@ -53978,10 +53905,6 @@ PanelBlurSelectedArea() {
     Gui, Add, Text, xp y+10 wp Center vPrinterPageInfos, Click and drag to change the preview area, or in the viewport.
     If (PrefsLargeFonts=1)
        Gui, Font, s%LargeUIfontValue%
-
-    infoBlend := (coreDesiredPixFmt="0x21808") ? "Disabled in 24-RGB mode" : "None"
-    If (coreDesiredPixFmt="0x21808")
-       BlurAreaBlendMode := 1
 
     infoMask := defineCurrentAlphaMask()
     If (InStr(infoMask, "inexistent") || InStr(infoMask, "none") || viewportQPVimage.imgHandle)
@@ -54021,7 +53944,7 @@ PanelBlurSelectedArea() {
 
     Gui, Tab, 2
     Gui, Add, Text, x+10 y+10 Section w%thisW% gBtnResetBlendMode +TabStop +hwndhTemp, Blending mode: 
-    GuiAddDropDownList("x+5 wp-25 gupdateUIblurPanel AltSubmit Choose" BlurAreaBlendMode " vBlurAreaBlendMode", infoBlend "|" userBlendModesList, [hTemp])
+    GuiAddDropDownList("x+5 wp-25 gupdateUIblurPanel AltSubmit Choose" BlurAreaBlendMode " vBlurAreaBlendMode", "None|" userBlendModesList, [hTemp])
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIblurPanel")
     Gui, Add, Checkbox, xs y+10 Checked%BlurAreaApplyFX% vBlurAreaApplyFX gupdateUIblurPanel, &Apply color adjustments
     GuiAddSlider("blurAreaOpacity", 3,255, 255, "Opacity", "updateUIblurPanel", 1, "xs y+15 w" txtWid - 27 " hp")
@@ -55887,14 +55810,6 @@ updateUIzoomBlurPanel(a:=0,b:=0) {
 
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: Submit, NoHide
-    If (coreDesiredPixFmt="0x21808")
-    {
-       BlurAreaBlendMode := 0
-       GuiControl, SettingsGUIA: Disable, blurAreaSoftEdges
-       GuiControl, SettingsGUIA: Disable, BlurAreaBlendMode
-       GuiControl, SettingsGUIA: Choose, BlurAreaBlendMode, 1
-    }
-
     actu := (BlurAreaBlendMode>1) ? "Enabled" : "Disabled"
     GuiControl, SettingsGUIA: %actu%, blurAreaApplyFX
     isActive := (BlurAreaBlendMode>1 && blurAreaApplyFX=1) ? 1 : 0
@@ -55920,13 +55835,6 @@ updateUIblurPanel(a:=0,b:=0) {
 
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: Submit, NoHide
-    If (coreDesiredPixFmt="0x21808")
-    {
-       BlurAreaBlendMode := 0
-       GuiControl, SettingsGUIA: Disable, BlurAreaBlendMode
-       GuiControl, SettingsGUIA: Choose, BlurAreaBlendMode, 1
-    }
-
     If (AnyWindowOpen=78)
     {
        actu := (blurAreaPixelizeAmount>1 && !viewportQPVimage.imgHandle) ? 1 : 0
@@ -55936,13 +55844,6 @@ updateUIblurPanel(a:=0,b:=0) {
        GuiControl, % actu, mainBtnACT
     } Else If (AnyWindowOpen=26)
     {
-       If (coreDesiredPixFmt="0x21808")
-       {
-          blurAreaSoftEdges := 0
-          GuiControl, SettingsGUIA: Disable, blurAreaSoftEdges
-          GuiControl, SettingsGUIA:, blurAreaSoftEdges, 0
-       }
-
        pr := (blurAreaEqualXY=1) ? blurAreaAmount : max(blurAreaAmount, blurAreaYamount)
        actu := (testAllowSelInvert() && BlurAreaInverted=0) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        If (pr>1)
@@ -57245,8 +57146,6 @@ updateUIfillPanel(actionu:=0) {
     }
 
     decideCustomShapeStyle()
-    If (coreDesiredPixFmt="0x21808")
-       FillAreaBlendMode := 1
     If (FillAreaInverted=1 && FillAreaBlendMode>1)
        FillAreaGradientWrapped := 1
 
@@ -57293,8 +57192,6 @@ updateUIfillPanel(actionu:=0) {
        GuiControl, % actu, FillAreaGlassy
        uiSlidersArray["userUIshapeCavity", 10] := (viewportQPVimage.imgHandle && !(FillAreaShape=1 || FillAreaShape=3 && FillAreaEllipseSection=1440)) ? 0 : 1
        uiSlidersArray["FillAreaBlurAmount", 10] := (viewportQPVimage.imgHandle || FillAreaRemBGR=1 || FillAreaBlendMode=25) ? 0 : 1
-       If (coreDesiredPixFmt="0x21808")
-          GuiControl, SettingsGUIA: Disable, FillAreaBlendMode
     } Else If (CurrentPanelTab=2)
     {
        gradMode := isInRange(FillAreaColorMode, 2, 4)
@@ -58822,8 +58719,7 @@ uiADDalphaMaskTabs(t1, t2, labelu) {
        alphaMaskRefBMP := 1
 
     Gui, Tab, %t1% ; alpha mask
-    friendlyMaskInfo := (coreDesiredPixFmt="0x21808") ? "Disabled in 24-RGB mode" : "No alpha mask"
-    GuiAddDropDownList("x+15 y+15 Section w" txtWid2 " AltSubmit Choose" alphaMaskingMode " valphaMaskingMode g" labelu, friendlyMaskInfo "|Linear gradient|Radial gradient|Box gradient|Image bitmap|Custom shape", "Alpha mask type")
+    GuiAddDropDownList("x+15 y+15 Section w" txtWid2 " AltSubmit Choose" alphaMaskingMode " valphaMaskingMode g" labelu, "No alpha mask|Linear gradient|Radial gradient|Box gradient|Image bitmap|Custom shape", "Alpha mask type")
     If (AnyWindowOpen!=70)
        GuiAddButton("x+1 w" sml " hp vUIviewAlpha gUIbtnViewAlphaMaskNow", "P", "Alpha mask preview", "Show a temporary preview of the alpha mask in the viewport")
     
@@ -70500,10 +70396,7 @@ createMenuMainView() {
 
       ; createMenuVPhudHisto()
       ; kMenu("PVview", "Add", "Show histogram", ":PVimgHistos")
-      friendlyPix := (coreDesiredPixFmt="0x21808") ? "24-RGB" : "32-RGBA"
       Menu, PVview, Add
-      If (A_PtrSize=4)
-         kMenu("PVview", "Add", "Pi&xel format mode: " friendlyPix, "ToggleCorePixFmt")
 
       ; If (!AnyWindowOpen || mustPreventMenus=1)
          kMenu("PVview", "Add", "&Rotation ("vpIMGrotation "°)", ":PVimgVProt")
@@ -75790,7 +75683,7 @@ useGdiHatchedBrush(dummy:=0) {
 
    If (dummy="vp" && imgFxMode=8 && currIMGdetails.HasAlpha!=1)
       Return Gdi_GetStockObject(0)
-   Else If (coreDesiredPixFmt="0x21808" || dummy="vp" && imgFxMode=8 && currIMGdetails.HasAlpha=1)
+   Else If (dummy="vp" && imgFxMode=8 && currIMGdetails.HasAlpha=1)
       Return Gdi_GetStockObject(4)
    Else If (UserVPalphaBgrStyle=2)
       Return Gdi_GetStockObject(2)
@@ -78224,7 +78117,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
      If !zE
         zE := Gdip_BitmapSetColorDepth(rBitmap, internalColorDepth, ColorDepthDithering)
 
-     If (!zE && coreDesiredPixFmt="0x26200A") ; PixelFormat32bppARGB
+     If !zE
      {
         zBitmap := Gdip_CloneBmpCoreArea(A_ThisFunc, rBitmap)
         If validBMP(zBitmap)
