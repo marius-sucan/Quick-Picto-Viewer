@@ -102179,7 +102179,7 @@ batchSimpleColorsAdjusts() {
       If (ResizeUseDestDir=1)
          msgInfos .= "`n`nThe files will be saved in " ResizeDestFolder "\"
       Else
-         msgInfos .= "`n`nThe files will be will be OVERWRITTEN."
+         msgInfos .= "`n`nThe files will be OVERWRITTEN."
       msgResult := msgBoxWrapper(appTitle ": Confirmation", msgInfos, 4, 0, "question")
       If (msgResult!="Yes")
          Return
