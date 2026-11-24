@@ -2324,9 +2324,9 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum, deepSim) {
        Return 0
 
     If (r=1)
-       simpleMsgBoxWrapper(appTitle ": ERROR", "An error occurred calling " fn "() for " givenKey ". Too many parameters.")
+       simpleMsgBoxWrapper(appTitle ": ERROR", "An error occurred while calling " fn "() for " givenKey ". Too many parameters.")
     Else If r
-       simpleMsgBoxWrapper(appTitle ": ERROR", "An error occurred calling " r "() function for " givenKey ".")
+       simpleMsgBoxWrapper(appTitle ": ERROR", "An error occurred while calling " r "() function for " givenKey ".")
 
     Return r ? -1 : allowLoop + 1
 } ; // processDefaultKbdCombos
@@ -2819,9 +2819,9 @@ OpenThisFileFolder(modus:=0, pathu:=0) {
        Catch wasError
        {
           If AnyWindowOpen
-             msgBeepTimer("ERROR: An unknown error occurred opening the folder:`n" folderu "\")
+             msgBeepTimer("ERROR: An unknown error occurred while opening the folder:`n" folderu "\")
           Else
-             msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the folder:`n" folderu "\", 0, 0, "error")
+             msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred while opening the folder:`n" folderu "\", 0, 0, "error")
        }
     }
 }
@@ -3034,7 +3034,7 @@ OpenFileProperties() {
     {
        Try Run, Properties "%imgPath%"
        Catch wasError
-             msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the system file properties.", 0, 0, "error")
+             msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred while opening the system file properties.", 0, 0, "error")
     }
 }
 
@@ -6937,7 +6937,7 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
          kMenu("PVnav", "Add", "Cop&y points", "MenuCopyVectorPoints")
 
       kMenu("PVnav", "Add", "Deselect points`tCtrl+D", "MenuSelNoVectorPoints")
-      kMenu("PVnav", "Add", "In&vert points selection`tShift+I", "MenuSelInvertVectorPoints")
+      kMenu("PVnav", "Add", "In&vert point selection`tShift+I", "MenuSelInvertVectorPoints")
       kMenu("PVnav", "Add", "&Delete selected points`tDelete", "MenuRemSelVectorPoints")
       If (dontAddPoint=1)
       {
@@ -6974,9 +6974,9 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
             kMenu("PVnav", "Check", "Symmetrical anchors`tR")
       }
 
-      kMenu("PVnav", "Add/Uncheck", "&Open ended path`tO", "toggleOpenClosedLineEditorCustomShape", "opened closed vector")
+      kMenu("PVnav", "Add/Uncheck", "&Open-ended path`tO", "toggleOpenClosedLineEditorCustomShape", "opened closed vector")
       If (closedLineCustomShape=0)
-         kMenu("PVnav", "Check", "&Open ended path`tO")
+         kMenu("PVnav", "Check", "&Open-ended path`tO")
 
       createVectorMenuToolModes()
       kMenu("PVnav", "AddSeparator", 0)
@@ -14403,7 +14403,7 @@ realtimePasteInPlaceRotator(previewMode, clipBMP, ByRef newBitmap) {
 
     If ((VPselRotation>0 || shearImgX!=0 || shearImgY!=0) && !ER && !viewportQPVimage.imgHandle)
     {
-       setWindowTitle("Rotating image at " Round(VPselRotation, 1) "°")
+       setWindowTitle("Rotating image by " Round(VPselRotation, 1) "°")
        xBitmap := RotateAndSkewBitmap(clipBMP, VPselRotation, shearImgX, shearImgY, ellipseModus, thisImgQuality, PasteInPlaceRevealOriginal)
        If validBMP(xBitmap)
        {
@@ -27153,7 +27153,7 @@ omniBoxFolderExplorerOpen() {
    Catch wasError
    {
       If !AnyWindowOpen
-         msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the folder:`n" folderPath, 0, 0, "error")
+         msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred while opening the folder:`n" folderPath, 0, 0, "error")
    }
 }
 
@@ -30784,7 +30784,7 @@ folderTreeDefaultAction(modus:=0, g:=0) {
       Catch wasError
       {
          If !AnyWindowOpen
-            msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the folder:`n" folderPath, 0, 0, "error")
+            msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred while opening the folder:`n" folderPath, 0, 0, "error")
       }
    } Else If (z=2 && folderPath)
    {
@@ -31224,7 +31224,7 @@ FolderTreeFindActiveFile(givenPath:=0) {
        Return
 
     If (userPrivateMode=1)
-       Return msgBeepTimer("WARNING: Private mode is activated. Access to this feature is denied,`nbecause it would be a breach of privacy.")
+       Return msgBeepTimer("WARNING: Private mode is activated. Access to this feature is denied`nbecause it would be a breach of privacy.")
 
     Gui, fdTreeGuia: Default
     Gui, fdTreeGuia: TreeView, TVlistFolders
@@ -62377,7 +62377,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0, typedDe
       {
          etaTime := ETAinfos(countTFilez, filesElected, startOperation)
          If (failedFiles>0)
-            etaTime .= "`nFailed to perform action on " groupDigits(failedFiles) " files"
+            etaTime .= "`nFailed to perform the action on " groupDigits(failedFiles) " files"
          If (failedFolders>0)
             etaTime .= "`nFailed to create " groupDigits(failedFolders) " folders"
          If (skippedFiles>0)
@@ -62509,7 +62509,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0, typedDe
    }
 
    If (failedFiles>0)
-      someErrors .= "`nFailed to perform action on " groupDigits(failedFiles) " files"
+      someErrors .= "`nFailed to perform the action on " groupDigits(failedFiles) " files"
    If (failedFolders>0)
       someErrors .= "`nFailed to create " groupDigits(failedFolders) " folders"
    If (skippedFiles>0)
@@ -65836,7 +65836,7 @@ RefreshFilesList() {
      If !FileExist(CurrentSLD)
      {
         zPlitPath(CurrentSLD, 0, OutFileName, OutDir)
-        Return msgBeepTimer("ERROR: Unable to load the files list.`nThe file is missing or access denied.`n" OutFileName "`n" OutDir "\")
+        Return msgBeepTimer("ERROR: Unable to load the files list.`nThe file is missing or access is denied.`n" OutFileName "`n" OutDir "\")
      }
 
      If askAboutFileSave(" and the files list will be reloaded")
@@ -69059,7 +69059,7 @@ InvokeMenuBarImage(manuID:=0, justBuild:=0) {
            kMenu("pvMenuBarImage", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
 
         If (RegExMatch(imgPath, "i)(.\.pdf)$") || markedSelectFile)
-           kMenu("pvMenuBarImage", "Add", "Extract texts from PDF pages", "PanelPDFreadTexts", "convert retrieve read search links pdf get")
+           kMenu("pvMenuBarImage", "Add", "Extract text from PDF pages", "PanelPDFreadTexts", "convert retrieve read search links pdf get")
 
         If WinOCR_IsSupported()
            kMenu("pvMenuBarImage", "Add", "Text recognition (&OCR)", "PanelOCRtextRecognition", "optical character recognition extract read texts words clipboard")
@@ -69109,7 +69109,7 @@ InvokeMenuBarImage(manuID:=0, justBuild:=0) {
         kMenu("pvMenuBarImage", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
 
      If (RegExMatch(imgPath, "i)(.\.pdf)$") || markedSelectFile)
-        kMenu("pvMenuBarImage", "Add", "Extract texts from PDF pages", "PanelPDFreadTexts", "convert retrieve read search links pdf get")
+        kMenu("pvMenuBarImage", "Add", "Extract text from PDF pages", "PanelPDFreadTexts", "convert retrieve read search links pdf get")
 
      If WinOCR_IsSupported()
         kMenu("pvMenuBarImage", "Add", "Text recognition (&OCR)", "PanelOCRtextRecognition", "optical character recognition extract read texts words clipboard")
@@ -72856,7 +72856,7 @@ createMenuStatistics() {
 }
 
 createMenuFilesIndexOptions() {
-   infoMenuRefresh := RegExMatch(CurrentSLD, sldsPattern) ? "Reload .SLD file" : "Refresh opened folder(s)"
+   infoMenuRefresh := RegExMatch(CurrentSLD, sldsPattern) ? "Reload .SLD file" : "Refresh open folder(s)"
    pathu := PathCompact(CurrentSLD, 40)
    If pathu
    {
@@ -72897,7 +72897,7 @@ createMenuFilesIndexOptions() {
 
       Menu, PVfList, Add,
       ; If RegExMatch(CurrentSLD, sldsPattern)
-      labelu := (SLDtypeLoaded=3) ? "Clean inexistent files entries" : "Clean &duplicate and inexistent entries"
+      labelu := (SLDtypeLoaded=3) ? "Clean inexistent file entries" : "Clean &duplicate and inexistent entries"
       kMenu("PVfList", "Add", labelu, "cleanDeadFilesList", "remove dead files erase delete")
       If (StrLen(DynamicFoldersList)>1)
          kMenu("PVfList", "Add", "&Regenerate the entire list", "RegenerateEntireList")
@@ -73142,7 +73142,7 @@ OpenRecentEntry(menuItem, modus:=0) {
      } Else If RegExMatch(newEntry, sldsPattern)
      {
         If !FileExist(newEntry)
-           Return msgBeepTimer("ERROR: Unable to load the files list.`nThe file is missing or access denied.`n" OutFileName "`n" OutDir "\")
+           Return msgBeepTimer("ERROR: Unable to load the files list.`nThe file is missing or access is denied.`n" OutFileName "`n" OutDir "\")
      } Else If !FolderExist(StrReplace(newEntry, "|"))
      {
         Return msgBeepTimer("ERROR: Folder not found or access denied:`n" StrReplace(newEntry, "|"))
@@ -74037,7 +74037,7 @@ toggleEllipseSelection(modus:=-1) {
      Else If (FillAreaCurveTension=5)
         ll := "Bézier path"
      Else
-        ll := "Points tension: " tensionCurveCustomShape
+        ll := "Point tension: " tensionCurveCustomShape
 
       dummy := "||" ll ",,togglePathCurveTension"
    }
