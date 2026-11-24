@@ -4965,7 +4965,7 @@ defineThumbsAratio() {
   Return friendly
 }
 
-recalculateThumbsSizes() {
+recalculateThumbsSizes(dynColumnsDelta:=0) {
    Static theString := "WAWAWAWAWAWAWAWAWAWAWAWAWAWAWAWAWAWAWAWAW"
         , prevDimensions, columnsPossible, txtResH, othumbsW := 300, othumbsH := 300
 
@@ -4988,30 +4988,36 @@ recalculateThumbsSizes() {
    Else If (thumbsZoomLevel>3)
      thumbsZoomLevel := 3
  
-   thumbsH := Round(othumbsH*thumbsZoomLevel)
-   thumbsW := Round(othumbsW*thumbsZoomLevel)
+   minSize := 80 + Round(OSDfontSize/9)
    vpWinClientSize(mainWidth, mainHeight)
-   If (thumbsH>mainHeight || thumbsW>mainWidth)
+   mainWidth := Max(mainWidth, minSize), mainHeight := Max(mainHeight, minSize)
+   minColumns := Max(2, Ceil(mainWidth/2048))
+   maxColumns := mainWidth//minSize
+   If (dynamicThumbsColumns=1)
    {
-      calcIMGdimensions(thumbsW, thumbsH, mainWidth//2 - 16, mainHeight//2 - 16, ResizedW, ResizedH)
-      If ResizedH
-         thumbsH := ResizedH
-      If ResizedW
-         thumbsW := ResizedW
-   }
+      thumbsH := Round(othumbsH*thumbsZoomLevel)
+      thumbsW := Round(othumbsW*thumbsZoomLevel)
+      If (thumbsH>mainHeight || thumbsW>mainWidth)
+         calcIMGdimensions(othumbsW, othumbsH, mainWidth, mainHeight, thumbsW, thumbsH)
 
-   If (thumbsColumns>0 && dynamicThumbsColumns=0)
-   {
-      calcIMGdimensions(thumbsW, thumbsH, mainWidth//thumbsColumns, mainHeight, ResizedW, ResizedH)
-      z := Round(mainHeight/ResizedH)
-      If z
-         thumbsH := mainHeight//z
-      If ResizedW
-         thumbsW := ResizedW
+      columns := Min(Max(Round(mainWidth/thumbsW), minColumns), maxColumns)
+      If dynColumnsDelta
+      {
+         ; the zoom level of the neighbouring column count
+         newColumns := Min(Max(columns + dynColumnsDelta, minColumns), maxColumns)
+         If (newColumns!=columns)
+         {
+            thumbsZoomLevel := clampInRange(mainWidth/(newColumns*othumbsW), 0.35, 3)
+            Return recalculateThumbsSizes()
+         }
+      }
+   } Else
+      columns := Min(Max(thumbsColumns, minColumns), maxColumns)
 
-      thumbsW := clampInRange(thumbsW, 80 + Round(OSDfontSize/9), 2048)
-      thumbsH := clampInRange(thumbsH, 80 + Round(OSDfontSize/9), 2048)
-   }
+   ; whole columns and rows span the viewport
+   thumbsW := mainWidth//columns
+   rows := Round(mainHeight/Round(thumbsW*othumbsH/othumbsW))
+   thumbsH := mainHeight//Min(Max(rows, 1, Ceil(mainHeight/2048)), mainHeight//minSize)
 
    If isInRange(max(thumbsW, thumbsH), 0, 150)
       thumbsSizeQuality := 125
@@ -11813,10 +11819,7 @@ ChangeThumbsZoom(dir) {
    apo := thumbsZoomLevel "|" thumbsColumns
    If (dynamicThumbsColumns=1)
    {
-      If (dir=1)
-         thumbsZoomLevel += 0.1
-      Else
-         thumbsZoomLevel -= 0.1
+      recalculateThumbsSizes((dir=1) ? -1 : 1)
    } Else
    {
       If (dir=1)
@@ -11837,7 +11840,6 @@ ChangeThumbsZoom(dir) {
 
    INIaction(1, "thumbsZoomLevel", "General")
    INIaction(1, "thumbsColumns", "General")
-   ; INIaction(1, "dynamicThumbsColumns", "General")
    If (dynamicThumbsColumns=1)
       showTOOLtip("Thumbnails zoom level: " Round(thumbsZoomLevel*100) "%`nDisplay size: " thumbsW " x " thumbsH " px`nThumbnails caching at: " thumbsSizeQuality " px", A_ThisFunc, 2, thumbsZoomLevel/3)
    Else
@@ -39260,6 +39262,7 @@ readMainSettingsApp(act) {
     IniAction(act, "cycleFavesOpenIMG", "General", 1)
     IniAction(act, "deleteFileActAfter", "General", 2, 1, 3)
     IniAction(act, "DisplayTimeUser", "General", 2, 1, 99)
+    IniAction(act, "dynamicThumbsColumns", "General", 1)
     IniAction(act, "enableThumbsCaching", "General", 1)
     IniAction(act, "OSDfontBolded", "General", 1)
     IniAction(act, "OSDfontItalica", "General", 1)
@@ -44395,10 +44398,13 @@ PanelSetThumbColumnOptions() {
     INIaction(0, "markSearchMatches", "General", 1)
     ReadSettingsVPgrid()
     slideWid2 := txtWid//2 + 10
-    Global UIthumbsAratio, UIvpImgAlignCenter, UIimgFxMode
+    Global UIthumbsAratio, UIvpImgAlignCenter, UIimgFxMode, UIthumbsZoomLevel
     UIimgFxMode := (imgFxMode>3) ? imgFxMode - 1 : imgFxMode
     UIvpImgAlignCenter := (imageAlignVPtopLeft=0) ? 1 : 0
     UIthumbsAratio := thumbsAratio
+    UIthumbsZoomLevel := Round(thumbsZoomLevel*100)
+    disColumns := (dynamicThumbsColumns=1) ? " Disabled" : ""
+    disZoom := (dynamicThumbsColumns=1) ? "" : " Disabled"
     thisW := (PrefsLargeFonts=1) ? 90 : 65
     Gui, Add, Text, x15 y15 Section w%txtWid2%, Please note: most of the options listed here are shared with the full image view.
     Gui, Add, Text, xs y+15 w%slideWid2%, Flip thumbnails:
@@ -44417,9 +44423,15 @@ PanelSetThumbColumnOptions() {
     Gui, Add, Checkbox, xs y+10 gupdateUIthumbsView Checked%multilineStatusBar% vmultilineStatusBar, Two-line status bar
     Gui, Add, Checkbox, xs y+10 gupdateUIthumbsView Checked%thumbsModeItemHighlight% vthumbsModeItemHighlight, Solid active item highlighting
     Gui, Add, Text, xs y+15 hp +0x200 w%slideWid2%, Thumbnail columns:
-    GuiAddEdit("x+10 w70 gupdateUIthumbsView number -multi limit3 veditF5", thumbsColumns)
-    Gui, Add, UpDown, gupdateUIthumbsView vthumbsColumns Range2-99, % thumbsColumns
-    Gui, Add, Text, xs+15 y+7 w%txtWid2%, You can press the + / - keys or Ctrl + Wheel Up / Down to increase or decrease the number of columns.
+    GuiAddEdit("x+10 w70 gupdateUIthumbsView number -multi limit3 veditF5" disColumns, thumbsColumns)
+    Gui, Add, UpDown, gupdateUIthumbsView vthumbsColumns Range2-99 %disColumns%, % thumbsColumns
+    Gui, Add, Checkbox, xs y+10 gupdateUIthumbsView Checked%dynamicThumbsColumns% vdynamicThumbsColumns, &Dynamic number of columns
+    ; 0x200 = SS_CENTERIMAGE
+    Gui, Add, Text, xs y+10 hp +0x200 w%slideWid2%, Zoom level:
+    GuiAddEdit("x+10 w70 gupdateUIthumbsView number -multi limit3 veditF6" disZoom, UIthumbsZoomLevel)
+    Gui, Add, UpDown, gupdateUIthumbsView vUIthumbsZoomLevel Range35-300 %disZoom%, % UIthumbsZoomLevel
+    Gui, Add, Text, x+5 hp +0x200, `%
+    Gui, Add, Text, xs+15 y+7 w%txtWid2%, You can press the + / - keys or Ctrl + Wheel Up / Down to increase or decrease the number of columns. With a dynamic number of columns, the thumbnails keep their zoom level and the columns follow the window width.
 
     If !testIsDupesList()
        GuiControl, SettingsGUIA: Disable, fadeOtherDupeGroups
@@ -44447,11 +44459,20 @@ updateUIthumbsView() {
    GuiControlGet, UIvpImgAlignCenter
    GuiControlGet, UIthumbsAratio
    GuiControlGet, UIimgFxMode
+   GuiControlGet, UIthumbsZoomLevel
    imgFxMode := (UIimgFxMode>2) ? UIimgFxMode + 1 : UIimgFxMode
    act := (usrColorDepth>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % act, ColorDepthDithering
    act := (imgFxMode>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % act, btnFldr1
+   act := (dynamicThumbsColumns=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
+   GuiControl, % act, editF5
+   GuiControl, % act, thumbsColumns
+   act := (dynamicThumbsColumns=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   GuiControl, % act, editF6
+   GuiControl, % act, UIthumbsZoomLevel
+   If (UIthumbsZoomLevel!=Round(thumbsZoomLevel*100))
+      thumbsZoomLevel := clampInRange(UIthumbsZoomLevel/100, 0.35, 3)
 
    ; thumbsColumns := editF5
    imageAlignVPtopLeft := (UIvpImgAlignCenter=1) ? 0 : 1
@@ -44466,6 +44487,7 @@ updateUIthumbsView() {
 
 WriteThumbnailsSettingsPanel() {
    INIaction(1, "ColorDepthDithering", "General")
+   INIaction(1, "dynamicThumbsColumns", "General")
    INIaction(1, "fadeOtherDupeGroups", "General")
    INIaction(1, "FlipImgH", "General")
    INIaction(1, "FlipImgV", "General")
@@ -44476,6 +44498,7 @@ WriteThumbnailsSettingsPanel() {
    INIaction(1, "multilineStatusBar", "General")
    INIaction(1, "thumbsAratio", "General")
    INIaction(1, "thumbsColumns", "General")
+   INIaction(1, "thumbsZoomLevel", "General")
    INIaction(1, "usrColorDepth", "General")
    INIaction(1, "thumbsModeItemHighlight", "General")
 }
@@ -70401,7 +70424,7 @@ createMenuMainView() {
 
       If (thumbsListViewMode=1)
       {
-         infoThumbZoom := thumbsColumns " | " thumbsW "x" thumbsH " px" ; " (" Round(thumbsZoomLevel*100) "%)"
+         infoThumbZoom := ((dynamicThumbsColumns=1) ? Round(thumbsZoomLevel*100) "%" : thumbsColumns) " | " thumbsW "x" thumbsH " px"
          kMenu("PVview", "Add", "&Cycle aspect ratios`tT", "ToggleThumbsAratio")
          Try kMenu("PVview", "Add", defineThumbsAratio(), "dummy")
          Try kMenu("PVview", "Disable", defineThumbsAratio())
