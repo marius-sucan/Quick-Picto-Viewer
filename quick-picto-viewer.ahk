@@ -50538,7 +50538,7 @@ handleOpenCloseBezier(mm:=0) {
 ; through closedLineCustomShape; the renderer performs the same reconciliation on the fly, in
 ; viewerAutoCloseOpenPath(), this one performs it on the editable list, so that the closing
 ; segment gets its own key point and its own anchors and can be edited like any other segment;
-; the memo [cahed data] below holds the inverse of the last toggle, so that toggling straight
+; the memo [cached data] below holds the inverse of the last toggle, so that toggling straight
 ; back hands the user the very seam they had rather than a freshly generated one. 
 ;
 ; Only the ends of the path are cached. closeEditorBezierPath() and openEditorBezierPath()
@@ -65220,7 +65220,7 @@ combineFimImgsAddPage(multiFim, k, GFT, fif, fmt, modus, setW, setH, frameTime, 
 ; Prepares one page and appends it to multiFim. It takes ownership of k: everything is
 ; unloaded here. setW and setH are 0 when the page keeps its size. modus is the depth, see
 ; combineFimImgsConvertDepth(). loops - how many times the animation plays [0 = for ever],
-; given with the first page. Returns 1 on succes.
+; given with the first page. Returns 1 on success.
 
    If !k
       Return 0
@@ -68011,7 +68011,7 @@ createMenuSelectionAlign(modus:=0) {
    kMenu("PVselAlign", "Add", "&Center horizontally" kbdu, "alignImgSelectCenterH",, "Align selection: " sillySeparator,, ownu)
    kbdu := (modus!="selProp") ? "`tCtrl+NumPad 0" : ""
    kMenu("PVselAlign", "Add", "Center &vertically" kbdu, "alignImgSelectCenterV",, "Align selection: " sillySeparator,, ownu)
-   kMenu("PVselAlign", "Add", "Centere&d", "alignImgSelectCentered",, "Align selection: " sillySeparator,, ownu)
+   kMenu("PVselAlign", "Add", "Centre&d", "alignImgSelectCentered",, "Align selection: " sillySeparator,, ownu)
    If (isVarEqualTo(AnyWindowOpen, 74, 65, 32, 31, 24, 23) && !viewportQPVimage.imgHandle)
    {
       Menu, PVselAlign, Add
@@ -68300,7 +68300,7 @@ createMenuImageEditSubMenus(modus:=0) {
       createMenuConvertColorDepths()
       kMenu("PVimgFilters", "Add", "&Blur filters`tShift+B", "PanelBlurSelectedArea", "effects motion directional dissolve dilate erode box glow gaussian morphological morphology median")
       kMenu("PVimgFilters", "Add", "&Radial blur", "PanelZoomBlurSelectedArea", "effects motion directional zoom rotation spin")
-      kMenu("PVimgFilters", "Add", "&Pixelate", "PanelPixelizeSelectedArea", "pixelization pixelize mozaic deform", " image")
+      kMenu("PVimgFilters", "Add", "&Pixelate", "PanelPixelizeSelectedArea", "pixelization pixelize mosaic deform", " image")
       kMenu("PVimgFilters", "Add", "S&harpen", "PanelSharpenImage", "effects", " image")
       Menu, PVimgFilters, Add
       kMenu("PVimgFilters", "Add", "A&utomatic contrast / levels", "PanelAutoColors")
@@ -69256,7 +69256,7 @@ InvokeMenuBarList(manuID:=0, justBuild:=0) {
      }
 
      If !InStr(CurrentSLD, "\QPV\favourite-images-list.SLD")
-        kMenu("pvMenuBarList", "Add", "&Identify favourited images", "findFavesInList", "faved faves stared")
+        kMenu("pvMenuBarList", "Add", "&Identify favourited images", "findFavesInList", "faved faves starred")
   }
   If (justBuild!=1)
      showThisMenu("pvMenuBarList", 0, 1, manuID)
@@ -69745,7 +69745,7 @@ createMenuBonusNoImageOpened() {
    kMenu("PVmenu", "Add", "O&pen QPV settings folder", "openSettingsDir")
    kMenu("PVmenu", "Add", "&Close everything`tCtrl+F4", "closeDocuments")
    If (maxFilesIndex>1 && CurrentSLD)
-      kMenu("PVmenu", "Add", "&Identify favourited images in the list", "findFavesInList", "faved faves stared")
+      kMenu("PVmenu", "Add", "&Identify favourited images in the list", "findFavesInList", "faved faves starred")
 
    If (thumbsDisplaying=1)
    {
@@ -72073,7 +72073,7 @@ kMenu(mena, actu, labelu, funcu:=0, keywords:="", altLabel:="", keepUp:=0, ownKe
       funcListu := []
       objuA := [] ; menu items by index with properties objuA[menuIndex] := [prop1, prop2,... etc]
       objuC := [] ; menu names and their properties objuC[mena] := [menu-name, container-menu, acceleratorkey]
-      objuB := "" ; maps menu/menu items pairs to indexexes of objuA; objuB[mena "-" labelu] := menuIndex
+      objuB := "" ; maps menu/menu items pairs to indexes of objuA; objuB[mena "-" labelu] := menuIndex
       objuB := new hashtable()
       Return
    } Else If (actu="Give" && !mena)
@@ -77705,9 +77705,9 @@ LoadFileWithGDIp(imgPath, noBPPconv:=0, frameu:=0, useICM:=0, sizesDesired:=0, B
 }
 
 LoadBitmapFromFileu(imgPath, noBPPconv:=0, forceGDIp:=0, frameu:=0, sizesDesired:=0, ByRef newSizedImage:=0) {
-; LoadFimFile() on fail, fallsback to LoadWICimage()
-; LoadWICimage() on fail, fallsback to LoadFimFile()
-; LoadFileWithGDIp() on fail, fallsback to LoadWICimage(), and if needed to LoadFimFile()
+; LoadFimFile() on fail, falls back to LoadWICimage()
+; LoadWICimage() on fail, falls back to LoadFimFile()
+; LoadFileWithGDIp() on fail, falls back to LoadWICimage(), and if needed to LoadFimFile()
   mainLoadedIMGdetails := []
   If ((RegExMatch(imgPath, RegExFIMformPtrn) || (alwaysOpenWithFIM=1 && forceGDIp=0)) && allowFIMloader=1)
   {
@@ -80333,7 +80333,7 @@ RandomizeBrushColor(startToolColor) {
 
 HSL_ToRGB(hue, sat:=1, lum:=0.5 ) {
 ; Function by [VxE]. See > http://www.wikipedia.org/wiki/HSV_color_space
-; HSL to/from RGB conversion functions by [VxE]. Freely avalable @ http://www.autohotkey.com/community/viewtopic.php?f=2&t=88707
+; HSL to/from RGB conversion functions by [VxE]. Freely available @ http://www.autohotkey.com/community/viewtopic.php?f=2&t=88707
 ; Converts a hue/sat/lum into a 24-bit RGB color code. Input: 0 <= hue <= 360, 0 <= sat <= 1, 0 <= lum <= 1. 
 
    Static i24 := 0xFFFFFF, i40 := 0xFFFFFF0000, hx := "0123456789ABCDEF"
@@ -88598,7 +88598,7 @@ dupesPixDrainedFlag() {
 }
 
 readDupesPixBusyJob() {
-; Idenify the image file the collection pool has held on to the longest, how long for, and whether a
+; Identify the image file the collection pool has held on to the longest, how long for, and whether a
 ; decoder was ever started for it. 
 ; the state counters can say that one job is in flight and nothing is arriving, and that
 ; reads the same for a huge raw that needs another minute and for a worker the decode slot
