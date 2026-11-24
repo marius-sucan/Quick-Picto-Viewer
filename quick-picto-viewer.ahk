@@ -44428,11 +44428,11 @@ PanelSetThumbColumnOptions() {
     Gui, Add, Checkbox, xs y+10 gupdateUIthumbsView Checked%fadeOtherDupeGroups% vfadeOtherDupeGroups, Fade the other groups of image duplicates
     Gui, Add, Checkbox, xs y+10 gupdateUIthumbsView Checked%multilineStatusBar% vmultilineStatusBar, Two-line status bar
     Gui, Add, Checkbox, xs y+10 gupdateUIthumbsView Checked%thumbsModeItemHighlight% vthumbsModeItemHighlight, Solid active item highlighting
-    Gui, Add, Text, xs y+15 hp +0x200 w%slideWid2%, Thumbnail columns:
+    ; 0x200 = SS_CENTERIMAGE
+    Gui, Add, Text, xs y+15 hp +0x200 w%slideWid2%, Columns:
     GuiAddEdit("x+10 w70 gupdateUIthumbsView number -multi limit3 veditF5" disColumns, thumbsColumns)
     Gui, Add, UpDown, gupdateUIthumbsView vthumbsColumns Range2-99 %disColumns%, % thumbsColumns
     Gui, Add, Checkbox, xs y+10 gupdateUIthumbsView Checked%dynamicThumbsColumns% vdynamicThumbsColumns, &Dynamic number of columns
-    ; 0x200 = SS_CENTERIMAGE
     Gui, Add, Text, xs y+10 hp +0x200 w%slideWid2%, Zoom level:
     GuiAddEdit("x+10 w70 gupdateUIthumbsView number -multi limit3 veditF6" disZoom, UIthumbsZoomLevel)
     Gui, Add, UpDown, gupdateUIthumbsView vUIthumbsZoomLevel Range35-300 %disZoom%, % UIthumbsZoomLevel
