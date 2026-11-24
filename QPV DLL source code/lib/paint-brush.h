@@ -24,6 +24,12 @@ std::vector<size_t> activeBrushChunks;
 int chunkGridW = 0;
 int chunkBytesPerPixel = 0;
 
+// an opacity chunk of a 32-bit image holds a second plane: the alpha each pixel had when the stroke reached it
+static const int BRUSH_CHUNK_PIXELS = 128 * 128;
+static QPV_FORCEINLINE int brushChunkBytes(const int bytesPerPixel) {
+    return (bytesPerPixel==4) ? BRUSH_CHUNK_PIXELS * 2 : BRUSH_CHUNK_PIXELS;
+}
+
 // the effects brush's brightness and contrast tables
 static AdjustLUTs brushLUTs;
 
@@ -580,7 +586,7 @@ static bool brushSetupPass(BrushStamp &s) {
                 {
                     try
                     {
-                        brushOpacityChunks[chunkIdx] = new unsigned char[128 * 128]();
+                        brushOpacityChunks[chunkIdx] = new unsigned char[brushChunkBytes(s.bytesPerPixel)]();
                         if (s.useBlendMode==1)
                         {
                            brushOriginalPixelChunks[chunkIdx] = new unsigned char[128 * 128 * s.bytesPerPixel]();
@@ -804,6 +810,13 @@ static QPV_FORCEINLINE void brushSourceEffects(const BrushStamp &s, const int px
 
     // 2. Lightness, Gamma/Contrast, Hue, Saturation adjustments using RGBA16color
     brushAdjust(s, effB, effG, effR, effA, srcB, srcG, srcR, srcA);
+}
+
+// the most alpha a stroke that stamps in place may leave on a pixel: its source at the opacity laid there so far,
+// over the alpha the stroke found
+static QPV_FORCEINLINE int brushStrokeAlphaLimit(const int srcA, const int laidOpacity, const int startA) {
+    const int strokeA = (srcA * laidOpacity + 127) / 255;
+    return (strokeA==0 || startA==0) ? strokeA + startA : blendUnionAlpha(strokeA, startA);
 }
 
 // Smudge, pinch and bulge brushes: a bilinear sample of the clone, or of the image, at srcXf, srcYf
@@ -1243,6 +1256,9 @@ static void brushRows(const BrushStamp &s) {
             int srcR = tgtR;
             int srcA = tgtA;
             float weight = mask_fval * s.opaf;
+            // for the stamps laid in place: the alpha the stroke found here, and the opacity it has laid so far
+            int startA = -1;
+            int laidOpacity = 0;
 
             if (s.brushType<=5 && s.brushOverDraw==0 && s.overDrawOkay==1)
             {
@@ -1253,7 +1269,7 @@ static void brushRows(const BrushStamp &s) {
                 {
                     try
                     {
-                        chunk = new unsigned char[128 * 128]();
+                        chunk = new unsigned char[brushChunkBytes(s.bytesPerPixel)]();
                         #pragma omp critical
                         {
                             if (!brushOpacityChunks[chunkIdx])
@@ -1296,6 +1312,14 @@ static void brushRows(const BrushStamp &s) {
                     }
                 } else
                 {
+                    if (s.bytesPerPixel==4)
+                    {
+                        // with no opacity laid yet, the pixel is as the stroke found it
+                        if (chunk[pixelIdx]==0)
+                           chunk[BRUSH_CHUNK_PIXELS + pixelIdx] = tgtA;
+                        startA = chunk[BRUSH_CHUNK_PIXELS + pixelIdx];
+                    }
+
                     float maxAllowedWeight = (s.opaf - accOpa) / (1.0f - accOpa);
                     if (weight>=maxAllowedWeight)
                     {
@@ -1305,6 +1329,7 @@ static void brushRows(const BrushStamp &s) {
                     {
                         chunk[pixelIdx] = (unsigned char)clamp(newAccOpa * 255.0f, 0.0f, 255.0f);
                     }
+                    laidOpacity = chunk[pixelIdx];
                 }
             }
 
@@ -1358,6 +1383,12 @@ static void brushRows(const BrushStamp &s) {
                outG = blended.g;
                outB = blended.b;
                outA = blended.a;
+               // stamps laid in place would add up past the stroke's opacity
+               if (startA>=0 && outA>tgtA)
+               {
+                  const int limitA = brushStrokeAlphaLimit(srcA, laidOpacity, startA);
+                  outA = max(tgtA, min(outA, limitA));
+               }
             }
 
             // Write back to imgData

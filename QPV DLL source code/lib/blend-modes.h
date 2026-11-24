@@ -248,6 +248,12 @@ static QPV_FORCEINLINE int blendWeighChannel(const int o, const int b, const uns
     return (int)((t * o + u * b + 32768U) >> 16);
 }
 
+// the alpha of two visible layers, one over the other: rounded and at least one level above both, so that repeated
+// faint paint ends opaque
+static QPV_FORCEINLINE int blendUnionAlpha(const int sa, const int da) {
+    return max(sa + ((da * (255 - sa) + 127) / 255), min(max(sa, da) + 1, 255));
+}
+
 inline RGBAColor CalculateNewBlendModes(
   RGBAColor Orgb,
   RGBAColor Brgb,
@@ -329,8 +335,7 @@ inline RGBAColor CalculateNewBlendModes(
 
     const int sa = Orgb.a;
     const int da = Brgb.a;
-    // the union, rounded and at least one level above both layers, so that repeated faint paint ends opaque
-    const int resultA = max(sa + ((da * (255 - sa) + 127) / 255), min(max(sa, da) + 1, 255));
+    const int resultA = blendUnionAlpha(sa, da);
     if (resultA == 0)
        return {0, 0, 0, 0};
 
