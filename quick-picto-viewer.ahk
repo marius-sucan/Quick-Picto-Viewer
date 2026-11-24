@@ -27354,7 +27354,7 @@ createOmniBoxFoldersContextMenu(folderPath) {
       kMenu("PVfomni", "Check", "Se&t as the protected folder")
 
    kMenu("PVfomni", "Add", "Folder properties (E&xplorer)`tF12", "omniBoxFolderProperties")
-   kMenu("PVfomni", "Add", "Add to/remove from fa&vourites", "omniBoxFolderToFaves")
+   kMenu("PVfomni", "Add", "Add to/remove from fa&vourites", "omniBoxFolderToFaves", "favorites")
    Menu, PVfomni, Add
    kMenu("PVfomni", "Add", "Paste clip&board file(s) into...", "omniBoxFolderPasteClippy")
    kMenu("PVfomni", "Add", "Cop&y selected file(s) into...", "omniBoxFolderCopyFiles")
@@ -31659,7 +31659,7 @@ folderTreeContextMenu() {
          kMenu("PVfdTree", "Add", "&Rename folder`tF2", "folderTreeRenameFolder")
          kMenu("PVfdTree", "Add", "&Delete folder`tDelete", "folderTreeDeleteFolder")
          Menu, PVfdTree, Add
-         kMenu("PVfdTree", "Add", "Add to/remove from fa&vourites", "folderTreeAddFolderFaves")
+         kMenu("PVfdTree", "Add", "Add to/remove from fa&vourites", "folderTreeAddFolderFaves", "favorites")
          kMenu("PVfdTree", "Add/UnCheck", "Se&t as the protected folder", "folderTreeSetFolderProtected")
          If (Format("{:L}", protectedFolderPath)=Format("{:L}", folderPath) && preventDeleteFromProtectedPath=1)
             kMenu("PVfdTree", "Check", "Se&t as the protected folder")
@@ -68008,10 +68008,10 @@ createMenuSelectionAlign(modus:=0) {
    kMenu("PVselAlign", "Add", "&Right" kbdu, "alignImgSelectRight",, "Align selection: " sillySeparator,, ownu)
    Menu, PVselAlign, Add
    kbdu := (modus!="selProp") ? "`tCtrl+NumPad 5" : ""
-   kMenu("PVselAlign", "Add", "&Centre horizontally" kbdu, "alignImgSelectCenterH",, "Align selection: " sillySeparator,, ownu)
+   kMenu("PVselAlign", "Add", "&Centre horizontally" kbdu, "alignImgSelectCenterH", "center", "Align selection: " sillySeparator,, ownu)
    kbdu := (modus!="selProp") ? "`tCtrl+NumPad 0" : ""
-   kMenu("PVselAlign", "Add", "Centre &vertically" kbdu, "alignImgSelectCenterV",, "Align selection: " sillySeparator,, ownu)
-   kMenu("PVselAlign", "Add", "Centre&d", "alignImgSelectCentered",, "Align selection: " sillySeparator,, ownu)
+   kMenu("PVselAlign", "Add", "Centre &vertically" kbdu, "alignImgSelectCenterV", "center", "Align selection: " sillySeparator,, ownu)
+   kMenu("PVselAlign", "Add", "Centre&d", "alignImgSelectCentered", "centered", "Align selection: " sillySeparator,, ownu)
    If (isVarEqualTo(AnyWindowOpen, 74, 65, 32, 31, 24, 23) && !viewportQPVimage.imgHandle)
    {
       Menu, PVselAlign, Add
@@ -68263,7 +68263,7 @@ createMenuConvertColorDepths() {
 
    kMenu("PVimgClrDepths", "Add", "Black and white (1-bit, dithered)", "MenuConvertClrBW", "grayscale")
    kMenu("PVimgClrDepths", "Add", "8-bit (greyscale)", "MenuConvertClrGray", "grayscale")
-   kMenu("PVimgClrDepths", "Add", "8-bit (dithered colours)", "MenuConvertClr8bit")
+   kMenu("PVimgClrDepths", "Add", "8-bit (dithered colours)", "MenuConvertClr8bit", "colors")
    kMenu("PVimgClrDepths", "Add", "16-bit", "MenuConvertClr16bit")
    kMenu("PVimgClrDepths", "Add", "24-bit", "MenuConvertClr24bit")
    kMenu("PVimgClrDepths", "Add", "32-bit", "MenuConvertClr32bit")
@@ -68304,11 +68304,11 @@ createMenuImageEditSubMenus(modus:=0) {
       kMenu("PVimgFilters", "Add", "S&harpen", "PanelSharpenImage", "effects", " image")
       Menu, PVimgFilters, Add
       kMenu("PVimgFilters", "Add", "A&utomatic contrast / levels", "PanelAutoColors")
-      kMenu("PVimgFilters", "Add", "&Invert colours`tShift+I", "InvertSelectedArea", "effects negative")
-      kMenu("PVimgFilters", "Add", "Desaturate colour&s`tCtrl+G", "PanelDesatureSelectedArea", "grayscale effects")
-      kMenu("PVimgFilters", "Add", "Ad&just image colours`tU", "PanelAdjustColorsSimpleWindow", "grayscale effects lightness contrast saturation levels brightness")
+      kMenu("PVimgFilters", "Add", "&Invert colours`tShift+I", "InvertSelectedArea", "effects negative colors")
+      kMenu("PVimgFilters", "Add", "Desaturate colour&s`tCtrl+G", "PanelDesatureSelectedArea", "grayscale effects colors")
+      kMenu("PVimgFilters", "Add", "Ad&just image colours`tU", "PanelAdjustColorsSimpleWindow", "grayscale effects lightness contrast saturation levels brightness colors")
       If (AnyWindowOpen!=10)
-         kMenu("PVimgFilters", "Add", "Appl&y viewport colour effects`tCtrl+Shift+U", "ApplyVPcolorAdjustSelectedArea")
+         kMenu("PVimgFilters", "Add", "Appl&y viewport colour effects`tCtrl+Shift+U", "ApplyVPcolorAdjustSelectedArea", "color")
 
       Menu, PVimgFilters, Add
       kMenu("PVimgFilters", "Add", "&Add noise", "PanelAddNoiserImage", "effects clouds plasma")
@@ -68321,7 +68321,7 @@ createMenuImageEditSubMenus(modus:=0) {
       kMenu("PVimgDraw", "Add", "Define freeform &outline`tAlt+P", "MenuRealStartDrawingLines", "curve polygonal lines")
       kMenu("PVimgDraw", "Add", "&Paint brushes`tP", "PanelBrushTool", "pinch bulge effects draw deformer smudge cloner effects")
       kMenu("PVimgDraw", "Add", "&Erase or fade area`tDelete", "PanelEraseSelectedArea")
-      kMenu("PVimgDraw", "Add", "&Flood fill / colour bucket`tK", "PanelFloodFillTool", "colorize similarity cartoon")
+      kMenu("PVimgDraw", "Add", "&Flood fill / colour bucket`tK", "PanelFloodFillTool", "colorize similarity cartoon color")
       kMenu("PVimgDraw", "Add", "&Fill shapes`tAlt+Backspace", "tlbrFillShape", "curve polygonal glass effects blur pie ellipse triangle rhombus gradients rectangle")
       kMenu("PVimgDraw", "Add", "Fill be&hind image", "PanelFillBehindBgrImage", "background")
       kMenu("PVimgDraw", "Add", "Draw s&hape contours`tCtrl+L", "tlbrDrawShapesContour", "lines curve polygonal pie ellipse triangle rhombus rectangle arcs")
@@ -68394,7 +68394,7 @@ InvokeMenuBarVectorView(manuID:=0, modus:=0, justBuild:=0) {
    kMenu("pvMenuBarView", "Add", "Zoom adapt modes", ":PvImgAdapt")
    Menu, pvMenuBarView, Add
    createMenuImgColorsFX()
-   kMenu("pvMenuBarView", "Add", "Colours F&X and display modes", ":PVimgColorsFX")
+   kMenu("pvMenuBarView", "Add", "Colours F&X and display modes", ":PVimgColorsFX", "colors")
    kMenu("pvMenuBarView", "Add", "Reset vie&wport adjustments`t\", "ResetImageView", "image")
    Menu, pvMenuBarView, Add
    kMenu("pvMenuBarView", "Add", "Focus end point/first selected`tW", "focusVectorEndPoint")
@@ -68408,7 +68408,7 @@ InvokeMenuBarVectorView(manuID:=0, modus:=0, justBuild:=0) {
    kMenu("pvMenuBarView", "Add", "Increase grid size`tAlt+=", "MenuIncVPgridSize",,,1)
    kMenu("pvMenuBarView", "Add", "Decrease grid size`tAlt+-", "MenuDecVPgridSize",,,1)
    Menu, pvMenuBarView, Add
-   kMenu("pvMenuBarView", "Add/Uncheck", "Centred image &alignment`tA", "ToggleIMGalign", "viewport image position")
+   kMenu("pvMenuBarView", "Add/Uncheck", "Centred image &alignment`tA", "ToggleIMGalign", "viewport image position centered")
    If (imageAlignVPtopLeft=0)
       kMenu("pvMenuBarView", "Check", "Centred image &alignment`tA")
 
@@ -68725,8 +68725,8 @@ InvokeMenuBarEdit(manuID:=0, justBuild:=0) {
          {
             If isInRange(FillAreaColorMode, 2, 4)
             {
-               kMenu("pvMenuBarEdit", "Add", "&Reset gradient centre", "BtnSetTextureSource")
-               kMenu("pvMenuBarEdit", "Add/Uncheck", "&Allow gradient centre repositioning", "toggleClrGradientCenterRepose")
+               kMenu("pvMenuBarEdit", "Add", "&Reset gradient centre", "BtnSetTextureSource", "center")
+               kMenu("pvMenuBarEdit", "Add/Uncheck", "&Allow gradient centre repositioning", "toggleClrGradientCenterRepose", "center")
                If (userAllowClrGradientRecenter=1)
                   kMenu("pvMenuBarEdit", "Check", "&Allow gradient centre repositioning")
             } Else If (FillAreaColorMode=6)
@@ -69029,7 +69029,7 @@ InvokeMenuBarImage(manuID:=0, justBuild:=0) {
         Try kMenu("pvMenuBarImage", "Add", "&Filters", ":PVimgFilters")
         Try kMenu("pvMenuBarImage", "Add", "&Draw", ":PVimgDraw")
         Try kMenu("pvMenuBarImage", "Add", "&Transform", ":PVimgTransform")
-        Try kMenu("pvMenuBarImage", "Add", "&Convert colour depth", ":PVimgClrDepths")
+        Try kMenu("pvMenuBarImage", "Add", "&Convert colour depth", ":PVimgClrDepths", "color")
      } Else If (editingSelectionNow=1 && dummy!="mbr")
      {
         createMenuImageEditSubMenus("filters")
@@ -69047,7 +69047,7 @@ InvokeMenuBarImage(manuID:=0, justBuild:=0) {
         kMenu("pvMenuBarImage", "Check", "&Use gamma correction")
 
      If (imgEditPanelOpened=1)
-        kMenu("pvMenuBarImage", "Add", "Pic&k colour from image`tC", "changeBrushColorPicker", "pipette picker")
+        kMenu("pvMenuBarImage", "Add", "Pic&k colour from image`tC", "changeBrushColorPicker", "pipette picker color")
 
      If !AnyWindowOpen
      {
@@ -69559,7 +69559,7 @@ createMenuAlphaMask(givenMenu:="PValpha") {
 
    If (liveDrawingBrushTool=1)
    {
-      kMenu(givenMenu, "Add", "&Reset brush colours to B/W`tD", "ResetColorsToBW")
+      kMenu(givenMenu, "Add", "&Reset brush colours to B/W`tD", "ResetColorsToBW", "colors")
       kMenu(givenMenu, "Check", "&Paint alpha mask`tCtrl+K")
       kMenu(givenMenu, "Check", "&Paint alpha mask`tCtrl+K")
    } Else If (editingSelectionNow=1)
@@ -69812,7 +69812,7 @@ createMenuBonusImageLiveEditMode() {
    }
 
    kMenu("PVmenu", "Add", "File actions", ":PVtActFile")
-   kMenu("PVmenu", "Add", "Pic&k colour from image`tC", "changeBrushColorPicker", "picker pipette")
+   kMenu("PVmenu", "Add", "Pic&k colour from image`tC", "changeBrushColorPicker", "picker pipette color")
    kMenu("PVmenu", "Add/Uncheck", "&Apply image gamma correction", "toggleImgEditGammaCorrect", "image colors")
    If (userimgGammaCorrect=1)
       kMenu("PVmenu", "Check", "&Apply image gamma correction")
@@ -70036,7 +70036,7 @@ createMenuWinAlphaBGRstyles() {
    kMenu("PVimgAlphaBGR", "Add/UnCheck", "Checkers", "MenuAlphaBgrCheckers")
    If (UserVPalphaBgrStyle=1)
       kMenu("PVimgAlphaBGR", "Check", "Checkers")
-   kMenu("PVimgAlphaBGR", "Add/UnCheck", "Grey", "MenuAlphaBgrGRAY")
+   kMenu("PVimgAlphaBGR", "Add/UnCheck", "Grey", "MenuAlphaBgrGRAY", "gray")
    If (UserVPalphaBgrStyle=2)
       kMenu("PVimgAlphaBGR", "Check", "Grey")
    kMenu("PVimgAlphaBGR", "Add/UnCheck", "White", "MenuAlphaBgrWHITE")
@@ -70045,7 +70045,7 @@ createMenuWinAlphaBGRstyles() {
    kMenu("PVimgAlphaBGR", "Add/UnCheck", "Black", "MenuAlphaBgrBLACK")
    If (UserVPalphaBgrStyle=4)
       kMenu("PVimgAlphaBGR", "Check", "Black")
-   kMenu("PVimgAlphaBGR", "Add/UnCheck", "Window background colour", "MenuAlphaBgrWinClr")
+   kMenu("PVimgAlphaBGR", "Add/UnCheck", "Window background colour", "MenuAlphaBgrWinClr", "color")
    If (UserVPalphaBgrStyle=5)
       kMenu("PVimgAlphaBGR", "Check", "Window background colour")
 }
@@ -70175,10 +70175,10 @@ createMenuImgSizeAdapt(dummy:=0) {
             kMenu("PVview", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw reinhard drago")
 
          If !AnyWindowOpen
-            kMenu("PVview", "Add", "Viewport and colour adjustments panel`tShift+U", "PanelColorsAdjusterVPwindow")
+            kMenu("PVview", "Add", "Viewport and colour adjustments panel`tShift+U", "PanelColorsAdjusterVPwindow", "color")
 
          kMenu("PVview", "Add", "Reset vie&wport adjustments`t\", "ResetImageView", "image")
-         kMenu("PVview", "Add/Uncheck", "Centred &alignment`tA", "ToggleIMGalign", "viewport image position", " (image)")
+         kMenu("PVview", "Add/Uncheck", "Centred &alignment`tA", "ToggleIMGalign", "viewport image position centered", " (image)")
          If (imageAlignVPtopLeft=0)
             kMenu("PVview", "Check", "Centred &alignment`tA",,, " (image)")
 
@@ -70198,8 +70198,8 @@ createMenuImgSizeAdapt(dummy:=0) {
 
          kMenu("PVview", "Add", "C&ycle histogram modes`tG", "ToggleImgHistogram",,,1)
          keyu := (liveDrawingBrushTool=1 && thumbsDisplaying!=1 || AnyWindowOpen=63) ? "" : "`tQ"
-         kMenu("PVview", "Add", "C&ycle simulated colour depths" keyu, "ToggleImgColorDepth",,,1)
-         kMenu("PVview", "Add", "C&ycle colour display modes`tF", "ToggleImgFX",,,1)
+         kMenu("PVview", "Add", "C&ycle simulated colour depths" keyu, "ToggleImgColorDepth", "color",,1)
+         kMenu("PVview", "Add", "C&ycle colour display modes`tF", "ToggleImgFX", "colors",,1)
 
          infoThumbsList := defineListViewModes()
          infoThumbsMode := (thumbsDisplaying=1) ? "Switch to image view" : "Switch to " infoThumbsList " list view"
@@ -70224,7 +70224,7 @@ createMenuImgSizeAdapt(dummy:=0) {
          kMenu("PvImgAdapt", "Add", "&More options", ":PVview")
       } Else
       {
-         kMenu("PvImgAdapt", "Add/Uncheck", "Centred image &alignment`tA", "ToggleIMGalign", "viewport image position")
+         kMenu("PvImgAdapt", "Add/Uncheck", "Centred image &alignment`tA", "ToggleIMGalign", "viewport image position centered")
          If (imageAlignVPtopLeft=0)
             kMenu("PvImgAdapt", "Check", "Centred image &alignment`tA")
 
@@ -70252,9 +70252,9 @@ createMenuMainPreferences() {
 
    kMenu("PVperfs", "Add/Uncheck", "&Load Camera RAW files at high quality", "ToggleRAWquality")
    kMenu("PVperfs", "Add/Uncheck", "&High quality image resampling", "ToggleImgQuality")
-   kMenu("PVperfs", "Add/Uncheck", "&Perform dithering on colour depth changes", "ToggleImgColorDepthDithering")
+   kMenu("PVperfs", "Add/Uncheck", "&Perform dithering on colour depth changes", "ToggleImgColorDepthDithering", "color")
    kMenu("PVperfs", "Add/Uncheck", "&Apply gamma correction", "toggleImgEditGammaCorrect", "image colors")
-   kMenu("PVperfs", "Add/Uncheck", "&Apply colour management", "ToggleColorProfileManage", "profiles icc icm performance")
+   kMenu("PVperfs", "Add/Uncheck", "&Apply colour management", "ToggleColorProfileManage", "profiles icc icm performance color")
    If (userPerformColorManagement=1)
       kMenu("PVperfs", "Check", "&Apply colour management")
    If (userimgGammaCorrect=1)
@@ -70419,7 +70419,7 @@ createMenuMainView() {
          kMenu("PVview", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw")
 
       If (!AnyWindowOpen || isNowAlphaPainting()!=1 && imgEditPanelOpened=1 && AnyWindowOpen!=24 && AnyWindowOpen!=31)
-         kMenu("PVview", "Add", "Viewport and colour adjustments panel`tShift+U", "PanelColorsAdjusterVPwindow")
+         kMenu("PVview", "Add", "Viewport and colour adjustments panel`tShift+U", "PanelColorsAdjusterVPwindow", "color")
 
       ; createMenuVPhudHisto()
       ; kMenu("PVview", "Add", "Show histogram", ":PVimgHistos")
@@ -70435,11 +70435,11 @@ createMenuMainView() {
       createMenuColorDepth()
       dontShow := (thumbsDisplaying=1 && minimizeMemUsage=1) ? 1 : 0
       Menu, PVview, Add
-      kMenu("PVview", "Add", "Simulated colour &depth", ":PVimgSdepth")
+      kMenu("PVview", "Add", "Simulated colour &depth", ":PVimgSdepth", "color")
       If (dontShow!=1)
       {
          createMenuImgColorsFX()
-         kMenu("PVview", "Add", "Colours F&X and display modes", ":PVimgColorsFX")
+         kMenu("PVview", "Add", "Colours F&X and display modes", ":PVimgColorsFX", "colors")
       }
 
       If (currIMGdetails.HasAlpha=1 || thumbsDisplaying=1)
@@ -70449,7 +70449,7 @@ createMenuMainView() {
       }
 
       Menu, PVview, Add
-      kMenu("PVview", "Add/Uncheck", "Centred &alignment`tA", "ToggleIMGalign", "viewport image position")
+      kMenu("PVview", "Add/Uncheck", "Centred &alignment`tA", "ToggleIMGalign", "viewport image position centered")
       If (imageAlignVPtopLeft=0)
          kMenu("PVview", "Check", "Centred &alignment`tA")
 
@@ -70463,7 +70463,7 @@ createMenuMainView() {
       kMenu("PVview", "Check", "Mirror &horizontally`tH")
 
    Menu, PVview, Add
-   kMenu("PVview", "Add/Uncheck", "&Apply colour management", "ToggleColorProfileManage", "profiles icc icm performance")
+   kMenu("PVview", "Add/Uncheck", "&Apply colour management", "ToggleColorProfileManage", "profiles icc icm performance color")
    If (userPerformColorManagement=1)
       kMenu("PVview", "Check", "&Apply colour management")
 
@@ -70618,8 +70618,8 @@ createMenuImageFileActions(whichMenu) {
       pk := (markedSelectFile>1) ? "s" : ""
       Menu, % whichMenu, Add
       infoKbd := (thumbsDisplaying=1) ? "`tShift+U" : ""
-      kMenu(whichMenu, "Add", "Apply vie&wport colour adjustments" infoKbd, "filesListApplyColors", "image")
-      kMenu(whichMenu, "Add", "Apply advanced colour adjustments", "PanelAdjustColorsSimpleWindow", "image")
+      kMenu(whichMenu, "Add", "Apply vie&wport colour adjustments" infoKbd, "filesListApplyColors", "image color")
+      kMenu(whichMenu, "Add", "Apply advanced colour adjustments", "PanelAdjustColorsSimpleWindow", "image color")
       kMenu(whichMenu, "Add", "A&utomatic contrast / levels", "PanelAutoColors", "image")
       infoKbd := (thumbsDisplaying=1) ? "`tShift+H" : ""
       kMenu(whichMenu, "Add", "Flip image" pk " &horizontally" infoKbd, "filesListFlipHimage")
@@ -71025,17 +71025,17 @@ createMenuVPhudHisto() {
 createMenuColorDepth() {
    infoColorDepth := (usrColorDepth>1) ? "Original / reset" : defineColorDepth()
    keyu := (liveDrawingBrushTool=1 && thumbsDisplaying!=1 || AnyWindowOpen=64) ? "" : "`tQ"
-   kMenu("PVimgSdepth", "Add", "C&ycle simulated colour depths" keyu, "ToggleImgColorDepth",,,1)
+   kMenu("PVimgSdepth", "Add", "C&ycle simulated colour depths" keyu, "ToggleImgColorDepth", "color",,1)
    Menu, PVimgSdepth, Add
    kMenu("PVimgSdepth", "Add/Uncheck", infoColorDepth, "MenuResetImageColorDepth")
-   kMenu("PVimgSdepth", "Add/Uncheck", "2 bits (4 colours)", "MenuSetImageDepth2bits",, "Colour depth: " sillySeparator)
-   kMenu("PVimgSdepth", "Add/Uncheck", "3 bits (8 colours)", "MenuSetImageDepth3bits",, "Colour depth: " sillySeparator)
-   kMenu("PVimgSdepth", "Add/Uncheck", "4 bits (16 colours)", "MenuSetImageDepth4bits",, "Colour depth: " sillySeparator)
-   kMenu("PVimgSdepth", "Add/Uncheck", "5 bits (32 colours)", "MenuSetImageDepth5bits",, "Colour depth: " sillySeparator)
-   kMenu("PVimgSdepth", "Add/Uncheck", "6 bits (64 colours)", "MenuSetImageDepth6bits",, "Colour depth: " sillySeparator)
-   kMenu("PVimgSdepth", "Add/Uncheck", "7 bits (128 colours)", "MenuSetImageDepth7bits",, "Colour depth: " sillySeparator)
-   kMenu("PVimgSdepth", "Add/Uncheck", "8 bits (256 colours)", "MenuSetImageDepth8bits",, "Colour depth: " sillySeparator)
-   kMenu("PVimgSdepth", "Add/Uncheck", "16 bits (65536 colours)", "MenuSetImageDepth16bits",, "Colour depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "2 bits (4 colours)", "MenuSetImageDepth2bits", "colors color", "Colour depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "3 bits (8 colours)", "MenuSetImageDepth3bits", "colors color", "Colour depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "4 bits (16 colours)", "MenuSetImageDepth4bits", "colors color", "Colour depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "5 bits (32 colours)", "MenuSetImageDepth5bits", "colors color", "Colour depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "6 bits (64 colours)", "MenuSetImageDepth6bits", "colors color", "Colour depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "7 bits (128 colours)", "MenuSetImageDepth7bits", "colors color", "Colour depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "8 bits (256 colours)", "MenuSetImageDepth8bits", "colors color", "Colour depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "16 bits (65536 colours)", "MenuSetImageDepth16bits", "colors color", "Colour depth: " sillySeparator)
    If (usrColorDepth<2)
    {
       kMenu("PVimgSdepth", "Check", infoColorDepth)
@@ -71058,7 +71058,7 @@ createMenuColorDepth() {
       kMenu("PVimgSdepth", "Check", "16 bits (65536 colours)",,, "Colour depth: " sillySeparator)
 
    Menu, PVimgSdepth, Add
-   kMenu("PVimgSdepth", "Add/Uncheck", "&Perform dithering", "ToggleImgColorDepthDithering", "settings performance quality", " on colour depth changes")
+   kMenu("PVimgSdepth", "Add/Uncheck", "&Perform dithering", "ToggleImgColorDepthDithering", "settings performance quality color", " on colour depth changes")
    If (ColorDepthDithering=1)
       kMenu("PVimgSdepth", "Check", "&Perform dithering",,, " on colour depth changes")
 }
@@ -71067,7 +71067,7 @@ createMenuImgColorsFX() {
    infolumosAdjust := (imgFxMode=2 || imgFxMode=3) ? Round(lumosAdjust, 2) : Round(lumosGrayAdjust, 2)
    infoGammosAdjust := (imgFxMode=2 || imgFxMode=3) ? Round(GammosAdjust, 2) : Round(GammosGrayAdjust, 2)
    infoSatAdjust := (imgFxMode=4) ? zatAdjust : Round(satAdjust*100)
-   kMenu("PVimgColorsFX", "Add", "C&ycle colour display modes`tF", "ToggleImgFX",,,1)
+   kMenu("PVimgColorsFX", "Add", "C&ycle colour display modes`tF", "ToggleImgFX", "colors",,1)
    kMenu("PVimgColorsFX", "Add", DefineFXmodes(), "dummy")
    kMenu("PVimgColorsFX", "Disable", DefineFXmodes())
    If (imgFxMode=2 || imgFxMode=3 || imgFxMode=4)
@@ -71077,15 +71077,15 @@ createMenuImgColorsFX() {
    }
 
    Menu, PVimgColorsFX, Add
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Original colours", "MenuSetColorModeOriginal",, "Viewport colours: " sillySeparator)
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Personalized colours", "MenuSetColorModePersonalized",, "Viewport colours: " sillySeparator)
-   kMenu("PVimgColorsFX", "Add/Uncheck", "Greys&cale", "MenuSetColorModeGrayscale",, "Viewport colours: " sillySeparator)
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Red channel", "MenuSetColorModeRedC",, "Viewport colours: " sillySeparator)
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Green channel", "MenuSetColorModeGreenC",, "Viewport colours: " sillySeparator)
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Blue channel", "MenuSetColorModeBlueC",, "Viewport colours: " sillySeparator)
-   kMenu("PVimgColorsFX", "Add/Uncheck", "Alp&ha channel", "MenuSetColorModeAlphaC",, "Viewport colours: " sillySeparator)
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Inverted colours", "MenuSetColorModeInverted",, "Viewport colours: " sillySeparator)
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Sepia", "MenuSetColorModeSepia",, "Viewport colours: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Original colours", "MenuSetColorModeOriginal", "colors", "Viewport colours: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Personalized colours", "MenuSetColorModePersonalized", "colors", "Viewport colours: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "Greys&cale", "MenuSetColorModeGrayscale", "grayscale colors", "Viewport colours: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Red channel", "MenuSetColorModeRedC", "colors", "Viewport colours: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Green channel", "MenuSetColorModeGreenC", "colors", "Viewport colours: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Blue channel", "MenuSetColorModeBlueC", "colors", "Viewport colours: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "Alp&ha channel", "MenuSetColorModeAlphaC", "colors", "Viewport colours: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Inverted colours", "MenuSetColorModeInverted", "colors", "Viewport colours: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Sepia", "MenuSetColorModeSepia", "colors", "Viewport colours: " sillySeparator)
    If (thumbsDisplaying=1)
       kMenu("PVimgColorsFX", "Disable", "Alp&ha channel",,,"Viewport colours: " sillySeparator)
 
@@ -71111,7 +71111,7 @@ createMenuImgColorsFX() {
    If (thumbsDisplaying!=1 && imgFxMode>1)
    {
       Menu, PVimgColorsFX, Add
-      kMenu("PVimgColorsFX", "Add", "Toggle colours for 2 seconds`tShift+\", "MenuToggleColorAdjustments",, " (viewport)")
+      kMenu("PVimgColorsFX", "Add", "Toggle colours for 2 seconds`tShift+\", "MenuToggleColorAdjustments", "colors", " (viewport)")
    }
 }
 
@@ -71168,7 +71168,7 @@ createMenuLiveTools(dummy:=0) {
    Menu, PVlTools, Add
    kMenu("PVlTools", "Add", "&Paint brushes`tP", "PanelBrushTool", "pinch bulge effects draw deformer smudge cloner effects eraser")
    kMenu("PVlTools", "Add", "&Erase or fade area`tDelete", "PanelEraseSelectedArea")
-   kMenu("PVlTools", "Add", "F&lood fill / colour bucket`tK", "PanelFloodFillTool", "colorize similarity")
+   kMenu("PVlTools", "Add", "F&lood fill / colour bucket`tK", "PanelFloodFillTool", "colorize similarity color")
    kMenu("PVlTools", "Add", "&Fill shapes`tAlt+Backspace", "tlbrFillShape", "curve polygonal glass effects blur pie ellipse triangle rhombus gradients rectangle")
    kMenu("PVlTools", "Add", "Fill be&hind image", "PanelFillBehindBgrImage", "background")
    kMenu("PVlTools", "Add", "Draw s&hape contours`tCtrl+L", "tlbrDrawShapesContour", "lines curve polygonal pie ellipse triangle rhombus rectangle arcs")
@@ -71176,9 +71176,9 @@ createMenuLiveTools(dummy:=0) {
    kMenu("PVlTools", "Add", "Define alpha mas&k", "PanelSoloAlphaMasker")
    kMenu("PVlTools", "Add", "&Insert te&xt`tShift+T", "PanelInsertTextArea")
    kMenu("PVlTools", "Add", "S&ymmetry patterns", "PanelSymmetricaImage")
-   kMenu("PVlTools", "Add", "&Adjust image colours`tU", "PanelAdjustColorsSimpleWindow")
-   kMenu("PVlTools", "Add", "Adjust vie&wport colours and effects`tShift+U", "PanelColorsAdjusterVPwindow")
-   kMenu("PVlTools", "Add", "Desaturate colour&s`tCtrl+G", "PanelDesatureSelectedArea")
+   kMenu("PVlTools", "Add", "&Adjust image colours`tU", "PanelAdjustColorsSimpleWindow", "colors")
+   kMenu("PVlTools", "Add", "Adjust vie&wport colours and effects`tShift+U", "PanelColorsAdjusterVPwindow", "colors")
+   kMenu("PVlTools", "Add", "Desaturate colour&s`tCtrl+G", "PanelDesatureSelectedArea", "colors")
    If (AnyWindowOpen=10)
       kMenu("PVlTools", "Check/Disable", "Adjust vie&wport colours and effects`tShift+U")
    Else If (AnyWindowOpen=23)
@@ -71215,7 +71215,7 @@ createMenuLiveTools(dummy:=0) {
       kMenu("PVlTools", "Add", "Flip selected &horizontally" keyu, "FlipSelectedAreaH")
       keyu := (AnyWindowOpen) ? "" : "`tShift+V"
       kMenu("PVlTools", "Add", "Flip selected &vertically" keyu, "FlipSelectedAreaV")
-      kMenu("PVlTools", "Add", "&Invert colours`tShift+I", "InvertSelectedArea")
+      kMenu("PVlTools", "Add", "&Invert colours`tShift+I", "InvertSelectedArea", "colors")
    }
 }
 
@@ -71359,11 +71359,11 @@ addMenuBonusesBrushTools() {
       kMenu("PVmenu", "Add", "Toggle simple/soft brush types`tB", "toggleBrushTypes")
       kMenu("PVmenu", "Add", "Toggle brush double size`tShift+S", "toggleBrushDoubleSize")
       kMenu("PVmenu", "Add", "Toggle airbrush mode`tT", "toggleBrushAirMode")
-      kMenu("PVmenu", "Add", "Reset colours to black and white`tD", "ResetColorsToBW")
+      kMenu("PVmenu", "Add", "Reset colours to black and white`tD", "ResetColorsToBW", "colors")
       kMenu("PVmenu", "Add", "Reset brush aspect ratio and rotation", "MenuResetBrushAsRatio")
       If (AnyWindowOpen=64)
       {
-         kMenu("PVmenu", "Add", "Colour Effects brush`tQ", "toggleBrushTypeFX")
+         kMenu("PVmenu", "Add", "Colour Effects brush`tQ", "toggleBrushTypeFX", "color")
          kMenu("PVmenu", "Add", "Eraser brush`tR", "toggleBrushTypeEraser")
          kMenu("PVmenu", "Add", "Cloner brush`tJ", "toggleBrushTypeCloner")
          kMenu("PVmenu", "Add", "Deformer brushes`tP", "toggleBrushDeformers")
@@ -71399,11 +71399,11 @@ BuildImgLiveEditMenu(givenCoords:=0) {
       Menu, PVmenu, Add
       If (editingSelectionNow=1)
       {
-         kMenu("PVmenu", "Add", "Appl&y colour effects inside selection`tCtrl+Shift+U", "ApplyVPcolorAdjustSelectedArea")
+         kMenu("PVmenu", "Add", "Appl&y colour effects inside selection`tCtrl+Shift+U", "ApplyVPcolorAdjustSelectedArea", "color")
          kMenu("PVmenu", "Add", "&... outside the selection", "ApplyVPcolorAdjustSelectedArea")
       }
 
-      kMenu("PVmenu", "Add/Uncheck", "&Activate viewport colour adjustments`t\", "BtnToggleNoColorsFX")
+      kMenu("PVmenu", "Add/Uncheck", "&Activate viewport colour adjustments`t\", "BtnToggleNoColorsFX", "color")
       If (ForceNoColorMatrix!=1)
          kMenu("PVmenu", "Check", "&Activate viewport colour adjustments`t\")
       kMenu("PVmenu", "Add", "&Reset all adjustments to defaults`tCtrl+\", "BtnResetImageView")
@@ -71437,7 +71437,7 @@ BuildImgLiveEditMenu(givenCoords:=0) {
 
    Menu, PVmenu, Add
    If (mustPreventMenus=1)
-      kMenu("PVmenu", "Add", "Swap tool colours: A / B`tX", "ToggleBrushColors")
+      kMenu("PVmenu", "Add", "Swap tool colours: A / B`tX", "ToggleBrushColors", "colors")
 
    If (editingSelectionNow=1)
    {
@@ -71449,8 +71449,8 @@ BuildImgLiveEditMenu(givenCoords:=0) {
          If (DrawLineAreaBorderCenter=5)
             f := "grid"
 
-         kMenu("PVmenu", "Add/Uncheck", "&Allow " f " centre repositioning", "toggleSpiralRaysCenterReposition")
-         kMenu("PVmenu", "Add", "&Reset " f " centre", "BtnResetSpiralRayCenter")
+         kMenu("PVmenu", "Add/Uncheck", "&Allow " f " centre repositioning", "toggleSpiralRaysCenterReposition", "center")
+         kMenu("PVmenu", "Add", "&Reset " f " centre", "BtnResetSpiralRayCenter", "center")
          If (userAllowsGradientRecentering=1)
             kMenu("PVmenu", "Check", "&Allow " f " centre repositioning")
       }
@@ -71513,7 +71513,7 @@ BuildImgLiveEditMenu(givenCoords:=0) {
    } Else If isVarEqualTo(AnyWindowOpen, 31, 24)
    {
       kMenu("PVmenu", "Add", "Cycle adapt to selection modes`tS", "togglePasteInPlaceAdaptModes")
-      kMenu("PVmenu", "Add/Uncheck", "Colour adjustments on object`tU", "togglePasteInPlaceColorsFX")
+      kMenu("PVmenu", "Add/Uncheck", "Colour adjustments on object`tU", "togglePasteInPlaceColorsFX", "color")
       If (PasteInPlaceApplyColorFX=1)
          kMenu("PVmenu", "Check", "Colour adjustments on object`tU")
 
@@ -71865,7 +71865,7 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
       Try kMenu("PVedit", "Add", "&Filters", ":PVimgFilters")
       Try kMenu("PVedit", "Add", "&Draw", ":PVimgDraw")
       Try kMenu("PVedit", "Add", "&Transform", ":PVimgTransform")
-      Try kMenu("PVedit", "Add", "&Convert colour depth", ":PVimgClrDepths")
+      Try kMenu("PVedit", "Add", "&Convert colour depth", ":PVimgClrDepths", "color")
    }
 
    createMenuFavourites()
