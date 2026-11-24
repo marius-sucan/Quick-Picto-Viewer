@@ -218,7 +218,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , cmdExifTool := "", tabzDarkModus := 0, maxRecentOpenedFolders := 6, UIuserToneMapParamA := 210, UIuserToneMapParamB := 160
    , userImgChannelRlvl, userImgChannelGlvl, userImgChannelBlvl, userImgChannelAlvl, combosDarkModus := ""
    , sillySeparator :=  "▪", menuCustomNames := new hashtable(), clrGradientCoffX := 0, clrGradientCoffY := 0
-   , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Subtract|Luminosity|Ghosting|Inverted difference*|Clip to alpha*|Replace*|Behind*"
+   , userBlendModesList := "Darken*|Multiply*|Linear burn*|Colour burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Colour dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Subtract|Luminosity|Ghosting|Inverted difference*|Clip to alpha*|Replace*|Behind*"
    , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := []
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
    , PDFpwdsCache := [], multiCoreThumbsInitGood := "n", thumbsPoolState := 0
@@ -10752,13 +10752,13 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
              mpx := "| " Round(imgSelW * imgSelH/1000000, 1) " MPx"
              theMsg := "X / Y: " Round(ImgSelX1) ", " Round(ImgSelY1) "`nW / H: " Round(imgSelW) ", " Round(imgSelH) theRatio mpx addMsg
              If (adjustGradientOffset=1 && parametricWin=1)
-                theMsg := "Object center offset`nX / Y: " Round(alphaMaskOffsetX * 100, 1) "%, " Round(alphaMaskOffsetY * 100, 1) "%"
+                theMsg := "Object centre offset`nX / Y: " Round(alphaMaskOffsetX * 100, 1) "%, " Round(alphaMaskOffsetY * 100, 1) "%"
              Else If (adjustGradientOffset=1)
-                theMsg := "Alpha mask gradient center offset`nX / Y: " Round(alphaMaskOffsetX * 100, 1) "%, " Round(alphaMaskOffsetY * 100, 1) "%`nGradient angle: " Round(alphaMaskGradientAngle, 1) "°"
+                theMsg := "Alpha mask gradient centre offset`nX / Y: " Round(alphaMaskOffsetX * 100, 1) "%, " Round(alphaMaskOffsetY * 100, 1) "%`nGradient angle: " Round(alphaMaskGradientAngle, 1) "°"
              Else If (adjustSkewImg=1)
                 theMsg := "Skew image object`nX / Y: " Round(shearImgX * 10, 1) "%, " Round(shearImgY * 10, 1) "%"
              Else If (adjustGradientOffset=2)
-                theMsg := "Color gradient center offset`nX / Y: " Round(clrGradientOffX * 100, 1) "%, " Round(clrGradientOffY * 100, 1) "%`nGradient angle: " Round(FillAreaGradientAngle, 1) "°"
+                theMsg := "Colour gradient centre offset`nX / Y: " Round(clrGradientOffX * 100, 1) "%, " Round(clrGradientOffY * 100, 1) "%`nGradient angle: " Round(FillAreaGradientAngle, 1) "°"
              Else If (adjustSelCavity=1)
                 theMsg := "Selection exclusion area`nX / Y: " Round(innerSelectionCavityX*100, 1) "%, " Round(innerSelectionCavityY*100, 1) "%"
 
@@ -11306,18 +11306,18 @@ DefineVPselAreaMode() {
 }
 
 DefineFXmodes() {
-   Static FXmodesLabels := {1:"ORIGINAL", 2:"PERSONALIZED", 3:"AUTO-ADJUSTED", 4:"GRAYSCALE", 5:"RED CHANNEL", 6:"GREEN CHANNEL", 7:"BLUE CHANNEL", 8:"ALPHA CHANNEL", 9:"INVERTED COLORS", 10:"SEPIA"}
+   Static FXmodesLabels := {1:"ORIGINAL", 2:"PERSONALIZED", 3:"AUTO-ADJUSTED", 4:"GREYSCALE", 5:"RED CHANNEL", 6:"GREEN CHANNEL", 7:"BLUE CHANNEL", 8:"ALPHA CHANNEL", 9:"INVERTED COLOURS", 10:"SEPIA"}
 
    If FXmodesLabels.HasKey(imgFxMode)
       friendly := FXmodesLabels[imgFxMode]
    Else
-      friendly := "Colors FX: " imgFxMode
+      friendly := "Colours FX: " imgFxMode
 
    If (bwDithering=1 && imgFxMode=4)
       friendly := "BLACK/WHITE DITHERED"
 
    If (imgFxMode=1 && isInRange(usrColorDepth, 2, 10))
-      friendly := "ALTERED COLOR DEPTH"
+      friendly := "ALTERED COLOUR DEPTH"
 
    Return friendly
 }
@@ -11344,7 +11344,7 @@ ToggleImgColorDepth(dir:=0) {
    usrColorDepth := clampInRange(usrColorDepth, 1, 9, 1)
    ForceRefreshNowThumbsList()
    infoColorDepth := (usrColorDepth>1) ? defineColorDepth() : "NONE"
-   showTOOLtip("Image color depth simulated:`n" infoColorDepth, A_ThisFunc, 2, (usrColorDepth - 0.999)/8)
+   showTOOLtip("Image colour depth simulated:`n" infoColorDepth, A_ThisFunc, 2, (usrColorDepth - 0.999)/8)
    SetTimer, RemoveTooltip, % -msgDisplayTime
    INIaction(1, "usrColorDepth", "General")
    INIaction(1, "imgFxMode", "General")
@@ -11368,7 +11368,7 @@ defineColorDepth() {
    Static bitsOptions := {0:0, 1:0, 2:2, 3:3, 4:4, 5:5, 6:6, 7:7, 8:8, 9:16}
 
    internalColorDepth := bitsOptions[usrColorDepth]
-   r := internalColorDepth " bits [" 2**internalColorDepth " colors]"
+   r := internalColorDepth " bits [" 2**internalColorDepth " colours]"
    If (r<1)
       r := currIMGdetails.PixelFormat
    Else If (ColorDepthDithering=1)
@@ -11380,7 +11380,7 @@ defineColorDepth() {
 }
 
 ToggleImgFX(dir:=0) {
-   Static fxBar := "", lastInvoked := 1, moreFX :={1:"None", 2:"Brightness / Contrast", 3:"Hue / Saturation / Lightness", 4:"Levels adjust [High / Mid / Low]", 5:"Color tint [Hue / Amount]", 6:"Colour balance", 7:"Color curve per channel"}
+   Static fxBar := "", lastInvoked := 1, moreFX :={1:"None", 2:"Brightness / Contrast", 3:"Hue / Saturation / Lightness", 4:"Levels adjust [High / Mid / Low]", 5:"Colour tint [Hue / Amount]", 6:"Colour balance", 7:"Colour curve per channel"}
         , curvesFX := {1:"Brightness (density)", 2:"Contrast", 3:"Highlights", 4:"Shadows", 5:"Midtones", 6:"White saturation", 7:"Black saturation"}
         , curvesChannels := {1:"Red", 2:"Green", 3:"Blue", 4:"All"}
 
@@ -11437,12 +11437,12 @@ ToggleImgFX(dir:=0) {
 
    bonus := (usrColorDepth>1 && imgFxMode=1) ? 0.5 : 0
    If (usrColorDepth>1 && imgFxMode=1)
-      friendly .= "`nSimulated color depth: " defineColorDepth()
+      friendly .= "`nSimulated colour depth: " defineColorDepth()
 
    If (imgFxMode=4 || imgFxMode=3 || imgFxMode=2)
       friendly .= "`n `nPress " ((thumbsDisplaying=1) ? "U" : "Shift + U") " to adjust the colour display options."
 
-   showTOOLtip("Image colors: " friendly, A_ThisFunc, 2, (imgFxMode - 0.999 + bonus)/9)
+   showTOOLtip("Image colours: " friendly, A_ThisFunc, 2, (imgFxMode - 0.999 + bonus)/9)
    SetTimer, RemoveTooltip, % -msgDisplayTime
    ForceRefreshNowThumbsList()
    INIaction(1, "imgFxMode", "General")
@@ -11465,7 +11465,7 @@ ToggleImgFX(dir:=0) {
    If (imgFxMode>1 && thumbsDisplaying!=1 && !AnyWindowOpen && drawingShapeNow!=1 && !viewportQPVimage.imgHandle)
    {
       applyLabel := (editingSelectionNow=1 && !testEntireImgSelected()) ? "Apply to selection" : "Apply to image"
-      CreateTempGuiButton(applyLabel ",,quickBarApplyColorMode||Adjust colors,,PanelColorsAdjusterVPwindow||Reset,,HardResetImageView", 0)
+      CreateTempGuiButton(applyLabel ",,quickBarApplyColorMode||Adjust colours,,PanelColorsAdjusterVPwindow||Reset,,HardResetImageView", 0)
       fxBar := (TouchScreenMode=1) ? tempBtnVisible : ""
    } Else If (imgFxMode=1 && fxBar!="" && fxBar=tempBtnVisible)
    {
@@ -11475,7 +11475,7 @@ ToggleImgFX(dir:=0) {
 }
 
 defineImgAlign() {
-   modes := {0:"Center", 1:"Top-left corner", 2:"Top-center", 3:"Top-right corner", 4:"Left-center", 5:"Center", 6:"Right-center", 7:"Bottom-left corner", 8:"Bottom-center", 9:"Bottom-right corner"}
+   modes := {0:"Centre", 1:"Top-left corner", 2:"Top-centre", 3:"Top-right corner", 4:"Left-centre", 5:"Centre", 6:"Right-centre", 7:"Bottom-left corner", 8:"Bottom-centre", 9:"Bottom-right corner"}
    r := modes[imageAlignVPtopLeft]
    StringUpper, r, r
    Return r
@@ -11700,7 +11700,7 @@ VPchangeLumos(dir, dummy:=0) {
       If (imgFxMode=4)
          addMsg := DefineFXmodes()
       If (imgFxMode=1 && usrColorDepth>1)
-         addMsg .= "`nImage color depth: ALTERED [ " defineColorDepth() " ]"
+         addMsg .= "`nImage colour depth: ALTERED [ " defineColorDepth() " ]"
       If (vpIMGrotation>0)
          addMsg .= "`nImage rotated: " vpIMGrotation "°."
       If InStr(currIMGdetails.PixelFormat, "TONE-MAPPED")
@@ -17436,7 +17436,7 @@ alertReduceColorDepth(alertMode:=1) {
 
    vpFmt := Gdip_GetImagePixelFormat(useGdiBitmap(), 2)
    If (thisImgBPP!=24 && thisImgBPP!=32)
-      msgu := "The image you are about to edit has an unsupported colour depth for editing: " pixFmt "`n`nThe image will be converted to the viewport image color depth: " vpFmt ". Therefore, some color information will likely be lost."
+      msgu := "The image you are about to edit has an unsupported colour depth for editing: " pixFmt "`n`nThe image will be converted to the viewport image colour depth: " vpFmt ". Therefore, some colour information will likely be lost."
 
    pff := msgu ? "The image " : "The image you are about to edit "
    If (currIMGdetails.Frames>1)
@@ -17471,7 +17471,7 @@ alertReduceSaveColorDepth() {
    pixFmt := currIMGdetails.PixelFormat  " | " currIMGdetails.RawFormat
    thisImgBPP := SubStr(pixFmt, 1, InStr(pixFmt, "-") - 1)
    If (thisImgBPP!=24 && thisImgBPP!=32)
-      msgResult := msgBoxWrapper(appTitle ": IMAGE SAVE WARNING", "The image you intend to save originally has a colour depth unsupported for editing: " pixFmt "`n`nThe image will be converted to a 24- or 32-bit colour depth. Therefore, some color information will probably be lost. ", "&Continue|C&ancel", 1, "exclamation")
+      msgResult := msgBoxWrapper(appTitle ": IMAGE SAVE WARNING", "The image you intend to save originally has a colour depth unsupported for editing: " pixFmt "`n`nThe image will be converted to a 24- or 32-bit colour depth. Therefore, some colour information will probably be lost. ", "&Continue|C&ancel", 1, "exclamation")
    Else If (currIMGdetails.Frames>1)
       msgResult := msgBoxWrapper(appTitle ": IMAGE SAVE WARNING", "The image you intend to save has " currIMGdetails.Frames " frames or pages.`n`nOnly the current frame will be preserved; the other frames will be discarded. ", "&Continue|C&ancel", 1, "exclamation")
 
@@ -17692,8 +17692,8 @@ ApplyVPcolorAdjustSelectedArea(modus:=0) {
 
     If (imgFxMode=1)
     {
-       msgBeepTimer("No viewport colour adjustments to apply to the image`n`nPress F to cycle through modes`nor press Shift + U to open the viewport color adjustments panel")
-       CreateTempGuiButton("Cycle color modes,,quickBarNextColorMode||Adjust colors,,PanelColorsAdjusterVPwindow", 0)
+       msgBeepTimer("No viewport colour adjustments to apply to the image`n`nPress F to cycle through modes`nor press Shift + U to open the viewport colour adjustments panel")
+       CreateTempGuiButton("Cycle colour modes,,quickBarNextColorMode||Adjust colours,,PanelColorsAdjusterVPwindow", 0)
        Return
     }
 
@@ -17711,7 +17711,7 @@ ApplyVPcolorAdjustSelectedArea(modus:=0) {
     {
        imgFxMode := o_imgFxMode
        trGdip_DisposeImage(newBitmap)
-       msgBeepTimer("Failed to apply the viewport color adjustments to the selected image area")
+       msgBeepTimer("Failed to apply the viewport colour adjustments to the selected image area")
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17721,7 +17721,7 @@ ApplyVPcolorAdjustSelectedArea(modus:=0) {
     {
        trGdip_DisposeImage(newBitmap)
        Gdip_DeleteGraphics(G2)
-       msgBeepTimer("Failed to apply the viewport color adjustments to the selected image area`nUnable to create selection path")
+       msgBeepTimer("Failed to apply the viewport colour adjustments to the selected image area`nUnable to create selection path")
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17737,7 +17737,7 @@ ApplyVPcolorAdjustSelectedArea(modus:=0) {
     Gdip_DeleteGraphics(G2)
     okay := validBMP(zBitmap)
     trGdip_DisposeImage(zBitmap)
-    etaTime := "Elapsed time to apply viewport color effects: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) 
+    etaTime := "Elapsed time to apply viewport colour effects: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) 
     addJournalEntry(etaTime)
     If (r0!="fail" && r1!="fail" && G2 && validBMP(newBitmap) && okay=1)
     {
@@ -17749,7 +17749,7 @@ ApplyVPcolorAdjustSelectedArea(modus:=0) {
        }
     } Else
     {
-       msgBeepTimer("Failed to apply the viewport color adjustments to the selected image area`nError messages feel so desaturated...")
+       msgBeepTimer("Failed to apply the viewport colour adjustments to the selected image area`nError messages feel so desaturated...")
        trGdip_DisposeImage(newBitmap)
     }
 
@@ -17767,7 +17767,7 @@ AdjustColorsLegacySelectedArea(prevFXmode:=0) {
        Return 
 
     If (prevFXmode<2 || !isNumber(prevFXmode))
-       Return msgBeepTimer("No colour adjustments to apply to the image`n`nPress U to open the color adjustments panel")
+       Return msgBeepTimer("No colour adjustments to apply to the image`n`nPress U to open the colour adjustments panel")
 
     mergeViewPortRotationImgEditing()
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
@@ -17785,7 +17785,7 @@ AdjustColorsLegacySelectedArea(prevFXmode:=0) {
     {
        trGdip_DisposeImage(newBitmap)
        imgFxMode := o_imgFxMode
-       msgBeepTimer("Failed to apply the color adjustments to the selected image area")
+       msgBeepTimer("Failed to apply the colour adjustments to the selected image area")
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17796,7 +17796,7 @@ AdjustColorsLegacySelectedArea(prevFXmode:=0) {
        trGdip_DisposeImage(newBitmap)
        Gdip_DeleteGraphics(G2)
        imgFxMode := o_imgFxMode
-       msgBeepTimer("Failed to apply the color adjustments to the selected image area`nUnable to create selection path")
+       msgBeepTimer("Failed to apply the colour adjustments to the selected image area`nUnable to create selection path")
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17850,7 +17850,7 @@ AdjustColorsLegacySelectedArea(prevFXmode:=0) {
     okay := validBMP(zBitmap)
     trGdip_DisposeImage(zBitmap, 1)
     trGdip_DisposeImage(xBitmap, 1)
-    etaTime := "Elapsed time to apply viewport color effects: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) 
+    etaTime := "Elapsed time to apply viewport colour effects: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) 
     addJournalEntry(etaTime)
     realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
     If (r0!="fail" && r1!="fail" && G2 && validBMP(newBitmap) && okay=1)
@@ -17858,7 +17858,7 @@ AdjustColorsLegacySelectedArea(prevFXmode:=0) {
        wrapRecordUndoLevelNow(newBitmap)
     } Else
     {
-       msgBeepTimer("Failed to apply the color adjustments to the selected image area`nIt is all so blue in my coding...")
+       msgBeepTimer("Failed to apply the colour adjustments to the selected image area`nIt is all so blue in my coding...")
        trGdip_DisposeImage(newBitmap)
     }
 
@@ -17886,7 +17886,7 @@ AdjustColorsSimpleSelectedArea() {
     G2 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap, 7, 4, compositingQuality)
     If !G2
     {
-       msgBeepTimer("Failed to apply the color adjustments to the selected image area")
+       msgBeepTimer("Failed to apply the colour adjustments to the selected image area")
        trGdip_DisposeImage(newBitmap)
        SetTimer, ResetImgLoadStatus, -250
        Return
@@ -17897,7 +17897,7 @@ AdjustColorsSimpleSelectedArea() {
     {
        trGdip_DisposeImage(newBitmap)
        Gdip_DeleteGraphics(G2)
-       msgBeepTimer("Failed to apply the color adjustments to the selected image area`nUnable to create selection path")
+       msgBeepTimer("Failed to apply the colour adjustments to the selected image area`nUnable to create selection path")
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17941,7 +17941,7 @@ AdjustColorsSimpleSelectedArea() {
     Gdip_DeletePath(pPath)
     okay := validBMP(zBitmap)
     realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
-    etaTime := "Elapsed time to apply viewport color effects: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) 
+    etaTime := "Elapsed time to apply viewport colour effects: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) 
     addJournalEntry(etaTime)
     trGdip_DisposeImage(zBitmap, 1)
     trGdip_DisposeImage(xBitmap, 1)
@@ -17951,7 +17951,7 @@ AdjustColorsSimpleSelectedArea() {
        dummyTimerDelayiedImageDisplay(50)
     } Else
     {
-       msgBeepTimer("Failed to apply the color adjustments to the selected image area`nIt is so vividly painful...")
+       msgBeepTimer("Failed to apply the colour adjustments to the selected image area`nIt is so vividly painful...")
        trGdip_DisposeImage(newBitmap)
     }
 
@@ -18750,7 +18750,7 @@ QPV_SaveImageFile(funcu, pBitmap, file2save, jpegQuality, depthLevel:=1) {
       {
          E := QPV_GdipPalettizeBitmap(pBitmap, userGifPaletteDithering, 1)
          If E
-            addJournalEntry(A_ThisFunc "() invoked by " funcu "(): GDI+ failed to reduce the image to 256 colors [error " E "]. FreeImage reduces it instead, without transparency.")
+            addJournalEntry(A_ThisFunc "() invoked by " funcu "(): GDI+ failed to reduce the image to 256 colours [error " E "]. FreeImage reduces it instead, without transparency.")
       }
    } Else If (depth=16)
    {
@@ -20897,8 +20897,8 @@ undoRedoHugeImagesAct() {
       Abpp := FreeImage_GetBPP(hFIFimgA)
       If (bpp!=Abpp)
       {
-         addJournalEntry("Error: undo level has a different color depth than the viewport bitmap: " Abpp " // " bpp)
-         msgBeepTimer("WARNING: The recorded undo level has a different color depth than the viewport bitmap.`nUnable to undo.")
+         addJournalEntry("Error: undo level has a different colour depth than the viewport bitmap: " Abpp " // " bpp)
+         msgBeepTimer("WARNING: The recorded undo level has a different colour depth than the viewport bitmap.`nUnable to undo.")
          ResetImgLoadStatus()
          Return
       }
@@ -21227,7 +21227,7 @@ HugeImagesConvertClrDepth(modus) {
 
    If (modus!=24 && modus!=32)
    {
-      msgResult := msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", "For the selected color depth, image editing tools will not work. Do you want to continue?", "&Continue|C&ancel", 1, "exclamation")
+      msgResult := msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", "For the selected colour depth, image editing tools will not work. Do you want to continue?", "&Continue|C&ancel", 1, "exclamation")
       If (msgResult!="Continue")
          Return
    }
@@ -21243,7 +21243,7 @@ HugeImagesConvertClrDepth(modus) {
    bufferSize := Stride * kH
    If (oimgBPP=lzp && !isVarEqualTo(modus, "gray", "bw", 8))
    {
-      msgBeepTimer("The image already has the selected color depth: " modus "-bit.", 0)
+      msgBeepTimer("The image already has the selected colour depth: " modus "-bit.", 0)
       ResetImgLoadStatus()
       Return
    }
@@ -21252,7 +21252,7 @@ HugeImagesConvertClrDepth(modus) {
       Return
 
    setImageLoading()
-   showTOOLtip("Converting image color depth, please wait...")
+   showTOOLtip("Converting image colour depth, please wait...")
    discarded := 0
    If ((imgBPP!=24 && imgBPP!=32 && modus=8)
    || (imgBPP>32 && isVarEqualTo(modus, 8, 16, "bw", "gray")))
@@ -21290,7 +21290,7 @@ HugeImagesConvertClrDepth(modus) {
 
    If hFIFimgA
    {
-      showTOOLtip("Successfully converted the image color depth to " modus "-bit")
+      showTOOLtip("Successfully converted the image colour depth to " modus "-bit")
       oimgBPP := FreeImage_GetBPP(hFIFimgA)
       imgPath := viewportQPVimage.ImgFile
       ColorsType := FreeImage_GetColorType(hFIFimgA)
@@ -21341,7 +21341,7 @@ warnIncorrectColorDepthHugeImage(bpp, qpvMode){
       pixFmt := currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat
       thisImgBPP := SubStr(pixFmt, 1, InStr(pixFmt, "-") - 1)
       If (thisImgBPP!=24 && thisImgBPP!=32)
-         msgu := "The image you currently have opened has an unsupported color depth for editing: " pixFmt ".`n`nThe image was converted to " bpp " bits for display in the viewport. Therefore, some color information was likely lost."
+         msgu := "The image you currently have opened has an unsupported colour depth for editing: " pixFmt ".`n`nThe image was converted to " bpp " bits for display in the viewport. Therefore, some colour information was likely lost."
 
       If msgu
       {
@@ -21385,7 +21385,7 @@ HugeImagesApplyAutoColors() {
       If memoryUsageWarning(imgW//5, imgH//5, bpp)
          Return
 
-      showTOOLtip("Applying auto-adjust image colors, please wait...")
+      showTOOLtip("Applying auto-adjust image colours, please wait...")
       setImageLoading()
       obju := InitHugeImgSelPath(0, imgW, imgH)
       recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, 0, 0)
@@ -21409,7 +21409,7 @@ HugeImagesApplyAutoColors() {
       } Else
       {
          recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
-         msgBeepTimer("ERROR: Failed to auto-adjust the image colors")
+         msgBeepTimer("ERROR: Failed to auto-adjust the image colours")
       }
       ResetImgLoadStatus()
 }
@@ -22219,7 +22219,7 @@ HugeImagesApplyPasteInPlace() {
 }
 
 HugeImagesApplyCLRfxPasteInPlace(hFIFimgA, friendly) {
-   showTOOLtip("Applying " friendly ", please wait...`nPerforming color adjustments", 1)
+   showTOOLtip("Applying " friendly ", please wait...`nPerforming colour adjustments", 1)
    userImgAdjustNoClamp := (PasteInPlaceLight>1 && PasteInPlaceGamma<1) ? 1 : 0 
    pBitsAll := FreeImage_GetBits(hFIFimgA)
    Stride := FreeImage_GetStride(hFIFimgA)
@@ -22385,7 +22385,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          If (FillAreaApplyColorFX=1 && isinRange(thisBlendMode, 1, 22) && r && fillTool=1)
          {
             thisOpacity := (FillAreaColorMode=1) ? FillAreaOpacity : max(FillAreaOpacity, FillArea2ndOpacity)
-            showTOOLtip("Applying " modus "`nPerforming color adjustments, please wait", 1)
+            showTOOLtip("Applying " modus "`nPerforming colour adjustments, please wait", 1)
             rz := DllCall("qpvmain.dll\AdjustImageColorsPrecise", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisOpacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", Round(PasteInPlaceSaturation*655.35), "int", userImgAdjustAltBright, "int", Round(PasteInPlaceLight*257), "int", 0, "int", Round(PasteInPlaceGamma*655.30), "int", 0, "int", 0, "int", 0, "int", PasteInPlaceHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
          }
 
@@ -23938,7 +23938,7 @@ ChangeImageCanvasSize(userW, userH, userAddT, userAddB, userAddL, userAddR, user
        Gdip_SetClipRect(G2, imgSelPx, imgSelPy, imgW, imgH, 4)
        r0 := Gdip_GraphicsClear(G2, thisColor)
        If r0
-          addJournalEntry(A_ThisFunc "(): failed to set background color through trGdip_GraphicsClear()")
+          addJournalEntry(A_ThisFunc "(): failed to set background colour through trGdip_GraphicsClear()")
 
        Gdip_ResetClip(G2)
     }
@@ -25455,7 +25455,7 @@ corePasteClipboardImg(modus, imgW, imgH, allowFilesPaste) {
           clipBMP := drawTextInBox(toPaste, OSDFontName, PasteFntSize, imgW, imgH, OSDtextColor, OSDbgrColor, 0, 0, usrTextAlign, "0xFF")
           setGdipBMPinfos(clipBMP, A_ThisFunc "|recordUndoLevelNow")
           If (modus=1)
-             showTOOLtip("Text clipboard content rendered as an image.`nOSD font and colors were used.")
+             showTOOLtip("Text clipboard content rendered as an image.`nOSD font and colours were used.")
           SetTimer, RemoveTooltip, % -msgDisplayTime
        } Else
        {
@@ -26751,10 +26751,10 @@ ActToggleLivePreview() {
 }
 
 GuiAddPickerColor(options, colorReference, guiu:="SettingsGUIA") {
-    Gui, %guiu%: Add, Button, % options " +0x8000 gStartPickingColor vPicku" colorReference " +hwndhTemp", Color pipette
+    Gui, %guiu%: Add, Button, % options " +0x8000 gStartPickingColor vPicku" colorReference " +hwndhTemp", Colour pipette
     pk := (uiUseDarkMode=1) ? "" : "-dark"
     SetImgButtonStyle(hTemp, mainExecPath "\resources\toolbar\pipette" pk ".png", 0, 0, guiu)
-    ToolTip2ctrl(hTemp, "Pick color from the viewport")
+    ToolTip2ctrl(hTemp, "Pick colour from the viewport")
 }
 
 GuiAddCollapseBtn(options, guiu:="SettingsGUIA") {
@@ -26782,14 +26782,14 @@ GuiAddButton(options, uiLabel, readerLabel, ttipu:=0, guiu:="SettingsGUIA") {
 
 GuiAddColor(options, colorReference, labelu:=0, guiu:="SettingsGUIA") {
     realColor := %colorReference%
-    p := labelu ? labelu : "Color."
+    p := labelu ? labelu : "Colour."
     If (isWinXP=1)
-       Gui, %guiu%: Add, Text, % options " v" colorReference A_Space " +hwndhTemp gInvokeStandardDialogColorPicker +TabStop +0xE", %p% Invoke color picker.
+       Gui, %guiu%: Add, Text, % options " v" colorReference A_Space " +hwndhTemp gInvokeStandardDialogColorPicker +TabStop +0xE", %p% Invoke colour picker.
     Else
-       Gui, %guiu%: Add, Button, % options " +0x8000 v" colorReference A_Space " +hwndhTemp gInvokeStandardDialogColorPicker", %p% Invoke color picker.
+       Gui, %guiu%: Add, Button, % options " +0x8000 v" colorReference A_Space " +hwndhTemp gInvokeStandardDialogColorPicker", %p% Invoke colour picker.
 
     updateColoredRectCtrl(realColor, colorReference, guiu, hTemp)
-    p := labelu ? labelu : "Define color"
+    p := labelu ? labelu : "Define colour"
     ToolTip2ctrl(hTemp, p)
     Return hTemp
 }
@@ -27024,11 +27024,11 @@ removeDeadFavedFolders() {
 
    FileDelete, % folderFavesFile
    If (ErrorLevel && counter>0)
-      Return msgBeepTimer("ERROR: Failed to update the folder favorites list file. Access denied?")
+      Return msgBeepTimer("ERROR: Failed to update the folder favourites list file. Access denied?")
 
    FileAppend, % newListu, % folderFavesFile, UTF-8
    If ErrorLevel
-      msgBeepTimer("ERROR: Failed to update the folder favorites list file. Access denied?")
+      msgBeepTimer("ERROR: Failed to update the folder favourites list file. Access denied?")
    Else
       msgBeepTimer("Operation successfully completed.`n" failed " inexistent folders or files were found.", 0)
 }
@@ -27116,7 +27116,7 @@ addFolderSldATfavorites(givenPath) {
    Sleep, 5
    FileDelete, % folderFavesFile
    If ErrorLevel
-      Return msgBeepTimer("ERROR: Failed to access the folder favorites list file.")
+      Return msgBeepTimer("ERROR: Failed to access the folder favourites list file.")
 
    Sleep, 5
    If InStr(OutputVar, "`n" givenPath "`n")
@@ -27127,18 +27127,18 @@ addFolderSldATfavorites(givenPath) {
       givenPath := PathCompact(givenPath, "a", 1, OSDfontSize)
       FileAppend, % OutputVar, % folderFavesFile, UTF-8
       If ErrorLevel
-         msgBeepTimer("ERROR: Failed to update the folder favorites list file. " thisu " was not removed from the favorites list.")
+         msgBeepTimer("ERROR: Failed to update the folder favourites list file. " thisu " was not removed from the favourites list.")
       Else 
-         msgBeepTimer(thisu " removed from the favorites list:`n" givenPath, 0)
+         msgBeepTimer(thisu " removed from the favourites list:`n" givenPath, 0)
    } Else
    {
       OutputVar := "`n" givenPath "`n" OutputVar
       givenPath := PathCompact(givenPath, "a", 1, OSDfontSize)
       FileAppend, % OutputVar, % folderFavesFile, UTF-8
       If ErrorLevel
-         msgBeepTimer("ERROR: Failed to update the folder favorites list file. " thisu " was not added to the favorites list.")
+         msgBeepTimer("ERROR: Failed to update the folder favourites list file. " thisu " was not added to the favourites list.")
       Else
-         msgBeepTimer(thisu " added to the favorites list:`n" givenPath, 0)
+         msgBeepTimer(thisu " added to the favourites list:`n" givenPath, 0)
    }
 }
 
@@ -27354,7 +27354,7 @@ createOmniBoxFoldersContextMenu(folderPath) {
       kMenu("PVfomni", "Check", "Se&t as the protected folder")
 
    kMenu("PVfomni", "Add", "Folder properties (E&xplorer)`tF12", "omniBoxFolderProperties")
-   kMenu("PVfomni", "Add", "Add to/remove from fa&vorites", "omniBoxFolderToFaves")
+   kMenu("PVfomni", "Add", "Add to/remove from fa&vourites", "omniBoxFolderToFaves")
    Menu, PVfomni, Add
    kMenu("PVfomni", "Add", "Paste clip&board file(s) into...", "omniBoxFolderPasteClippy")
    kMenu("PVfomni", "Add", "Cop&y selected file(s) into...", "omniBoxFolderCopyFiles")
@@ -31659,7 +31659,7 @@ folderTreeContextMenu() {
          kMenu("PVfdTree", "Add", "&Rename folder`tF2", "folderTreeRenameFolder")
          kMenu("PVfdTree", "Add", "&Delete folder`tDelete", "folderTreeDeleteFolder")
          Menu, PVfdTree, Add
-         kMenu("PVfdTree", "Add", "Add to/remove from fa&vorites", "folderTreeAddFolderFaves")
+         kMenu("PVfdTree", "Add", "Add to/remove from fa&vourites", "folderTreeAddFolderFaves")
          kMenu("PVfdTree", "Add/UnCheck", "Se&t as the protected folder", "folderTreeSetFolderProtected")
          If (Format("{:L}", protectedFolderPath)=Format("{:L}", folderPath) && preventDeleteFromProtectedPath=1)
             kMenu("PVfdTree", "Check", "Se&t as the protected folder")
@@ -32672,9 +32672,9 @@ uiPopulateImgInfos() {
       diffRGBtotal := max(sumTotalR, sumTotalG, sumTotalB) - min(sumTotalR, sumTotalG, sumTotalB)
       diffRGBtotal := diffRGBtotal/max(sumTotalR, sumTotalG, sumTotalB)
       If (diffRGBtotal<0.0001 || diffRGBtotal="")
-         LV_Add(A_Index, "Grayscale image", 1)
+         LV_Add(A_Index, "Greyscale image", 1)
       Else
-         LV_Add(A_Index, "Grayscale image", 0)
+         LV_Add(A_Index, "Greyscale image", 0)
 
       LV_Add(A_Index, "Image file format", currIMGdetails.RawFormat)
    }
@@ -44407,12 +44407,12 @@ PanelSetThumbColumnOptions() {
     Gui, Add, Text, xs y+15 w%slideWid2%, Highlight images:
     Gui, Add, Checkbox, x+10 wp-15 gupdateUIthumbsView Checked%highlightAlreadySeenImages% vhighlightAlreadySeenImages, &already seen
     Gui, Add, Checkbox, x+10 gupdateUIthumbsView Checked%markSearchMatches% vmarkSearchMatches, &matching search query
-    GuiAddDropDownList("xs y+15 w" txtWid " gupdateUIthumbsView AltSubmit Choose" UIimgFxMode " vUIimgFxMode", "Original image colors|Personalized colors|Grayscale|Red channel|Green channel|Blue channel|-|Inverted colors|Sepia", "Viewport color adjustments mode")
+    GuiAddDropDownList("xs y+15 w" txtWid " gupdateUIthumbsView AltSubmit Choose" UIimgFxMode " vUIimgFxMode", "Original image colours|Personalized colours|Greyscale|Red channel|Green channel|Blue channel|-|Inverted colours|Sepia", "Viewport colour adjustments mode")
     Gui, Add, Button, x+5  w%thisW% hp vbtnFldr1 gHardResetImageView, &Reset
-    GuiAddDropDownList("xs y+5 w" txtWid " gupdateUIthumbsView AltSubmit Choose" usrColorDepth " vusrColorDepth", "Default color depth|2 bits [4 colors]|3 bits [8 colors]|4 bits [16 colors]|5 bits [32 colors]|6 bits [64 colors]|7 bits [128 colors]|8 bits [256 colors]|16 bits [65536 colors]", "Simulate viewport color depth")
+    GuiAddDropDownList("xs y+5 w" txtWid " gupdateUIthumbsView AltSubmit Choose" usrColorDepth " vusrColorDepth", "Default colour depth|2 bits [4 colours]|3 bits [8 colours]|4 bits [16 colours]|5 bits [32 colours]|6 bits [64 colours]|7 bits [128 colours]|8 bits [256 colours]|16 bits [65536 colours]", "Simulate viewport colour depth")
     Gui, Add, Checkbox, x+5 hp gupdateUIthumbsView Checked%ColorDepthDithering% vColorDepthDithering, Dithering
     GuiAddDropDownList("xs y+5 w" slideWid2 " AltSubmit gupdateUIthumbsView Choose" UIthumbsAratio " vUIthumbsAratio", "Wide (1.81)|Tall (0.48)|Square (1.00)", "Thumbnails aspect ratio")
-    Gui, Add, Checkbox, x+10 hp gupdateUIthumbsView Checked%UIvpImgAlignCenter% vUIvpImgAlignCenter, &Centered alignment
+    Gui, Add, Checkbox, x+10 hp gupdateUIthumbsView Checked%UIvpImgAlignCenter% vUIvpImgAlignCenter, &Centred alignment
     Gui, Add, Checkbox, xs y+10 gupdateUIthumbsView Checked%fadeOtherDupeGroups% vfadeOtherDupeGroups, Fade the other groups of image duplicates
     Gui, Add, Checkbox, xs y+10 gupdateUIthumbsView Checked%multilineStatusBar% vmultilineStatusBar, Two-line status bar
     Gui, Add, Checkbox, xs y+10 gupdateUIthumbsView Checked%thumbsModeItemHighlight% vthumbsModeItemHighlight, Solid active item highlighting
@@ -44733,8 +44733,8 @@ PanelExtractFrames() {
     GuiAddEdit("x+10 w" thisWid " number -multi limit3 veditF5", userJpegQuality)
     Gui, Add, UpDown, vuserJpegQuality Range1-100, % userJpegQuality
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
-    Gui, Add, Text, xs+15 y+7 w%ml% hp +0x200 +hwndhTemp, Fallback color depth:
-    hTemp := GuiAddDropDownList("x+10 w" thisWid " AltSubmit Choose" depthChoice " vuserSaveBitsDepth", "32 bits RGBA|24 bits RGB|16 bits RGB [32768 colors]|8 bits RGB [256 colors]", [hTemp])
+    Gui, Add, Text, xs+15 y+7 w%ml% hp +0x200 +hwndhTemp, Fallback colour depth:
+    hTemp := GuiAddDropDownList("x+10 w" thisWid " AltSubmit Choose" depthChoice " vuserSaveBitsDepth", "32 bits RGBA|24 bits RGB|16 bits RGB [32768 colours]|8 bits RGB [256 colours]", [hTemp])
     ToolTip2ctrl(hTemp, "PDF pages are saved at the selected colour depth.`nOther frames and pages keep their own depth when the file format can store it;`nthe selected colour depth applies when it cannot.")
     sml := (PrefsLargeFonts=1) ? 40 : 30
     GuiAddButton("x+5 w" sml " hp gbtnHelpSaveImgPanel", " ?", "Help")
@@ -44858,8 +44858,8 @@ PanelCombineImagesMultipage() {
     Gui, Add, Checkbox, x+5 hp gBtnChangeMultiPageFmt Checked%userCombineTiffKeepOrig% vuserCombineTiffKeepOrig, Embed originals
     Gui, Add, Checkbox, xs y+5 hp Checked%userCombineSubFrames% vuserCombineSubFrames, Join contained frames from selected files
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
-    Gui, Add, Text, xs y+10 w%ml% hp +0x200 vtxtLine1 +hwndhTemp, Maximum color depth:
-    GuiAddDropDownList("x+1 w" thisWid " AltSubmit Choose" userSaveBitsDepth " vuserSaveBitsDepth gBtnChangeMultiPageFmt", "32 bits RGBA|24 bits RGB|16 bits RGB [32768 colors]|8 bits RGB [256 colors]", [hTemp])
+    Gui, Add, Text, xs y+10 w%ml% hp +0x200 vtxtLine1 +hwndhTemp, Maximum colour depth:
+    GuiAddDropDownList("x+1 w" thisWid " AltSubmit Choose" userSaveBitsDepth " vuserSaveBitsDepth gBtnChangeMultiPageFmt", "32 bits RGBA|24 bits RGB|16 bits RGB [32768 colours]|8 bits RGB [256 colours]", [hTemp])
     Gui, Add, Checkbox, x+5 hp Checked%userCombineDepthDithering% vuserCombineDepthDithering, Dithering
     Gui, Add, Text, xs y+10 w%ml% hp +0x200 vtxtLine2, Frame delay (in ms)
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
@@ -44882,18 +44882,18 @@ PanelCombineImagesMultipage() {
     Gui, Add, Checkbox, x+5 hp Checked%combinePDFpageLandscape% vcombinePDFpageLandscape, Landscape
     thisWid := (PrefsLargeFonts=1) ? 90 : 65
     Gui, Add, Text, xs y+10 w%ml% hp +0x200 vtxtLine4, Image alignment on page:
-    GuiAddDropDownList("x+1 w" thisWid " Choose" userCombinePDFalignH " AltSubmit vuserCombinePDFalignH", "Left|Center|Right", "Horizontal alignment of the image")
-    GuiAddDropDownList("x+5 wp Choose" userCombinePDFalignV " AltSubmit vuserCombinePDFalignV", "Top|Center|Bottom", "Vertical alignment of the image")
+    GuiAddDropDownList("x+1 w" thisWid " Choose" userCombinePDFalignH " AltSubmit vuserCombinePDFalignH", "Left|Centre|Right", "Horizontal alignment of the image")
+    GuiAddDropDownList("x+5 wp Choose" userCombinePDFalignV " AltSubmit vuserCombinePDFalignV", "Top|Centre|Bottom", "Vertical alignment of the image")
     zml := (PrefsLargeFonts=1) ? 65 : 50
-    Gui, Add, Text, xs y+10 w%ml% hp +0x200 vtxtLine6, Background color:
-    GuiAddColor("x+1 hp w" zml, "UserCombinePDFbgrColor", "PDF background color")
+    Gui, Add, Text, xs y+10 w%ml% hp +0x200 vtxtLine6, Background colour:
+    GuiAddColor("x+1 hp w" zml, "UserCombinePDFbgrColor", "PDF background colour")
     Gui, Add, Checkbox, xs y+10 Checked%userCombinePDFenlarge% vuserCombinePDFenlarge, Enlarge small images to fit the page
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
     Gui, Add, Text, xs y+7 w%ml% hp+5 +0x200 vtxtLine7, Image resolution (DPI):
     GuiAddEdit("x+1 w" thisWid " number -multi limit4 veditF9", userCombinePDFdpi)
     Gui, Add, UpDown, +0x80 vuserCombinePDFdpi Range50-1200, % userCombinePDFdpi   ; UDS_NOTHOUSANDS
     Gui, Add, Checkbox, xs y+7 Checked%userCombinePDFkeepJpegs% vuserCombinePDFkeepJpegs, Keep JPEG files as they are, when suitable
-    Gui, Add, Checkbox, xs y+10 gTglRszApplyEffects Checked%ResizeApplyEffects% vResizeApplyEffects, Apply viewport color adjustments and effects
+    Gui, Add, Checkbox, xs y+10 gTglRszApplyEffects Checked%ResizeApplyEffects% vResizeApplyEffects, Apply viewport colour adjustments and effects
     Gui, Add, Text, xs y+7 w%ml% hp+5 +0x200 vtxtLine5, Image quality `%:
     GuiAddEdit("x+1 w" thisWid " number -multi limit3 veditF6", userJpegQuality)
     Gui, Add, UpDown, vuserJpegQuality Range3-97, % userJpegQuality
@@ -45700,11 +45700,11 @@ PanelCreateIMGthumbsSheet() {
     Gui, Add, UpDown, vuserJpegQuality Range1-100, % userJpegQuality
 
     widu := (PrefsLargeFonts=1) ? 29 : 25
-    Gui, Add, Text, xs y+10 hp +0x200 w%slideWid2%, Background color:
-    GuiAddColor("x+10 hp w" widu*2, "userThumbsSheetBgrColor", "Thumbnails sheet background color")
+    Gui, Add, Text, xs y+10 hp +0x200 w%slideWid2%, Background colour:
+    GuiAddColor("x+10 hp w" widu*2, "userThumbsSheetBgrColor", "Thumbnails sheet background colour")
     GuiAddPickerColor("x+5 hp w" widu, "userThumbsSheetBgrColor")
 
-    Gui, Add, Checkbox, xs y+10 gTglRszApplyEffects Checked%ResizeApplyEffects% vResizeApplyEffects, Apply viewport color adjustments and effects
+    Gui, Add, Checkbox, xs y+10 gTglRszApplyEffects Checked%ResizeApplyEffects% vResizeApplyEffects, Apply viewport colour adjustments and effects
 
     EditWid := (PrefsLargeFonts=1) ? 250 : 150
     ml := (PrefsLargeFonts=1) ? 70 : 50
@@ -45724,15 +45724,15 @@ PanelCreateIMGthumbsSheet() {
     Gui, Add, Checkbox, x+15 y+15 Section gupdateUIthumbsSheet Checked%userThumbsSheetShowLabel% vuserThumbsSheetShowLabel, Show file names as labels
     Gui, Add, Text, xs+15 y+15 w%EditWid% Section, Font name:
     GuiAddDropDownList("xs y+5 wp Sort gupdateUIthumbsSheet Choose1 vTextInAreaFontName", TextInAreaFontName)
-    Gui, Add, Text, xs y+15, Text size and color:
+    Gui, Add, Text, xs y+15, Text size and colour:
     GuiAddEdit("xs+0 y+5 w" editWid//2 " gupdateUIthumbsSheet r1 limit3 -multi number -wantCtrlA -wantTab -wrap veditF6 ", TextInAreaFontSize, "Font size")
     Gui, Add, UpDown, vTextInAreaFontSize gupdateUIthumbsSheet Range10-950, % TextInAreaFontSize
-    GuiAddColor("x+2 hp w" widu*2, "TextInAreaFontColor", "Text color")
+    GuiAddColor("x+2 hp w" widu*2, "TextInAreaFontColor", "Text colour")
     GuiAddPickerColor("x+2 hp w" widu, "TextInAreaFontColor")
     GuiAddSlider("TextInAreaFontOpacity", 10, 255, 255, "Text opacity", "updateUIthumbsSheet", 1, "xs y+5 w" EditWid " hp")
 
     Gui, Add, Text, xs y+15, Text alignment and style:
-    GuiAddDropDownList("xs y+5 w" editWid//2 " gupdateUIthumbsSheet Choose" TextInAreaAlign " AltSubmit vTextInAreaAlign", "Left|Center|Right", "Text horizontal alignment")
+    GuiAddDropDownList("xs y+5 w" editWid//2 " gupdateUIthumbsSheet Choose" TextInAreaAlign " AltSubmit vTextInAreaAlign", "Left|Centre|Right", "Text horizontal alignment")
     GuiAddCheckbox("x+2 yp hp+1 w" widu " gupdateUIthumbsSheet Checked" TextInAreaFontBold " vTextInAreaFontBold", "Bold", "B")
     GuiAddCheckbox("x+2 yp hp wp gupdateUIthumbsSheet Checked" TextInAreaFontItalic " vTextInAreaFontItalic", "Italic", "I")
     GuiAddCheckbox("x+2 yp hp wp gupdateUIthumbsSheet Checked" TextInAreaFontUline " vTextInAreaFontUline", "Underline", "&U")
@@ -45816,8 +45816,8 @@ PanelSetWallpaper() {
     Gui, Add, Text, x15 y15 Section w%ml%, Please choose the monitor and the image position and size adaptation mode on the desktop.
 
     GuiAddDropDownList("xs y+10 wp AltSubmit Choose1 vuserMonitorIDu", listu, "Monitor")
-    GuiAddDropDownList("xs y+10 wp-100 AltSubmit Choose" userMonitorImgPos " vuserMonitorImgPos", "Centered|Tiled|Stretched|Fit|Fill|Span", "Adapt to desktop mode")
-    GuiAddColor("x+5 hp w55", "monitorBgrColor", "Desktop background color")
+    GuiAddDropDownList("xs y+10 wp-100 AltSubmit Choose" userMonitorImgPos " vuserMonitorImgPos", "Centred|Tiled|Stretched|Fit|Fill|Span", "Adapt to desktop mode")
+    GuiAddColor("x+5 hp w55", "monitorBgrColor", "Desktop background colour")
     GuiAddPickerColor("x+5 hp wp-20", "monitorBgrColor")
     If warnu
        Gui, Add, Text, xs y+15 w%ml%, %warnu%
@@ -45973,7 +45973,7 @@ PanelSaveImg() {
     fmtWid := (PrefsLargeFonts=1) ? 110 : 80
     GuiAddDropDownList("xp y+8 w" fmtWid " AltSubmit gUIsaveFormatOptionsChanged Choose" fmtChoice " vuiSaveFmtChoice", userPossibleWriteFMTs "|.ICO", "File format", "File format: the options shown are those of this format.`nThe save dialog opens with it.")
     pkw := (PrefsLargeFonts=1) ? 190 : 140
-    GuiAddDropDownList("x+10 yp w" pkw " AltSubmit gUIsaveFormatOptionsChanged Choose" userJpegSubsampling " vuserJpegSubsampling", "1/4 color details|1/2 color details (recommended)|1/1 full color details", "JPEG chroma subsampling", "JPEG chroma subsampling: the resolution at which the colors are stored.`n1/4 | 4:2:0 - a quarter of the image resolution: the smallest files.`n1/2 | 4:2:2 - half of the horizontal resolution.`n1/1 | 4:4:4 - full resolution: sharp colored text and lines, larger files.")
+    GuiAddDropDownList("x+10 yp w" pkw " AltSubmit gUIsaveFormatOptionsChanged Choose" userJpegSubsampling " vuserJpegSubsampling", "1/4 colour details|1/2 colour details (recommended)|1/1 full colour details", "JPEG chroma subsampling", "JPEG chroma subsampling: the resolution at which the colours are stored.`n1/4 | 4:2:0 - a quarter of the image resolution: the smallest files.`n1/2 | 4:2:2 - half of the horizontal resolution.`n1/1 | 4:4:4 - full resolution: sharp coloured text and lines, larger files.")
     GuiAddDropDownList("xp yp wp AltSubmit gUIsaveFormatOptionsChanged Choose" userSaveImgCompressionLvl " vuserSaveImgCompressionLvl", "No compression|Fast compression|Normal compression|Best compression", "PNG and TIFF compression", "Lossless image format.`n`nThe compression level only trades the saving speed for the file size.`nPNG uses zlib for compression.`nTIFF: LZW is used with Fast and Normal, and ZIP Deflate for Best.`n«Best» can be very slow on large PNG photos.`nTIFFs with no compression open in more applications.")
     GuiAddSaveLossless("xp yp wp hp")
     Gui, Add, Text, xp yp wp hp +0x200 Disabled vuiSaveFmtNoOptions, -
@@ -45984,7 +45984,7 @@ PanelSaveImg() {
     GuiAddDropDownList("xp yp w" pkw " AltSubmit gUIsaveFormatOptionsChanged Choose" userJxlEffort " vuserJxlEffort", "E-1|E-2|E-3|E-4|E-5|E-6|E-7|E-8|E-9", "JPEG XL compression effort", "JPEG XL encoder compression effort:`n1 is the fastest, 9 gives the smallest files and is much slower.`n7 is the default.")
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
     GuiAddSlider("userJpegQuality", 2,100, 95, "Quality", "iniSaveJPGquality", 1, "xs+15 y+8 w" thisWid + 10 " hp", saveQualityTip(1))
-    GuiAddDropDownList("x+10 w" thisWid " AltSubmit gUIsaveFormatOptionsChanged Choose" depthChoice " vuserSaveBitsDepth", "32 bits RGBA|24 bits RGB|16 bits RGB [32768 colors]|8 bits RGB [256 colors]" bonusChoice, "Color depth")
+    GuiAddDropDownList("x+10 w" thisWid " AltSubmit gUIsaveFormatOptionsChanged Choose" depthChoice " vuserSaveBitsDepth", "32 bits RGBA|24 bits RGB|16 bits RGB [32768 colours]|8 bits RGB [256 colours]" bonusChoice, "Colour depth")
     sml := (PrefsLargeFonts=1) ? 40 : 30
     GuiAddButton("x+5 w" sml " hp gbtnHelpSaveImgPanel", " ?", "Help")
     GuiAddSaveGifPaletteDithering("xs+15 y+8 w" thisWid)
@@ -46023,7 +46023,7 @@ GuiAddSaveLossless(pos) {
 
 GuiAddSaveGifPaletteDithering(pos) {
     Gui, Add, Checkbox, % pos " gUIsaveFormatOptionsChanged Checked" userGifPaletteDithering " vuserGifPaletteDithering +hwndhTemp", Dithering
-    ToolTip2ctrl(hTemp, "GIF files and the 8-bit colour depth use a palette of 256 colours.`nDithering mixes them in patterns to imitate the missing colors.`nTurn it off for screenshots, text and flat graphics.")
+    ToolTip2ctrl(hTemp, "GIF files and the 8-bit colour depth use a palette of 256 colours.`nDithering mixes them in patterns to imitate the missing colours.`nTurn it off for screenshots, text and flat graphics.")
 }
 
 GuiAddSavePaletteTransparency(pos) {
@@ -46111,9 +46111,9 @@ saveQualityTip(inSavePanel:=0) {
 
 btnHelpSaveImgPanel() {
    If (AnyWindowOpen=84)
-      f := "`n `nExtracted frames and pages keep the color depth of the file they come from, when the destination file format allows it and nothing is lost; otherwise the «Fallback depth» applies. PDF pages are always saved at the «Fallback depth»."
-   p := (AnyWindowOpen!=15) ? "`n`nThe color depth option is not applicable to all of the supported image file formats. GIF files and the 8-bit colour depth use" : "`n`nGIF files use"
-   p .= " a palette of 256 colors: «Dithering» mixes them in patterns to imitate the missing colors, and «Keep transparency» makes the pixels more than half transparent fully transparent."
+      f := "`n `nExtracted frames and pages keep the colour depth of the file they come from, when the destination file format allows it and nothing is lost; otherwise the «Fallback depth» applies. PDF pages are always saved at the «Fallback depth»."
+   p := (AnyWindowOpen!=15) ? "`n`nThe colour depth option is not applicable to all of the supported image file formats. GIF files and the 8-bit colour depth use" : "`n`nGIF files use"
+   p .= " a palette of 256 colours: «Dithering» mixes them in patterns to imitate the missing colours, and «Keep transparency» makes the pixels more than half transparent fully transparent."
    pj := (AnyWindowOpen=15) ? "Progressive JPEG files («P»)" : "Progressive JPEG files"
 
    msgBoxWrapper(appTitle ": HELP", "The quality applies to JPG, JNG, WEBP, JXL, JXR and JP2 files; 100 gives the best lossy quality. WEBP, JXL, JXR and JP2 files can also be saved without any loss, with the «Lossless» option; it is one option for these four formats.`n`n" pj " show a coarse version of the image first, while they load.`n`nJPEG XL compression effort: 1 is the fastest; 9 gives the smallest files and is the slowest.`n`nPNG and TIFF files always store the image data losslessly. The compression option for both only trades the saving speed for the file size. TIFF files use LZW at the fast and normal levels, and ZIP at the best one. PNG relies on Zlib for compression. `n`nThe file format options are set in the «Save image» panel and in the file format converter. They apply to every image file " appTitle " saves." p f, -1, 0, 0)
@@ -46182,13 +46182,13 @@ PanelBrushTool(dummy:=0, modus:=0) {
     hasa := (PrefsLargeFonts=1) ? 27 : 18
     Gui, Add, Tab3, %tabzDarkModus% AltSubmit Choose%thisPanelTab% vCurrentPanelTab gBtnTabsInfoUpdate hwndhCurrTab, General|Effects|Randomize|Pen pressure
     Gui, Tab, 1 ; general
-    GuiAddDropDownList("x+15 y+15 w" slideWid " Section AltSubmit gupdateUIbrushTool Choose" BrushToolType " vBrushToolType", "Simple solid color|Soft edges brush|Cloner|Eraser|Effects|Smudge|Pinch|Bulge", "Brush type")
+    GuiAddDropDownList("x+15 y+15 w" slideWid " Section AltSubmit gupdateUIbrushTool Choose" BrushToolType " vBrushToolType", "Simple solid colour|Soft edges brush|Cloner|Eraser|Effects|Smudge|Pinch|Bulge", "Brush type")
     wo := (PrefsLargeFonts=1) ? slideWid // 2 + 75 : slideWid // 2 + 30
     Gui, Add, Checkbox, x+10 hp w%wo% +0x1000 gupdateUIbrushTool Checked%BrushToolEraserRestore% vBrushToolEraserRestore , Redefine opacity
     Gui, Add, Button, xp yp hp wp gBtnSetClonerBrushSource vuiBtnSetCloner +hwndhTemp, &Define source
     ToolTip2ctrl(hTemp, "Shortcut in viewport: S")
     Gui, Add, Text, xs y+10 h%hasa% w%sml% +0x200 Center gBtnToggleBrushColors vUIbtnBrushColorA +TabStop +hwndhBtnTglClrA, [X]
-    ToolTip2ctrl(hBtnTglClrA, "Toggle active color")
+    ToolTip2ctrl(hBtnTglClrA, "Toggle active colour")
     GuiAddPickerColor("x+5 hp w" sml, "BrushToolAcolor")
     GuiAddColor("x+5 hp w60", "BrushToolAcolor")
     opaciSlideW := (PrefsLargeFonts=1) ? 130 : 85
@@ -46196,7 +46196,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
     Gui, Add, Checkbox, x+5 hp wp Checked%BrushToolAutoAngle% vBrushToolAutoAngle gupdateUIbrushTool, Auto-rotate
 
     Gui, Add, Text, xs y+10 hp w%sml% +0x200 Center gBtnToggleBrushColors vUIbtnBrushColorB +TabStop +hwndhBtnTglClrB, [X]
-    ToolTip2ctrl(hBtnTglClrB, "Toggle active color")
+    ToolTip2ctrl(hBtnTglClrB, "Toggle active colour")
     GuiAddPickerColor("x+5 hp w" sml, "BrushToolBcolor")
     GuiAddColor("x+5 hp w60", "BrushToolBcolor")
     GuiAddSlider("BrushToolBopacity", 2,255, 255, "Opacity", "updateUIbrushTool", 1, "x+5 w" opaciSlideW " hp")
@@ -46225,7 +46225,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
     GuiAddSlider("BrushToolWetness", 0,22, 0, "Wetness", "updateUIbrushTool", 1, "x+10 wp-27 hp")
     GuiAddCheckbox("x+1 hp w26 gupdateUIbrushTool Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
 
-    Gui, Add, Checkbox, xs y+10 w%slideWid% gupdateUIbrushTool Checked%BrushToolApplyColorFX% vBrushToolApplyColorFX, Color adjustments
+    Gui, Add, Checkbox, xs y+10 w%slideWid% gupdateUIbrushTool Checked%BrushToolApplyColorFX% vBrushToolApplyColorFX, Colour adjustments
     GuiAddDropDownList("x+10 wp-27 gupdateUIbrushTool AltSubmit Choose" BrushToolBlendMode " vBrushToolBlendMode", "No blend mode|" userBlendModesList, "Blending mode")
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIbrushTool")
 
@@ -46240,9 +46240,9 @@ PanelBrushTool(dummy:=0, modus:=0) {
     Gui, Add, Text, x+10 h%hasa% +0x200 vinfoSymmetryLabel, Apply symmetry to: 
     Gui, Add, Checkbox, y+5 w%sml% hp gupdateUIbrushTool Checked%BrushToolSymmetryX% vBrushToolSymmetryX, X
     Gui, Add, Checkbox, x+5 wp hp gupdateUIbrushTool Checked%BrushToolSymmetryY% vBrushToolSymmetryY, Y
-    Gui, Add, Button, x+5 hp gBtnSetBrushSymmetryCoords vBTNuiSetLabelSymmetry +hwndhTemp, S&et center
+    Gui, Add, Button, x+5 hp gBtnSetBrushSymmetryCoords vBTNuiSetLabelSymmetry +hwndhTemp, S&et centre
     ToolTip2ctrl(hTemp, "Shortcut in viewport: Shift + Y`nCycle modes: Y")
-    Gui, Add, Checkbox, xs y+9 gupdateUIbrushTool Checked%autoApplyVPcolors% vautoApplyVPcolors, Auto-apply viewport color effects to image
+    Gui, Add, Checkbox, xs y+9 gupdateUIbrushTool Checked%autoApplyVPcolors% vautoApplyVPcolors, Auto-apply viewport colour effects to image
 
     Gui, Tab, 3 ; randomize
     GuiAddSlider("BrushToolRandomSize", 0,200, 0, "Brush size", "updateUIbrushTool", 1, "xs y+15 w" slideWid " h" hasa)
@@ -46406,9 +46406,9 @@ BtnToggleBrushColors(dummy:=0, kk:=0) {
          showLEDprimaryColor()
 
       If (BrushToolType>2 && AnyWindowOpen=64)
-         showTOOLtip("Opacity: " Round(thisOpacity/255*100) "%`nThe current brush has no color option")
+         showTOOLtip("Opacity: " Round(thisOpacity/255*100) "%`nThe current brush has no colour option")
       Else
-         showTOOLtip(labelu " color: " thisColor moreInfos, "ToggleBrushColors", 1)
+         showTOOLtip(labelu " colour: " thisColor moreInfos, "ToggleBrushColors", 1)
       SetTimer, RemoveTooltip, % -msgDisplayTime
    } 
 
@@ -46498,7 +46498,7 @@ APIatan2(y,x) {
 ResetColorsToBW() {
    If (isNowAlphaPainting()=1 || BrushToolType!=3 && AnyWindowOpen=64)
    {
-      msgBeepTimer("Colors set to black and white", 0, msgDisplayTime//1.5)
+      msgBeepTimer("Colours set to black and white", 0, msgDisplayTime//1.5)
       isOkay := (BrushToolAopacity>=254 && BrushToolBopacity>=254) ? 1 : 0
       showLEDprimaryColor()
       isGood := (BrushToolAcolor="ffFFff" && BrushToolBcolor="000000") || (BrushToolBcolor="ffFFff" && BrushToolAcolor="000000") ? 1 : 0
@@ -46546,7 +46546,7 @@ BtnSetClonerBrushSource() {
 BtnResetGradientCenter() {
    If (alphaMaskingMode>=1 && alphaMaskingMode!=5)
    {
-      msgBeepTimer("Alpha mask gradient center was reset", 0)
+      msgBeepTimer("Alpha mask gradient centre was reset", 0)
       alphaMaskOffsetX := alphaMaskOffsetY := alphaMaskCoffsetX := alphaMaskCoffsetY := 0
       If (imgEditPanelOpened=1 && AnyWindowOpen>0)
       {
@@ -46561,7 +46561,7 @@ BtnResetSpiralRayCenter() {
    If (DrawLineAreaBorderCenter=5)
       f := "Grid"
 
-   msgBeepTimer(f " center was reset", 0)
+   msgBeepTimer(f " centre was reset", 0)
    alphaMaskOffsetX := alphaMaskOffsetY := 0
    If (AnyWindowOpen=30)
       SetTimer, updateUIdrawParamLinesPanel, -150
@@ -46571,7 +46571,7 @@ BtnResetSpiralRayCenter() {
 BtnSetTextureSource() {
    If (FillAreaColorMode!=6)
    {
-      msgBeepTimer("Color gradient center was reset", 0)
+      msgBeepTimer("Colour gradient centre was reset", 0)
       clrGradientOffX := clrGradientOffY := clrGradientCoffX := clrGradientCoffY := 0
       If (AnyWindowOpen=23)
          SetTimer, updateUIfillPanel, -150
@@ -49242,7 +49242,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
        trGdip_GetImageDimensions(userClipBMPpaste, imgW, imgH)
 
     bonusTabs := (viewportQPVimage.imgHandle) ? "" : "|Alpha mask|Paint alpha mask"
-    Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Main|Crop|Adjust colors%bonusTabs%
+    Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Main|Crop|Adjust colours%bonusTabs%
     Gui, Tab, 1 ; general
     fr :=  (toolu="transform") ? "Transformed" : "Clipboard"
     Gui, Add, Text, x+15 y+15 Section w%txtWid%, Canvas: %oImgW% x %oImgH% px.`n%fr% object: %imgW% x %imgH% px.
@@ -49252,7 +49252,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
     sml := (PrefsLargeFonts=1) ? 70 : 55
     widu := (PrefsLargeFonts=1) ? 30 : 25
     GuiAddDropDownList("xs y+7 wp gupdateUIpastePanel AltSubmit Choose" PasteInPlaceAdaptMode " vPasteInPlaceAdaptMode", "Adjust image to selection|Fill selection area entirely (ignore aspect ratio)|Original image size", "Image fitting to selection")
-    GuiAddDropDownList("xs y+7 gupdateUIpastePanel w" txtWid2 " AltSubmit Choose" PasteInPlaceAlignment " vPasteInPlaceAlignment", "Top, left corner|Top, right corner|Center point|Bottom, left corner|Bottom, right corner", "Anchor point in selection area")
+    GuiAddDropDownList("xs y+7 gupdateUIpastePanel w" txtWid2 " AltSubmit Choose" PasteInPlaceAlignment " vPasteInPlaceAlignment", "Top, left corner|Top, right corner|Centre point|Bottom, left corner|Bottom, right corner", "Anchor point in selection area")
     GuiAddDropDownList("x+2 gupdateUIpastePanel w" txtWid2 - widu*2 - 4 " AltSubmit Choose" PasteInPlaceOrientation " vPasteInPlaceOrientation", "0°|90°|180°|270°", "Image orientation")
     GuiAddCheckbox("x+2 yp hp w" widu " gupdateUIpastePanel Checked" PasteInPlaceOrientFlipX " vPasteInPlaceOrientFlipX", "Flip horizontally", "X")
     GuiAddCheckbox("x+2 yp hp wp gupdateUIpastePanel Checked" PasteInPlaceOrientFlipY " vPasteInPlaceOrientFlipY", "Flip vertically", "Y")
@@ -49285,7 +49285,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
     GuiAddDropDownList("x+2 w" txtWid2 - widu - 3 " AltSubmit Choose" PasteInPlaceGlassy " vPasteInPlaceGlassy gupdateUIpastePanel", "No glass effect|Weak|Mild|Moderate|Strong|Extreme", "Glass effect")
     GuiAddSlider("PasteInPlaceOpacity", 1,512, 255, ".updateLabelPasteImgOpacity", "updateUIpastePanel", 1, "xs y+10 w" txtWid - widu - 2 " hp", "Opacity above 100% allows the user to restore partially`nvisible pixels in the manipulated image object.")
     GuiAddCheckbox("x+1 hp w" widu " gupdateUIpastePanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
-    Gui, Add, Checkbox, xs y+15 w%txtWid2% hp gupdateUIpastePanel Checked%PasteInPlaceApplyColorFX% vPasteInPlaceApplyColorFX, Color adjustments
+    Gui, Add, Checkbox, xs y+15 w%txtWid2% hp gupdateUIpastePanel Checked%PasteInPlaceApplyColorFX% vPasteInPlaceApplyColorFX, Colour adjustments
     Gui, Add, Checkbox, x+5 wp hp gupdateUIpastePanel Checked%userimgGammaCorrect% vuserimgGammaCorrect, Gamma correction
     GuiAddGeneralColorAdjustCtrls(txtWid, "updateUIpastePanel")
 
@@ -49307,7 +49307,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
 }
 
 BtnHelpTransform() {
-    msgBoxWrapper(appTitle ": HELP", "The transform panel hosts a multitude of functions: clone, crop, resize, skew, rotate, align images side by side, adjust colours and/or blend images.`n`nClone an image area. Select an image area, open this panel and click the Reset button to make sure no effects are applied.`n`nRotate the image. Locate the dot in the center of the selection area with the mouse cursor in the viewport, and click 'n drag to adjust the rotation angle. Alternatively, set the object orientation angle found in the Main tab.`n`nCrop an image. Set the first drop-down in the Main tab to «Original image size», make the selection as small as you need it to be and set the alignment of the pivot (Main tab). Then go to the Crop tab and set the available preferences: crop shape, angle and so on.`n`nAdjust colors and blend images. In the «Adjust colors» tab one can activate the colour adjustments check-box, adjust opacity and choose different blending modes.`n`nWhen alpha masking is activated and its tab is selected, users can click 'n drag inside the selection area to adjust the mask's gradient center. To reset the position, press Alt+L-Click inside the selection area.", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "The transform panel hosts a multitude of functions: clone, crop, resize, skew, rotate, align images side by side, adjust colours and/or blend images.`n`nClone an image area. Select an image area, open this panel and click the Reset button to make sure no effects are applied.`n`nRotate the image. Locate the dot in the centre of the selection area with the mouse cursor in the viewport, and click 'n drag to adjust the rotation angle. Alternatively, set the object orientation angle found in the Main tab.`n`nCrop an image. Set the first drop-down in the Main tab to «Original image size», make the selection as small as you need it to be and set the alignment of the pivot (Main tab). Then go to the Crop tab and set the available preferences: crop shape, angle and so on.`n`nAdjust colours and blend images. In the «Adjust colours» tab one can activate the colour adjustments check-box, adjust opacity and choose different blending modes.`n`nWhen alpha masking is activated and its tab is selected, users can click 'n drag inside the selection area to adjust the mask's gradient centre. To reset the position, press Alt+L-Click inside the selection area.", -1, 0, 0)
 }
 
 MenuResetTransformToolPos() {
@@ -51133,7 +51133,7 @@ PanelEditorImgResize() {
     GuiAddEdit("x+5 wp r1 limit7 -multi number -wrap gupdateUIresizeImgEditPanel vuserEditHeight", (ResizeInPercentage=1) ? 100 : oImgH, "Height")
     Gui, Add, Checkbox, x+5 hp gTglRszInPercentage Checked%ResizeInPercentage% vResizeInPercentage, Use `% percentages
     Gui, Add, Checkbox, xs+15 y+5 hp gTglRszKeepAratio Checked%ResizeKeepAratio% vResizeKeepAratio, Keep aspect ratio
-    Gui, Add, Checkbox, x+5 hp Checked%adjustCanvasCentered% vadjustCanvasCentered, Centered image
+    Gui, Add, Checkbox, x+5 hp Checked%adjustCanvasCentered% vadjustCanvasCentered, Centred image
     If (viewportQPVimage.imgHandle)
        ResizeEnforceCanvas := 0
     clrW := (PrefsLargeFonts=1) ? 65 : 45
@@ -51141,9 +51141,9 @@ PanelEditorImgResize() {
     Gui, Add, Checkbox, xs y+10 hp Checked%ResizeEnforceCanvas% vResizeEnforceCanvas gupdateUIresizeImgEditPanel, Set the given dimensions as canvas size
     sml := (PrefsLargeFonts=1) ? 90 : 60
     ha := (PrefsLargeFonts=1) ? 28 : 19
-    GuiAddDropDownList("xs+15 y+7 wp-" sml " AltSubmit Choose" ResizeFillCanvasMode " vResizeFillCanvasMode gupdateUIresizeImgEditPanel", "Transparent background|Extend image borders|Solid color|Blurred image", "Canvas fill mode")
+    GuiAddDropDownList("xs+15 y+7 wp-" sml " AltSubmit Choose" ResizeFillCanvasMode " vResizeFillCanvasMode gupdateUIresizeImgEditPanel", "Transparent background|Extend image borders|Solid colour|Blurred image", "Canvas fill mode")
     GuiAddPickerColor("xp y+10 w25 hp", "OutlierFillColor")
-    GuiAddColor("x+2 hp w" clrW " hp", "OutlierFillColor", "Background color")
+    GuiAddColor("x+2 hp w" clrW " hp", "OutlierFillColor", "Background colour")
     GuiAddSlider("OutlierFillOpacity", 3,255, 255, "Opacity", "iniSaveOutlierClrOpaciy", 1, "x+5 w" clrW*2 + 10 " hp")
 
     Gui, Add, Checkbox, xs y+15 hp Checked%ResizeQualityHigh% vResizeQualityHigh gupdateUIresizeImgEditPanel, &High quality image resampling
@@ -52100,7 +52100,7 @@ GuiAddGeneralColorAdjustCtrls(slideWid, funcu) {
     sml := (PrefsLargeFonts=1) ? 30 : 20
     GuiAddSlider("PasteInPlaceHue", -180,180, 0, "Hue: $€°", funcu, 2, "xs y+15 w" slideWid " h" ha)
     If (viewportQPVimage.imgHandle)
-       GuiAddCheckbox("x+1 hp+1 w" sml " g" funcu " Checked" userImgAdjustInvertColors " vuserImgAdjustInvertColors", "Invert colors", "I")
+       GuiAddCheckbox("x+1 hp+1 w" sml " g" funcu " Checked" userImgAdjustInvertColors " vuserImgAdjustInvertColors", "Invert colours", "I")
     GuiAddSlider("PasteInPlaceSaturation", -100,100, 0, "Saturation", funcu, 2, "xs y+10 w" slideWid " hp")
     If (viewportQPVimage.imgHandle)
        GuiAddCheckbox("x+1 hp+1 w" sml " g" funcu " Checked" userImgAdjustAltSat " vuserImgAdjustAltSat", "Alternate saturation adjustment mode", "A")
@@ -52167,7 +52167,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     userUIshapeCavity := Round((innerSelectionCavityX + innerSelectionCavityY) / 2 * 400)
     ha := (PrefsLargeFonts=1) ? 27 : 18
     bonusTabs := !(viewportQPVimage.imgHandle) ? "|Alpha mask|Paint mask" : ""
-    Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Main|Fill|Adjust colors%bonusTabs%
+    Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Main|Fill|Adjust colours%bonusTabs%
 
     Gui, Tab, 1 ; main options
     ml := (PrefsLargeFonts=1) ? 35 : 25
@@ -52192,7 +52192,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
 
     sml := slideWid  - 27
     Gui, Add, Checkbox, xs y+1 hp Checked%FillAreaInverted% vFillAreaInverted gupdateUIfillPanel, &Invert selection area
-    Gui, Add, Checkbox, xs y+7 Checked%FillAreaApplyColorFX% vFillAreaApplyColorFX gupdateUIfillPanel, &Apply color adjustments
+    Gui, Add, Checkbox, xs y+7 Checked%FillAreaApplyColorFX% vFillAreaApplyColorFX gupdateUIfillPanel, &Apply colour adjustments
     Gui, Add, Text, xs y+10 hp +0x200 w%slideWid% +TabStop gBtnResetGlassFX vtxtLine1, Glass effect
     GuiAddDropDownList("x+1 w" slideWid - 27 " AltSubmit Choose" FillAreaGlassy " vFillAreaGlassy gupdateUIfillPanel", "Not activated|Weak|Mild|Moderate|Strong|Extreme", "Glass effect")
     GuiAddCheckbox("x+1 yp hp w26 gupdateUIfillPanel Checked" FillAreaCutGlass " vFillAreaCutGlass", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
@@ -52205,15 +52205,15 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     sml := (PrefsLargeFonts=1) ? 66 : 44
     wml := (PrefsLargeFonts=1) ? 112 : 75
     bonusDl := (viewportQPVimage.imgHandle) ? "" : "|Random patterns|Texture"
-    GuiAddDropDownList("x+10 y+10 Section w" slideWid " AltSubmit Choose" FillAreaColorMode " vFillAreaColorMode gupdateUIfillPanel", "Solid color|Linear gradient|Radial gradient|Box gradient" bonusDl, "Shape fill mode")
+    GuiAddDropDownList("x+10 y+10 Section w" slideWid " AltSubmit Choose" FillAreaColorMode " vFillAreaColorMode gupdateUIfillPanel", "Solid colour|Linear gradient|Radial gradient|Box gradient" bonusDl, "Shape fill mode")
     kplo := (PrefsLargeFonts=1) ? 0 : 40
-    Gui, Add, Button, x+5 vbtnFldr5 wp-%kplo% hp -wrap gBtnSetTextureSource, &Reset gradient center
+    Gui, Add, Button, x+5 vbtnFldr5 wp-%kplo% hp -wrap gBtnSetTextureSource, &Reset gradient centre
     GuiAddPickerColor("xs y+5 h" ha " w25", "FillAreaColor")
     GuiAddColor("x+5 hp w" sml, "FillAreaColor")
     GuiAddSlider("FillAreaOpacity", 1,255, 255, "Opacity", "updateUIfillPanel", 1, "x+5 w" wml " hp")
     kak := Round(ha*2.2), kuk := (PrefsLargeFonts=1) ? sml*2 - 13 : sml*2 - 7
     Gui, Add, Text, xp+%kuk% yp w%kak% h%kak% -Border +0xE gGradientsPreviewResponder vinfoFillAreaGradientView +hwndhGradientFillpreview, Gradient preview
-    ToolTip2ctrl(hGradientFillpreview, "Click and drag to adjust the gradient offset.`nHold Alt while dragging to adjust its center.")
+    ToolTip2ctrl(hGradientFillpreview, "Click and drag to adjust the gradient offset.`nHold Alt while dragging to adjust its centre.")
 
     kak := ha + 5
     GuiAddPickerColor("xs yp+" kak " h" ha " w25", "FillArea2ndColor")
@@ -52225,11 +52225,11 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     GuiAddSlider("FillAreaGradientPosA", 0,200, 0, "Position A", "updateUIfillPanel", 3, "xs y+15 wp hp")
     GuiAddSlider("FillAreaGradientPosB", 0,200, 200, "Position B", "updateUIfillPanel", 3, "x+5 wp hp")
     GuiAddDropDownList("xs y+15 wp AltSubmit Choose" FillAreaGradientWrapped " vFillAreaGradientWrapped gupdateUIfillPanel", "Tiled gradient|Tiled - flip X|Tiled - flip Y|Tiled - flip X/Y|No gradient tiling", "Gradient tiling mode")
-    Gui, Add, Checkbox, x+5 hp Checked%FillAreaColorReversed% vFillAreaColorReversed gupdateUIfillPanel, &Reverse colors
+    Gui, Add, Checkbox, x+5 hp Checked%FillAreaColorReversed% vFillAreaColorReversed gupdateUIfillPanel, &Reverse colours
     Gui, Add, Checkbox, xs y+8 hp Checked%userimgGammaCorrect% vuserimgGammaCorrect gupdateUIfillPanel, &Gamma correction
 
     Gui, Tab, 3 ; apply fx
-    Gui, Add, Text, x+10 y+10 Section, Color adjustments can be toggled from the main tab.
+    Gui, Add, Text, x+10 y+10 Section, Colour adjustments can be toggled from the main tab.
     GuiAddGeneralColorAdjustCtrls(txtWid, "updateUIfillPanel")
     If (viewportQPVimage.imgHandle)
        Gui, Add, Text, xs y+10 Section, These only apply with blending modes.
@@ -52412,10 +52412,10 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     Gui, Add, Checkbox, xs y+7 hp Checked%freeHandSelectionMode% vfreeHandSelectionMode gupdateUIdrawShapesPanel, &Freehand draw mode
 
     ml := (PrefsLargeFonts=1) ? 60 : 45
-    Gui, Add, Text, xs y+15 w%btnWid% hp +0x200, Line color
-    GuiAddColor("x+5 hp w" ml, "DrawLineAreaColor", "Line color")
+    Gui, Add, Text, xs y+15 w%btnWid% hp +0x200, Line colour
+    GuiAddColor("x+5 hp w" ml, "DrawLineAreaColor", "Line colour")
     GuiAddPickerColor("x+2 hp w25", "DrawLineAreaColor")
-    GuiAddSlider("DrawLineAreaOpacity", 3,255, 255, "Color opacity", "updateUIdrawShapesPanel", 1, "xs y+5 w" btnWid*2 + 5 " hp")
+    GuiAddSlider("DrawLineAreaOpacity", 3,255, 255, "Colour opacity", "updateUIdrawShapesPanel", 1, "xs y+5 w" btnWid*2 + 5 " hp")
     GuiAddCheckbox("x+1 hp w26 gupdateUIdrawShapesPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
     Gui, Add, Text, xs y+15 w%btnWid% hp +0x200 gBtnResetBlendMode +hwndhTemp, Blending mode
     GuiAddDropDownList("x+5 wp gupdateUIdrawShapesPanel AltSubmit Choose" DrawLineAreaBlendMode " vDrawLineAreaBlendMode", "None|" userBlendModesList, [hTemp])
@@ -52545,7 +52545,7 @@ PanelConfigVPgrid() {
     ml := (PrefsLargeFonts=1) ? 55 : 40
     Gui, Add, Checkbox, x15 y15 w%slideWid2% Section gupdateUIgridPanel Checked%showViewPortGrid% vshowViewPortGrid, &Show viewport grid
     GuiAddPickerColor("xs+16 y+10 hp+5 w25", "vpGridColor")
-    GuiAddColor("x+5 hp w" ml, "vpGridColor", "Grid color")
+    GuiAddColor("x+5 hp w" ml, "vpGridColor", "Grid colour")
     
     ml := (PrefsLargeFonts=1) ? 115 : 80
     GuiAddSlider("vpGridAlpha", 3,255, 128, "Opacity", "updateUIgridPanel", 1, "x+5 w" ml " hp")
@@ -52726,8 +52726,8 @@ PanelDrawParametricLines() {
     Gui, Add, Text, xs y+13 hp+3 wp -wrap +0x200 gdummy vinfoLine +hwndhTemp, Pivot mode
     ToolTip2ctrl(hTemp, "This defines the behaviour of the object when rotated")
     GuiAddDropDownList("xp yp wp gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaPolarMode " vDrawLineAreaPolarMode", "Inside|Outside|X-axis only", "Skewing mode")
-    GuiAddDropDownList("x+10 wp gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaSpiralCenterMode " vDrawLineAreaSpiralCenterMode", "Cone|Inverted cone|Rotobilæ", "Spiral center mode")
-    GuiAddDropDownList("xp yp wp gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaGridCenter " vDrawLineAreaGridCenter", "Bulge warp|Center warp|Vertical curtain|Horizontal curtain", "Grid center mode")
+    GuiAddDropDownList("x+10 wp gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaSpiralCenterMode " vDrawLineAreaSpiralCenterMode", "Cone|Inverted cone|Rotobilæ", "Spiral centre mode")
+    GuiAddDropDownList("xp yp wp gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaGridCenter " vDrawLineAreaGridCenter", "Bulge warp|Centre warp|Vertical curtain|Horizontal curtain", "Grid centre mode")
     GuiAddSlider("DrawLineAreaPolarSection", 1,1440, 1440, ".updateLabelPolarSect", "updateUIdrawParamLinesPanel", 3, "xp yp wp hp")
     GuiAddButton("x+1 hp w35 gBtnHelpParametricPivot vBtn2", " ?", "Help")
 
@@ -52748,7 +52748,7 @@ PanelDrawParametricLines() {
     If (!viewportQPVimage.imgHandle)
     {
        GuiAddDropDownList("xs y+8 w" btnWid " gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaDashStyle " vDrawLineAreaDashStyle", "Continuous|Dashes|Dots|Dashes and dots", "Line style")
-       GuiAddDropDownList("x+10 wp gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign", "Inside|Centered|Outside", "Pen alignment")
+       GuiAddDropDownList("x+10 wp gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign", "Inside|Centred|Outside", "Pen alignment")
     }
 
     GuiAddDropDownList("xs y+10 wp AltSubmit Choose" DrawLineAreaCapsStyle " vDrawLineAreaCapsStyle gupdateUIdrawParamLinesPanel", "No caps|Square caps|Round caps", "Line end style")
@@ -52758,9 +52758,9 @@ PanelDrawParametricLines() {
 
     sml := (PrefsLargeFonts=1) ? 30 : 20
     ml := (PrefsLargeFonts=1) ? 72 : 25
-    Gui, Add, Text, xs y+%sml% w%ml% +0x200 hp, Color
+    Gui, Add, Text, xs y+%sml% w%ml% +0x200 hp, Colour
     ml := (PrefsLargeFonts=1) ? 56 : 42
-    GuiAddColor("x+10 w" ml " hp", "DrawLineAreaColor", "Line color")
+    GuiAddColor("x+10 w" ml " hp", "DrawLineAreaColor", "Line colour")
     GuiAddPickerColor("x+1 hp w25", "DrawLineAreaColor")
     GuiAddSlider("DrawLineAreaOpacity", 3,255, 255, "Opacity", "updateUIdrawParamLinesPanel", 1, "x+10 w" btnWid " h" ha)
     GuiAddCheckbox("x+1 hp w26 gupdateUIdrawParamLinesPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
@@ -52808,7 +52808,7 @@ BtnOpenPanelLines() {
 }
 
 BtnHelpParametricPivot() {
-    msgBoxWrapper(appTitle ": HELP", "The center of the generator can be customized using the pivot mode feature. Here's how to use it:`n`n1. Right-click in the viewport and activate the «Allow center repositioning» menu option.`n2. Click and drag inside the selection area to adjust the pivot or center of the generator.`n`nTo reset the center, in the same context menu, select «Reset center».", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "The centre of the generator can be customized using the pivot mode feature. Here's how to use it:`n`n1. Right-click in the viewport and activate the «Allow centre repositioning» menu option.`n2. Click and drag inside the selection area to adjust the pivot or centre of the generator.`n`nTo reset the centre, in the same context menu, select «Reset centre».", -1, 0, 0)
 }
 
 WriteSettingsDesaturateSelPanel() {
@@ -52852,7 +52852,7 @@ PanelDesatureSelectedArea() {
     btnWid2 := btnWid + 20
     Gui, Add, Text, x15 y15 Section w%txtWid%, Please experiment with the provided options to control how the image is desaturated.
     GuiAddDropDownList("xs w" btnWid2 " AltSubmit Choose" DesaturateAreaLevels " gupdateUIdesaturatePanel vDesaturateAreaLevels", "None|4|8|16|32|64|128|256", "Quantization level")
-    GuiAddDropDownList("x+8 wp AltSubmit Choose" DesaturateAreaChannel " gupdateUIdesaturatePanel vDesaturateAreaChannel", "All channels|All (alt)|Red|Green|Blue", "Color channel")
+    GuiAddDropDownList("x+8 wp AltSubmit Choose" DesaturateAreaChannel " gupdateUIdesaturatePanel vDesaturateAreaChannel", "All channels|All (alt)|Red|Green|Blue", "Colour channel")
     Gui, Add, Checkbox, x+10 yp hp Checked%DesaturateAreaDither% vDesaturateAreaDither gupdateUIdesaturatePanel, &Dithering
     ml := (PrefsLargeFonts=1) ? txtWid//2 + 4 : txtWid//2 + 18
     GuiAddSlider("DesaturateAreaAmount", 3, 255, 255, "Intensity", "updateUIdesaturatePanel", 1, "xs y+10 w" ml " hp")
@@ -52898,12 +52898,12 @@ PanelSymmetricaImage() {
     tinyPrevAreaCoordY := lastSymmetryCoords[2] ? lastSymmetryCoords[2] : imgSelY1 + 125
 
     btnWid2 := (PrefsLargeFonts=1) ? btnWid + 60 : btnWid + 20
-    Gui, Add, Tab3, %tabzDarkModus% y+15 gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
+    Gui, Add, Tab3, %tabzDarkModus% y+15 gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Colour options
     Gui, Tab, 1
     Gui, Add, Text, x+15 y+15 Section +0x200 +hwndhTemp, Symmetry mode:
     GuiAddDropDownList("x+10 w" btnWid2 " AltSubmit gupdateUIsymmetricaPanel Choose" UserSymmetricaMode " vUserSymmetricaMode", "X|Y|Both X/Y|X/Y and diagonal", [hTemp])
     GuiAddDropDownList("x+5 wp-20 AltSubmit gupdateUIsymmetricaPanel Choose" UserSymmetricaSrcAlign " vUserSymmetricaSrcAlign", "Top, left|Bottom, right", "Symmetry source corner")
-    Gui, Add, Checkbox, xs y+10 gupdateUIsymmetricaPanel Checked%UserSymmetricaCenteringMode% vUserSymmetricaCenteringMode, Allo&w symmetry center positioning
+    Gui, Add, Checkbox, xs y+10 gupdateUIsymmetricaPanel Checked%UserSymmetricaCenteringMode% vUserSymmetricaCenteringMode, Allo&w symmetry centre positioning
     Gui, Add, Text, xs y+15 +0x200, Source image options:
     ha := (PrefsLargeFonts=1) ? 27 : 18
     btnWid2 += 20
@@ -52927,7 +52927,7 @@ PanelSymmetricaImage() {
     GuiAddSlider("UserSymmetricaOpacity", 3,255, 255, "Opacity", "updateUIsymmetricaPanel", 1, "xs y+15 w" txtWid - ml - 1 " hp")
     GuiAddCheckbox("x+1 hp w" ml " gupdateUIsymmetricaPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
 
-    Gui, Add, Checkbox, xs y+15 hp Checked%BlurAreaApplyFX% gupdateUIsymmetricaPanel vBlurAreaApplyFX, &Apply color adjustments
+    Gui, Add, Checkbox, xs y+15 hp Checked%BlurAreaApplyFX% gupdateUIsymmetricaPanel vBlurAreaApplyFX, &Apply colour adjustments
     GuiAddSlider("BlurAreaHue", -180,180, 0, "Hue: $€°", "updateUIsymmetricaPanel", 2, "xs y+15 w" txtWid " hp")
     GuiAddSlider("BlurAreaSaturation", -100,100, 0, "Saturation", "updateUIsymmetricaPanel", 2, "xs y+10 wp hp")
     GuiAddSlider("BlurAreaLight", -255,255, 0, "Brightness", "updateUIsymmetricaPanel", 2, "xs y+10 wp hp")
@@ -53006,20 +53006,20 @@ PanelFloodFillTool() {
     Global PickuFloodFillColor
 
     ; fill color and appearance
-    Gui, Add, Text, x15 y15 Section h%ha% +0x200, Flood fill (bucket) color:
+    Gui, Add, Text, x15 y15 Section h%ha% +0x200, Flood fill (bucket) colour:
     GuiAddPickerColor("xs y+5 h" ha " w25", "FloodFillColor")
-    GuiAddColor("x+1 hp w" clrWid, "FloodFillColor", "Flood fill color")
+    GuiAddColor("x+1 hp w" clrWid, "FloodFillColor", "Flood fill colour")
     GuiAddSlider("FloodFillOpacity", 3,255, 255, "Opacity", "updateUIfloodFillPanel", 1, "x+5 w" fullWid - clrWid - 35 " hp")
     blends := StrReplace(userBlendModesList, "Clip to alpha*|Replace*|Behind*")
     GuiAddDropDownList("xs y+8 w" colWid - 27 " gupdateUIfloodFillPanel AltSubmit Choose" FloodFillBlendMode " vFloodFillBlendMode", "No blend mode|" blends, "Blending mode")
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIfloodFillPanel")
     Gui, Add, Checkbox, x+10 yp hp gupdateUIfloodFillPanel Checked%BlendModesPreserveAlpha% vBlendModesPreserveAlpha, Alpha channel intact
-    Gui, Add, Checkbox, xs y+8 hp gupdateUIfloodFillPanel Checked%FloodFillDynamicOpacity% vFloodFillDynamicOpacity, Flood opacity based on color similarity
+    Gui, Add, Checkbox, xs y+8 hp gupdateUIfloodFillPanel Checked%FloodFillDynamicOpacity% vFloodFillDynamicOpacity, Flood opacity based on colour similarity
 
     ; color similarity
-    Gui, Add, Text, xs y+15 w%lblWid% h%ha% +0x200, Color similarity:
+    Gui, Add, Text, xs y+15 w%lblWid% h%ha% +0x200, Colour similarity:
     GuiAddSlider("FloodFillTolerance", 0,255, 10, "Tolerance", "updateUIfloodFillPanel", 1, "x+6 w" fullWid - lblWid - 6 " hp")
-    GuiAddDropDownList("xs y+8 w" colWid " gupdateUIfloodFillPanel AltSubmit Choose" FloodFillAltToler " vFloodFillAltToler", "Grayscale [fast]|L*a*b*-based grayscale|CIE 2000 Delta E [accurate]", "Color similarity algorithm", "The selected algorithm is used to determine the degree of similarity between the colors")
+    GuiAddDropDownList("xs y+8 w" colWid " gupdateUIfloodFillPanel AltSubmit Choose" FloodFillAltToler " vFloodFillAltToler", "Greyscale [fast]|L*a*b*-based greyscale|CIE 2000 Delta E [accurate]", "Colour similarity algorithm", "The selected algorithm is used to determine the degree of similarity between the colours")
     Gui, Add, Checkbox, x+10 yp hp gupdateUIfloodFillPanel Checked%FloodFillEightWays% vFloodFillEightWays, Follow thin lines
 
     ; fill mode and affected area
@@ -53027,7 +53027,7 @@ PanelFloodFillTool() {
     If (viewportQPVimage.imgHandle && FloodFillSelectionMode=4)
        FloodFillSelectionMode := 1
 
-    Gui, Add, Checkbox, xs y+8 hp gupdateUIfloodFillPanel Checked%FloodFillModus% vFloodFillModus, Replace similar colors anywhere
+    Gui, Add, Checkbox, xs y+8 hp gupdateUIfloodFillPanel Checked%FloodFillModus% vFloodFillModus, Replace similar colours anywhere
     Gui, Add, Checkbox, xs y+8 hp w%lblWid% gupdateUIfloodFillPanel Checked%FloodFillCartoonMode% vFloodFillCartoonMode, Cartoon mode
     GuiAddDropDownList("x+6 w" colWid " gupdateUIfloodFillPanel AltSubmit Choose" FloodFillSelectionMode " vFloodFillSelectionMode", "Ignore selection|Flood inside|Flood outside" bonus, "Selection fill mode")
 
@@ -53035,7 +53035,7 @@ PanelFloodFillTool() {
     Gui, Add, Button, x+5 hp w%btnWid% gBtnCloseWindow Default, &Close
 
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
-    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Color bucket tool: " appTitle, winPos)
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Colour bucket tool: " appTitle, winPos)
     SetTimer, updateUIfloodFillPanel, -190
 }
 
@@ -53126,7 +53126,7 @@ PanelFillBehindBgrImage() {
 
     Global PickuFillBehindColor
     ml := (PrefsLargeFonts=1) ? 35 : 25
-    Gui, Add, Text, x15 y15 Section, Please set the shape, color and opacity options`nto fill behind (semi-) transparent pixels.
+    Gui, Add, Text, x15 y15 Section, Please set the shape, colour and opacity options`nto fill behind (semi-) transparent pixels.
     GuiAddDropDownList("xs y+10 Section w" slideWid " AltSubmit Choose" FillAreaShape " vFillAreaShape gupdateUIfillBehindPanel", "Rectangle|Rounded rectangle|Ellipse|Triangle|Right triangle|Rhombus|Custom shape", "Shape to fill")
     GuiAddDropDownList("x+5 wp-" ml + 5 " AltSubmit Choose" FillAreaCurveTension " vFillAreaCurveTension gupdateUIfillBehindPanel", "Polygonal|Smooth corners|Curve|Round curve|Bézier", "Vector path type")
     GuiAddSlider("FillAreaRectRoundness", 4,98, 10, "Roundness", "updateUIfillPanel", 1, "xp yp w" slideWid " hp")
@@ -53135,8 +53135,8 @@ PanelFillBehindBgrImage() {
     GuiAddSlider("userUIshapeCavity", 0,400, 0, "Shape cavity", "updateFillInnerCavity", 1, "xs y+5 w" slideWid " hp")
     GuiAddSlider("FillBehindOpacity", 2,255, 255, "Image opacity", "updateUIfillBehindPanel", 1, "x+5 wp hp")
     Gui, Add, Checkbox, xs y+7 hp Checked%freeHandSelectionMode% vfreeHandSelectionMode gupdateUIfillBehindPanel, &Freehand draw mode
-    Gui, Add, Text, xs y+15 hp +0x200, Fill color:
-    GuiAddColor("x+5 hp wp-15", "FillBehindColor", "Background color")
+    Gui, Add, Text, xs y+15 hp +0x200, Fill colour:
+    GuiAddColor("x+5 hp wp-15", "FillBehindColor", "Background colour")
     GuiAddPickerColor("x+1 hp w" ml, "FillBehindColor")
     If (wasSelect!=1 && EllipseSelectMode=0 && VPselRotation=0)
        FillBehindInvert := 0
@@ -53729,7 +53729,7 @@ PanelZoomBlurSelectedArea() {
     If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
        BlurAreaAlphaMask := 0
 
-    Gui, Add, Tab3, %tabzDarkModus% x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
+    Gui, Add, Tab3, %tabzDarkModus% x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Colour options
     Gui, Tab, 1
     Gui, Add, Text, x+10 y+10 w%thisW% Section +hwndhTemp, Blur mode: 
     GuiAddDropDownList("x+5 wp gupdateUIzoomBlurPanel AltSubmit Choose" zoomBlurMode " vzoomBlurMode", "Zoom H/V|Horizontal|Vertical|Rotate / spin", [hTemp])
@@ -53749,7 +53749,7 @@ PanelZoomBlurSelectedArea() {
     Gui, Add, Text, x+10 y+10 Section w%thisW% gBtnResetBlendMode +TabStop +hwndhTemp, Blending mode: 
     GuiAddDropDownList("x+5 wp-27 gupdateUIzoomBlurPanel AltSubmit Choose" BlurAreaBlendMode " vBlurAreaBlendMode", "None|" userBlendModesList, [hTemp])
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIzoomBlurPanel")
-    Gui, Add, Checkbox, xs y+10 Checked%BlurAreaApplyFX% vBlurAreaApplyFX gupdateUIzoomBlurPanel, &Apply color adjustments
+    Gui, Add, Checkbox, xs y+10 Checked%BlurAreaApplyFX% vBlurAreaApplyFX gupdateUIzoomBlurPanel, &Apply colour adjustments
     GuiAddSlider("BlurAreaHue", -180,180, 0, "Hue: $€°", "updateUIzoomBlurPanel", 2, "xs y+10 w" txtWid " hp")
     GuiAddSlider("BlurAreaSaturation", -100,100, 0, "Saturation", "updateUIzoomBlurPanel", 2, "xs y+10 wp hp")
     GuiAddSlider("BlurAreaLight", -255,255, 0, "Brightness", "updateUIzoomBlurPanel", 2, "xs y+10 wp hp")
@@ -53832,7 +53832,7 @@ PanelPixelizeSelectedArea() {
        maxu := 3000
 
     Gui, SettingsGUIA: +DPIScale
-    Gui, Add, Tab3, %tabzDarkModus% x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
+    Gui, Add, Tab3, %tabzDarkModus% x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Colour options
     Gui, Tab, 1
     Gui, Add, Text, x+10 y+10 Section w%thisW%, Pixelation mode:
     listu := (viewportQPVimage.imgHandle) ? "Rescale (Nearest neighbour)|Rescale (Bicubic)|Rescale (Bilinear)" : "Loose fitting|Rescale (Nearest neighbour)|Rescale (Bicubic)"
@@ -53854,13 +53854,13 @@ PanelPixelizeSelectedArea() {
     GuiAddDropDownList("xs y+10 wp" - sml*2 " gupdateUIblurPanel AltSubmit Choose" BlurAreaBlendMode " vBlurAreaBlendMode", "None|" userBlendModesList)
     GuiAddFlipBlendLayers("x+1 hp w" sml " gupdateUIblurPanel")
     GuiAddCheckbox("x+1 hp wp gupdateUIblurPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
-    Gui, Add, Checkbox, xs y+10 Checked%BlurAreaApplyFX% vBlurAreaApplyFX gupdateUIblurPanel, &Apply color adjustments
+    Gui, Add, Checkbox, xs y+10 Checked%BlurAreaApplyFX% vBlurAreaApplyFX gupdateUIblurPanel, &Apply colour adjustments
     If (viewportQPVimage.imgHandle)
        thisW -= sml
 
     GuiAddSlider("BlurAreaHue", -180,180, 0, "Hue: $€°", "updateUIblurPanel", 2, "xs y+10 w" thisW " hp")
     If (viewportQPVimage.imgHandle)
-       GuiAddCheckbox("x+1 hp+1 w" sml " Checked" userImgAdjustInvertColors " vuserImgAdjustInvertColors", "Invert colors", "I")
+       GuiAddCheckbox("x+1 hp+1 w" sml " Checked" userImgAdjustInvertColors " vuserImgAdjustInvertColors", "Invert colours", "I")
     GuiAddSlider("BlurAreaSaturation", -100,100, 0, "Saturation", "updateUIblurPanel", 2, "xs y+10 w" thisW " hp")
     If (viewportQPVimage.imgHandle)
        GuiAddCheckbox("x+1 hp+1 w" sml " Checked" userImgAdjustAltSat " vuserImgAdjustAltSat", "Alternate saturation adjustment mode", "A")
@@ -53942,7 +53942,7 @@ PanelBlurSelectedArea() {
 
     Global mainBtnACT
     Gui, SettingsGUIA: +DPIScale
-    Gui, Add, Tab3, %tabzDarkModus% x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
+    Gui, Add, Tab3, %tabzDarkModus% x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Colour options
     Gui, Tab, 1
     Gui, Add, Checkbox, x+10 y+10 w%thisW% Section Checked%blurAreaSoftEdges% vblurAreaSoftEdges gupdateUIblurPanel +hwndhTemp, &Soft edges%friendly%
     GuiAddDropDownList("x+5 w60 AltSubmit Choose" blurAreaSoftLevel " gupdateUIblurPanel vblurAreaSoftLevel", "0.3x|0.6x|1x|2x|3x|4x", "Edge softness level")
@@ -53973,7 +53973,7 @@ PanelBlurSelectedArea() {
     Gui, Add, Text, x+10 y+10 Section w%thisW% gBtnResetBlendMode +TabStop +hwndhTemp, Blending mode: 
     GuiAddDropDownList("x+5 wp-25 gupdateUIblurPanel AltSubmit Choose" BlurAreaBlendMode " vBlurAreaBlendMode", "None|" userBlendModesList, [hTemp])
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIblurPanel")
-    Gui, Add, Checkbox, xs y+10 Checked%BlurAreaApplyFX% vBlurAreaApplyFX gupdateUIblurPanel, &Apply color adjustments
+    Gui, Add, Checkbox, xs y+10 Checked%BlurAreaApplyFX% vBlurAreaApplyFX gupdateUIblurPanel, &Apply colour adjustments
     GuiAddSlider("blurAreaOpacity", 3,255, 255, "Opacity", "updateUIblurPanel", 1, "xs y+15 w" txtWid - 27 " hp")
     GuiAddCheckbox("x+1 hp w26 gupdateUIblurPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
     GuiAddSlider("BlurAreaHue", -180,180, 0, "Hue: $€°", "updateUIblurPanel", 2, "xs y+15 w" txtWid " hp")
@@ -54261,7 +54261,7 @@ PanelAddNoiserImage() {
     Gui, Add, Checkbox, xs y+10 w%2ndcol% hp Checked%blurAreaEqualXY% vblurAreaEqualXY gupdateUIaddNoisePanel, &Equal X/Y blur
     Gui, Add, Checkbox, x+7 hp gupdateUIaddNoisePanel Checked%UserAddNoiseTransparent% vUserAddNoiseTransparent, &Allow transparency
     Gui, Add, Checkbox, xs y+10 w%2ndcol% hp gupdateUIaddNoisePanel Checked%UserAddNoiseInvert% vUserAddNoiseInvert, &Invert noise
-    Gui, Add, Checkbox, x+7 hp gupdateUIaddNoisePanel Checked%UserAddNoiseGrays% vUserAddNoiseGrays, &Grayscale
+    Gui, Add, Checkbox, x+7 hp gupdateUIaddNoisePanel Checked%UserAddNoiseGrays% vUserAddNoiseGrays, &Greyscale
 
     blends := StrReplace(userBlendModesList, "Replace*|Behind*")
     Gui, Add, Text, xs y+7 hp w%2ndcol% +0x200 gBtnResetBlendMode +TabStop +hwndhTemp, Blending mode:
@@ -54419,11 +54419,11 @@ PanelNewImage() {
     GuiAddEdit("x+5 wp-10 gNewImageEditResponder r1 limit4 +number -multi -wantTab -wrap vUserNewDPI", UserNewDPI, "DPI")
     Gui, Add, Text, x+5 hp wp+55 +0x200 vinfoLine -wrap, -
     Gui, Add, Checkbox, xs y+10 Checked%NewImageReverseDimensions% vNewImageReverseDimensions, Rotate canvas 90°
-    Gui, Add, Checkbox, xs y+10 gupdateUInewImagePanel Checked%NewDocUseColor% vNewDocUseColor, Fill background with color
+    Gui, Add, Checkbox, xs y+10 gupdateUInewImagePanel Checked%NewDocUseColor% vNewDocUseColor, Fill background with colour
     ha := (PrefsLargeFonts=1) ? 28 : 19
     clrW := (PrefsLargeFonts=1) ? 65 : 45
     GuiAddPickerColor("xs+17 y+10 w26 h" ha, "OutlierFillColor")
-    GuiAddColor("x+2 hp w" clrW, "OutlierFillColor", "Background color")
+    GuiAddColor("x+2 hp w" clrW, "OutlierFillColor", "Background colour")
     txtWid -= 95
     GuiAddSlider("OutlierFillOpacity", 3,255, 255, "Opacity", "iniSaveOutlierClrOpaciy", 1, "x+5 w" clrW*2 + 20 " hp")
 
@@ -54615,8 +54615,8 @@ PanelPrintImage() {
     Gui, Add, Checkbox, xs y+10 hp gupdateUIprintPreview Checked%PrintDoFlipuH% vPrintDoFlipuH, Flip V
     Gui, Add, Checkbox, x+10 hp gupdateUIprintPreview Checked%PrintDoFlipuV% vPrintDoFlipuV, Flip H
     GuiAddSlider("PrintImgAngleOrientation", -180,180, 0, "Angle: $€°", "updateUIprintPreview", 2, "x+10 w" EditWid+10 " hp")
-    Gui, Add, Checkbox, xs y+10 gupdateUIprintPreview Checked%PrintColorMode% vPrintColorMode, Print &with colors
-    Gui, Add, Checkbox, xs y+10 gupdateUIprintPreview Checked%PrintUseViewportColors% vPrintUseViewportColors, Apply &viewport color adjustments
+    Gui, Add, Checkbox, xs y+10 gupdateUIprintPreview Checked%PrintColorMode% vPrintColorMode, Print &with colours
+    Gui, Add, Checkbox, xs y+10 gupdateUIprintPreview Checked%PrintUseViewportColors% vPrintUseViewportColors, Apply &viewport colour adjustments
     If (filesElected>1)
        Gui, Add, Text, xs y+10, % groupDigits(filesElected) " files are selected for printing."
 
@@ -54626,16 +54626,16 @@ PanelPrintImage() {
     hEditField := GuiAddEdit("xs y+5 w" EditWid2 " r3 gupdateUIprintPreview vUserTextArea limit2048", UserTextArea)
     Gui, Add, Text, xs y+15 wp, Font name:
     GuiAddDropDownList("xs y+5 wp Sort gupdateUIprintPreview Choose1 vTextInAreaFontName", TextInAreaFontName)
-    Gui, Add, Text, xs y+15, Text size and color:
+    Gui, Add, Text, xs y+15, Text size and colour:
     GuiAddEdit("xs+0 y+5 w" editWid " gupdateUIprintPreview r1 limit3 -multi number -wantCtrlA -wantTab -wrap veditF1 ", PrintTxtSize, "Font size")
     Gui, Add, UpDown, vPrintTxtSize gupdateUIprintPreview Range25-999, % PrintTxtSize
-    GuiAddColor("x+2 w55 hp", "TextInAreaFontColor", "Text color")
+    GuiAddColor("x+2 w55 hp", "TextInAreaFontColor", "Text colour")
     GuiAddPickerColor("x+2 hp w27", "TextInAreaFontColor")
     GuiAddSlider("TextInAreaFontOpacity", 10, 255, 255, "Opacity", "updateUIprintPreview", 1, "x+5 w" EditWid2//2 " hp")
 
     Gui, Add, Text, xs y+15, Text alignment and style:
-    GuiAddDropDownList("xs y+5 w" editWid " gupdateUIprintPreview Choose" TextInAreaAlign " AltSubmit vTextInAreaAlign", "Left|Center|Right", "Text horizontal alignment")
-    GuiAddDropDownList("x+2 wp gupdateUIprintPreview Choose" TextInAreaValign " AltSubmit vTextInAreaValign", "Top|Center|Bottom", "Text vertical alignment")
+    GuiAddDropDownList("xs y+5 w" editWid " gupdateUIprintPreview Choose" TextInAreaAlign " AltSubmit vTextInAreaAlign", "Left|Centre|Right", "Text horizontal alignment")
+    GuiAddDropDownList("x+2 wp gupdateUIprintPreview Choose" TextInAreaValign " AltSubmit vTextInAreaValign", "Top|Centre|Bottom", "Text vertical alignment")
     widu := (PrefsLargeFonts=1) ? 29 : 25
     GuiAddCheckbox("x+2 yp hp+1 w" widu " gupdateUIprintPreview Checked" TextInAreaFontBold " vTextInAreaFontBold", "Bold", "B")
     GuiAddCheckbox("x+2 yp hp wp gupdateUIprintPreview Checked" TextInAreaFontItalic " vTextInAreaFontItalic", "Italic", "I")
@@ -55597,7 +55597,7 @@ BtnCreateNewImage() {
           ; Gdip_GraphicsClear(G2, "0x99FF1122")
           Gdip_DeleteGraphics(G2)
        } Else
-          addJournalEntry("Failed to fill the new image with the user-defined background color. GDI+ object was not created.")
+          addJournalEntry("Failed to fill the new image with the user-defined background colour. GDI+ object was not created.")
     }
 
     If (!currentFileIndex || !CurrentSLD || !maxFilesIndex)
@@ -57073,7 +57073,7 @@ BtnAdjustColorsSimpleImgSelArea() {
    threG := (userImgAdjustLinkThresholds=1) ? userImgAdjustThreR : userImgAdjustThreG
    thisIDu := "a" userImgAdjustInvertColors userImgAdjustSat  userImgAdjustBright userImgAdjustContra userImgAdjustShadows userImgAdjustHighs userImgAdjustHue userImgAdjustTintAmount userImgAdjustGamma userImgAdjustOffR userImgAdjustOffG userImgAdjustOffB userImgAdjustOffA userImgAdjustThreR ThreG ThreB userImgAdjustThreA userImgAdjustWhitePoint userImgAdjustBlackPoint
    If (thisIDu="a000000003000000-1-1-1-1655350")
-      Return msgBeepTimer("WARNING: No color filters to apply.")
+      Return msgBeepTimer("WARNING: No colour filters to apply.")
 
    WriteSettingsSimpleColorAdjustsPanel()
    getSelectedFiles(0, 1)
@@ -57255,7 +57255,7 @@ updateUIfillPanel(actionu:=0) {
        If (FillAreaColorMode=5)
        {
           GuiControl, SettingsGUIA: Hide, FillAreaGradientWrapped
-          uiSlidersArray["FillArea2ndOpacity", 5] := "Color"
+          uiSlidersArray["FillArea2ndOpacity", 5] := "Colour"
           uiSlidersArray["FillAreaOpacity", 5] := "Pattern"
        } Else If (FillAreaColorMode=6)
        {
@@ -57299,7 +57299,7 @@ updateUIfillPanel(actionu:=0) {
        actu := (gradMode=1 || FillAreaColorMode=6) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
        GuiControl, % actu, btnFldr5
 
-       actu := (FillAreaColorMode=6) ? "&Set texture source" : "&Reset gradient center"
+       actu := (FillAreaColorMode=6) ? "&Set texture source" : "&Reset gradient centre"
        GuiControl, SettingsGUIA: , btnFldr5, % actu
     } Else If (CurrentPanelTab=3)
     {
@@ -58029,7 +58029,7 @@ ReadSettingsOCRpanel(act:=0) {
 }
 
 BTNhelpOCRpanel() {
-    msgBoxWrapper(appTitle ": HELP", "This tool recognizes texts in images with the optical character recognition (OCR) engine of Windows 10 and newer.`n`n«Recognize image» reads the image in the viewport, or its selected area, as it is copied with Ctrl+C: with the viewport color adjustments and flips. In thumbnails mode, it reads the focused image file.`n`nWindows recognizes only the languages for which OCR language packs are installed. The automatic mode relies on the languages of the user profile. Use «System options» to add more, then «Refresh».`n`nWindows OCR often misses small texts. When upscaling is set to automatic, the image is recognized again at a larger size if nothing was found or if the words are small. Images larger than the engine allows are downscaled.", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "This tool recognizes texts in images with the optical character recognition (OCR) engine of Windows 10 and newer.`n`n«Recognize image» reads the image in the viewport, or its selected area, as it is copied with Ctrl+C: with the viewport colour adjustments and flips. In thumbnails mode, it reads the focused image file.`n`nWindows recognizes only the languages for which OCR language packs are installed. The automatic mode relies on the languages of the user profile. Use «System options» to add more, then «Refresh».`n`nWindows OCR often misses small texts. When upscaling is set to automatic, the image is recognized again at a larger size if nothing was found or if the words are small. Images larger than the engine allows are downscaled.", -1, 0, 0)
 }
 
 BTNocrInstallLanguages() {
@@ -58627,7 +58627,7 @@ PanelInsertTextArea() {
     widu := (PrefsLargeFonts=1) ? 55 : 40
     ml := (PrefsLargeFonts=1) ? 35 : 24
     bonusTabs := (viewportQPVimage.imgHandle) ? "" : "|Alpha mask|Paint mask"
-    Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Text|Styling|Colors%bonusTabs%
+    Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Text|Styling|Colours%bonusTabs%
     Gui, Tab, 1
     hEditField := GuiAddEdit("x+15 y+15 Section w" txtWid " r10 gupdateUIInsertTextPanel vUserTextArea", UserTextArea, "Text to draw")
     Gui, Add, Button, gBtnFntDlgInsertText, Font options
@@ -58655,12 +58655,12 @@ PanelInsertTextArea() {
     GuiAddSlider("TextInAreaCharSpacing", -100,255, 0, "Letter spacing: $€", "updateUIInsertTextPanel", 3, "x+5 wp hp")
     GuiAddSlider("TextInAreaFontLineSpacing", -950,950, 0, "Line spacing: $€ px", "updateUIInsertTextPanel", 2, "xs y+10 wp hp")
     Gui, Add, Checkbox, x+5 yp hp gupdateUIInsertTextPanel Checked%TextInAreaOnlyBorder% vTextInAreaOnlyBorder, &Draw only the border
-    GuiAddDropDownList("xs y+10 wp gupdateUIInsertTextPanel Altsubmit Choose" TextInAreaBorderOut " vTextInAreaBorderOut", "No border|Centered|Contour", "Text border type")
+    GuiAddDropDownList("xs y+10 wp gupdateUIInsertTextPanel Altsubmit Choose" TextInAreaBorderOut " vTextInAreaBorderOut", "No border|Centred|Contour", "Text border type")
     GuiAddSlider("TextInAreaBorderSize", 1,650, 1, "Border thickness: $€ px", "updateUIInsertTextPanel", 1, "x+5 wp h" ha)
 
     Gui, Add, Text, xs y+10 wp hp +0x200 +TabStop gBtnResetTextAligns, Text alignment:
-    GuiAddDropDownList("x+3 w" editWid " gupdateUIInsertTextPanel Choose" TextInAreaAlign " AltSubmit vTextInAreaAlign", "Left|Center|Right", "Text horizontal alignment")
-    GuiAddDropDownList("x+5 wp gupdateUIInsertTextPanel Choose" TextInAreaValign " AltSubmit vTextInAreaValign", "Top|Center|Bottom", "Text vertical alignment")
+    GuiAddDropDownList("x+3 w" editWid " gupdateUIInsertTextPanel Choose" TextInAreaAlign " AltSubmit vTextInAreaAlign", "Left|Centre|Right", "Text horizontal alignment")
+    GuiAddDropDownList("x+5 wp gupdateUIInsertTextPanel Choose" TextInAreaValign " AltSubmit vTextInAreaValign", "Top|Centre|Bottom", "Text vertical alignment")
 
     Gui, Add, Checkbox, xm+15 yp+%ml% w%opaciSlideW% Section gupdateUIInsertTextPanel Checked%TextInAreaPaintBgr% vTextInAreaPaintBgr, Draw background
     Gui, Add, Checkbox, x+1 yp hp gupdateUIInsertTextPanel Checked%TextInAreaVerticalia% vTextInAreaVerticalia, Rotate text by 90°
@@ -58678,18 +58678,18 @@ PanelInsertTextArea() {
 
     Gui, Add, Text, x+15 y+15 h%ha% w%wa% +0x200 Section vtxtLine6, Text
     GuiAddPickerColor("x+1 hp w27", "TextInAreaFontColor")
-    GuiAddColor("x+2 w" clrW " hp", "TextInAreaFontColor", "Text color")
+    GuiAddColor("x+2 w" clrW " hp", "TextInAreaFontColor", "Text colour")
     GuiAddSlider("TextInAreaFontOpacity", 2,255, 255, "Opacity", "updateUIInsertTextPanel", 1, "x+5 w" opaciSlideW " hp")
 
     ml := (PrefsLargeFonts=1) ? 12 : 8
     Gui, Add, Text, xs y+%ml% h%ha% w%wa% +0x200 vtxtLine1, Border
     GuiAddPickerColor("x+1 hp w27", "TextInAreaBorderColor")
-    GuiAddColor("x+2 w" clrW " hp", "TextInAreaBorderColor", "Border color")
+    GuiAddColor("x+2 w" clrW " hp", "TextInAreaBorderColor", "Border colour")
     GuiAddSlider("TextInAreaBorderOpacity", 2,255, 255, "Opacity", "updateUIInsertTextPanel", 1, "x+5 w" opaciSlideW " hp")
 
     Gui, Add, Text, xs y+%ml% h%ha% w%wa% +0x200 vtxtLine2, Background
     GuiAddPickerColor("x+1 hp w27", "TextInAreaBgrColor")
-    GuiAddColor("x+2 w" clrW " hp", "TextInAreaBgrColor", "Background color")
+    GuiAddColor("x+2 w" clrW " hp", "TextInAreaBgrColor", "Background colour")
     GuiAddSlider("TextInAreaBgrOpacity", 2,255, 255, "Opacity", "updateUIInsertTextPanel", 1, "x+5 w" opaciSlideW " hp")
     Gui, Add, Text, xs y+10 w%wa% hp +0x200 +TabStop gBtnResetBlendMode +hwndhTemp, Blending mode
     GuiAddDropDownList("x+1 wp gupdateUIInsertTextPanel AltSubmit Choose" TextInAreaBlendMode " vTextInAreaBlendMode", "None|" userBlendModesList, [hTemp])
@@ -58765,13 +58765,13 @@ uiADDalphaMaskTabs(t1, t2, labelu) {
     kak := Round(ha*2.2)
     Gui, Add, Text, xs ys+2 vinfoAlphaFile, Alpha mask bitmap:
     GuiAddDropDownList("xs y+10 Section w" txtWid2 " g" labelu " AltSubmit valphaMaskRefBMP Choose" alphaMaskRefBMP, (transformTool=1) ? "User painted bitmap|Main image|Transformed object" : "User painted bitmap|Main image", "Alpha mask bitmap source")
-    GuiAddDropDownList("x+5 wp-90 AltSubmit Choose" alphaMaskBMPchannel " valphaMaskBMPchannel g" labelu " +hwndhTemp", "Red|Green|Blue|Alpha|All gray", "Alpha mask bitmap color channel to use")
+    GuiAddDropDownList("x+5 wp-90 AltSubmit Choose" alphaMaskBMPchannel " valphaMaskBMPchannel g" labelu " +hwndhTemp", "Red|Green|Blue|Alpha|All grey", "Alpha mask bitmap colour channel to use")
     GuiAddButton("x+2 w" sml " hp vUIremAlpha gdiscardUserPaintedAlpha", "X", "Discard user bitmap", "Destroy the user painted bitmap")
     Gui, Add, Text, xs ys+5 w%kak% h%kak% -Border +0xE gGradientsPreviewResponder vinfoAlphaMaskGradientView +hwndhGradientAlphaMSKpreview, Alpha mask gradient preview
-    ToolTip2ctrl(hGradientAlphaMSKpreview, "Click and drag to adjust the gradient offset.`nHold Alt while dragging to adjust its center.")
+    ToolTip2ctrl(hGradientAlphaMSKpreview, "Click and drag to adjust the gradient offset.`nHold Alt while dragging to adjust its centre.")
 
     kak := Round(ha*1.5)
-    Gui, Add, Button, x+10 h%ha% vUIresetAlphaCenter gBtnResetGradientCenter, &Reset gradient center
+    Gui, Add, Button, x+10 h%ha% vUIresetAlphaCenter gBtnResetGradientCenter, &Reset gradient centre
     If (AnyWindowOpen!=70)
     {
        Gui, Add, Checkbox, xs y+%kak% w%txtWid2% Checked%alphaMaskColorReversed% valphaMaskColorReversed g%labelu%, Invert mas&k
@@ -58786,7 +58786,7 @@ uiADDalphaMaskTabs(t1, t2, labelu) {
     Gui, Tab, %t2% ; paint alpha
     BrushToolType := clampInRange(BrushToolType, 1, 2)
     Gui, Add, Checkbox, x+15 y+15 Section gBTNtoggleAlphaPainting Choose%uiPasteInPlaceAlphaDrawMode% vuiPasteInPlaceAlphaDrawMode, Enable alpha mask painting mode
-    GuiAddDropDownList("xs y+10 Section AltSubmit w" txtWid2 " g" labelu " Choose" BrushToolType " vBrushToolType", "Simple solid color|Soft edges brush", "Brush type")
+    GuiAddDropDownList("xs y+10 Section AltSubmit w" txtWid2 " g" labelu " Choose" BrushToolType " vBrushToolType", "Simple solid colour|Soft edges brush", "Brush type")
     Gui, Add, Checkbox, x+10 hp gupdateUIbrushTool Checked%BrushToolOverDraw% vBrushToolOverDraw , &Airbrush mode
     Gui, Add, Text, xs y+10 hp w%sml% +0x200 Center gBtnToggleBrushColors vUIbtnBrushColorA +TabStop +hwndhBtnTglClrA, [X]
     GuiAddPickerColor("x+5 hp w" sml, "BrushToolAcolor")
@@ -58801,8 +58801,8 @@ uiADDalphaMaskTabs(t1, t2, labelu) {
     GuiAddSlider("BrushToolBopacity", 2,255, 255, "Opacity", labelu, 1, "x+5 w" opaciSlideW " hp")
     Gui, Add, Checkbox, x+5 hp wp g%labelu% Checked%BrushToolDoubleSize% vBrushToolDoubleSize, Size × 2
 
-    ToolTip2ctrl(hBtnTglClrA, "Toggle active color")
-    ToolTip2ctrl(hBtnTglClrB, "Toggle active color")
+    ToolTip2ctrl(hBtnTglClrA, "Toggle active colour")
+    ToolTip2ctrl(hBtnTglClrB, "Toggle active colour")
     GuiAddSlider("BrushToolSize", 2,980, 25, "Brush size: $€", labelu, 1, "xs y+15 w" slideWid " hp")
     GuiAddSlider("BrushToolStepping", 0,251, 0, ".updateLabelBrushStep", labelu, 1, "x+10 wp hp")
     GuiAddSlider("BrushToolAspectRatio", -100,100, 0, "Aspect ratio", labelu, 2, "xs y+10 wp hp")
@@ -58997,12 +58997,12 @@ PanelPreferencesWindow() {
     Gui, Tab, 1
     Gui, Add, Text, x+15 y+15 Section, Font name
     Gui, Add, Text, xs yp+30, Font size (OSD / clipboard)
-    Gui, Add, Text, xs yp+30, Text color and style
+    Gui, Add, Text, xs yp+30, Text colour and style
     Gui, Add, Text, xs yp+30, Alignment (captions / paste)
-    Gui, Add, Text, xs yp+30, OSD background color
+    Gui, Add, Text, xs yp+30, OSD background colour
 
     Gui, Add, Text, xs yp+30, Display time (in sec.)
-    Gui, Add, Text, xs yp+30, Window background color
+    Gui, Add, Text, xs yp+30, Window background colour
     Gui, Add, Text, xs yp+30, Add rows in list views
     Gui, Add, Checkbox, xs yp+30 gupdateUIsettings Checked%usrTextureBGR% vusrTextureBGR, &Ambiental textured background
 
@@ -59014,16 +59014,16 @@ PanelPreferencesWindow() {
     GuiAddEdit("x+2 w" editWid " r1 gupdateUIsettings limit3 -multi number -wantCtrlA -wantReturn -wantTab -wrap veditF4", PasteFntSize, "Text on paste font size")
     Gui, Add, UpDown, vPasteFntSize Range12-350, %PasteFntSize%
 
-    GuiAddColor("xs yp+30 w" editWid " h28", "OSDtextColor", "OSD text color")
+    GuiAddColor("xs yp+30 w" editWid " h28", "OSDtextColor", "OSD text colour")
     GuiAddPickerColor("x+5 hp w25", "OSDtextColor")
     GuiAddCheckbox("x+2 yp hp w27 gupdateUIsettings Checked" OSDfontBolded " vOSDfontBolded","Bold", "B")
     GuiAddCheckbox("x+2 yp hp w27 gupdateUIsettings Checked" OSDfontItalica " vOSDfontItalica", "Italic", "I")
     GuiAddDropDownList("xs yp+30 w" editWid " gupdateUIsettings vusrTextAlign", usrTextAlign "||Left|Right|Center", "Text alignment")
-    GuiAddColor("xs+0 yp+30 w" editWid " hp", "OSDbgrColor", "OSD background color")
+    GuiAddColor("xs+0 yp+30 w" editWid " hp", "OSDbgrColor", "OSD background colour")
     GuiAddPickerColor("x+5 hp w25", "OSDbgrColor")
     GuiAddEdit("xs+0 yp+30 gupdateUIsettings w" editWid " hp r1 limit2 -multi number -wantCtrlA -wantReturn -wantTab -wrap veditF6", DisplayTimeUser, "OSD display time in seconds")
     Gui, Add, UpDown, vDisplayTimeUser Range1-99, %DisplayTimeUser%
-    GuiAddColor("xs+0 yp+30 w" editWid " hp", "WindowBGRcolor", "Window background color")
+    GuiAddColor("xs+0 yp+30 w" editWid " hp", "WindowBGRcolor", "Window background colour")
     GuiAddPickerColor("x+5 hp w25", "WindowBGRcolor")
     GuiAddEdit("xs+0 yp+30 gupdateUIsettings w" editWid " hp r1 limit2 -multi number -wantCtrlA -wantReturn -wantTab -wrap veditF8", additionalLVrows, "Additional list view rows")
     Gui, Add, UpDown, vadditionalLVrows Range0-15, % additionalLVrows
@@ -59035,10 +59035,10 @@ PanelPreferencesWindow() {
     uiPopulateFontsList("OSDFontName", "SettingsGUIA")
 
     Gui, Tab, 2
-    Gui, Add, Checkbox, x+15 y+15 Section gupdateUIsettings Checked%userPerformColorManagement% vuserPerformColorManagement hwndhTemp, Apply color management
-    ToolTip2ctrl(hTemp, "Convert images from their embedded color profile to sRGB")
+    Gui, Add, Checkbox, x+15 y+15 Section gupdateUIsettings Checked%userPerformColorManagement% vuserPerformColorManagement hwndhTemp, Apply colour management
+    ToolTip2ctrl(hTemp, "Convert images from their embedded colour profile to sRGB")
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%userimgGammaCorrect% vuserimgGammaCorrect +hwndhTemp, Apply gamma correction (image editing)
-    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%ColorDepthDithering% vColorDepthDithering, Perform dithering on color depth changes
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%ColorDepthDithering% vColorDepthDithering, Perform dithering on colour depth changes
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%preventUndoLevels% vpreventUndoLevels, Record undo levels
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%minimizeMemUsage% vminimizeMemUsage +hwndhTemp, Attempt to minimize memory usage (not recommended)
     ToolTip2ctrl(hTemp, "When this option is activated, the performance of QPV will be drastically reduced.`nSome features or functions might be disabled.")
@@ -59062,7 +59062,7 @@ PanelPreferencesWindow() {
     Gui, Add, Checkbox, xs y+7 gToggleIMGalign Checked%imageAlignVPtopLeft% vimageAlignVPtopLeft, Top-left image alignment in the viewport
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%lockZoomLevel% vlockZoomLevel +hwndhTemp, Retain zoom level on image change (lock zoom level)
     ToolTip2ctrl(hTemp, "When this option is deactivated, QPV attempts to retain the dimensions`nin the viewport, whether the new image is larger or smaller,`nto improve the user experience.")
-    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%resetImageViewOnChange% vresetImageViewOnChange, Auto-reset viewport color adjustments on image change
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%resetImageViewOnChange% vresetImageViewOnChange, Auto-reset viewport colour adjustments on image change
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%LimitSelectBoundsImg% vLimitSelectBoundsImg, Limit selection area to image boundaries 
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%allowGIFsPlayEntirely% vallowGIFsPlayEntirely, Wait for animations to play once during slideshows
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%doSlidesTransitions% vdoSlidesTransitions, Smooth slideshow transitions
@@ -59074,7 +59074,7 @@ PanelPreferencesWindow() {
 
     ml := (PrefsLargeFonts=1) ? 265 : 150
     labelu := (thumbsDisplaying=1)`? "PanelSetThumbColumnOptions" : "PanelColorsAdjusterVPwindow"
-    Gui, Add, Button, xs y+7 w%ml% g%labelu%, &Viewport color options
+    Gui, Add, Button, xs y+7 w%ml% g%labelu%, &Viewport colour options
 
     Gui, Tab, 4
     pp := (FIMfailed2init=1) ? "( ! )"
@@ -59100,7 +59100,7 @@ PanelPreferencesWindow() {
     Gui, Add, Checkbox, y+7 gupdateUIsettings Checked%allowWICloader% vallowWICloader, Allow Windows Imaging Component (WIC) loader
     Gui, Add, Checkbox, y+7 gupdateUIsettings Checked%allowFIMloader% vallowFIMloader, Allow FreeImage loader
     Gui, Add, Checkbox, y+7 gupdateUIsettings Checked%noQualityWarnings% vnoQualityWarnings, Reduce the number of warnings
-    Gui, Add, Text, xs+18 y+7 w%txtWid%, This applies to image quality or color depth changes, or when memory usage may increase excessively.
+    Gui, Add, Text, xs+18 y+7 w%txtWid%, This applies to image quality or colour depth changes, or when memory usage may increase excessively.
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%userPrivateMode% vuserPrivateMode, Private mode UI
     Gui, Add, Text, xs+18 y+7 w%txtWid%, Hidden file names and blurred images.
     Gui, Add, Text, xs y+10, Maximum thumbnails to hold in memory:
@@ -59166,7 +59166,7 @@ PanelAdjustToneMapping() {
     Gui, Add, Text, x15 y15 w460 h320 +0x1000 +0xE +hwndhLVmainu, Image before 
     Gui, Add, Text, x480 y15 w460 h320 +0x1000 +0xE +hwndhCropCornersPic, Image after
     Gui, SettingsGUIA: +DPIScale
-    Gui, Add, Text, x15 y+10 Section w%txtWid% vinfoLine, Pixel format: -----------. Image in linear light converted to display colors. Deactivate color management to tone-map it.
+    Gui, Add, Text, x15 y+10 Section w%txtWid% vinfoLine, Pixel format: -----------. Image in linear light converted to display colours. Deactivate colour management to tone-map it.
     Gui, Add, Checkbox, xs y+10 gupdateUItoneMappingPanel Checked%allowToneMappingImg% vallowToneMappingImg, Apply tone mapping to image(s)
     GuiAddDropDownList("xs y+10 w" txtWid//2 - 2 " AltSubmit gupdateUItoneMappingPanel Choose" cmrRAWtoneMapAlgo " vcmrRAWtoneMapAlgo", "F. Drago (FreeImage)|E. Reinhard (FreeImage)|F. Drago (OpenCV)|E. Reinhard (OpenCV)|Simple mode (OpenCV)", "HDR tone mapping algorithm")
     GuiAddSlider("UIuserToneMapParamD", 0,400, 0, "Additional exposure", "updateUItoneMappingPanel", 1, "x+1 w" txtWid//2 - 2 " hp")
@@ -59177,7 +59177,7 @@ PanelAdjustToneMapping() {
     GuiAddSlider("UIuserToneMapOCVparamB", 1,400, 200, "Parameter OCV-B", "updateUItoneMappingPanel", 1, "xp yp wp hp")
     GuiAddSlider("UIuserToneMapParamC", 1,400, 74, "Parameter C", "updateUItoneMappingPanel", 1, "xs y+10 wp hp")
     Gui, Add, Checkbox, xs y+10 wp gupdateUItoneMappingPanel Checked%userHQraw% vuserHQraw, Load camera RAW images at high quality
-    Gui, Add, Checkbox, xs y+5 wp gupdateUItoneMappingPanel Checked%userPerformColorManagement% vuserPerformColorManagement, Apply color management
+    Gui, Add, Checkbox, xs y+5 wp gupdateUItoneMappingPanel Checked%userPerformColorManagement% vuserPerformColorManagement, Apply colour management
 
     initializeFimPreviewIMG(getIDimage(currentFileIndex))
     ml := (PrefsLargeFonts=1) ? 35 : 25
@@ -59196,7 +59196,7 @@ PanelAdjustToneMapping() {
 }
 
 BtnHelpToneMapping() {
-   msgBoxWrapper(appTitle ": HELP", "High-dynamic range images (HDRIs) must be converted to 24 bits to be displayed on screen. You can choose the algorithm to use for this and also configure it.`n`nWhen the option to load Camera RAW images with high quality is activated, the tone-mapping options can be applied to these as well. Color management, when activated, is applied after the tone mapping.`n`nDeactivating tone-mapping for HDR, EXR and PFM image file formats is not possible.`n`nThe OpenCV implementations execute faster and may produce better results, but the alpha channel, if present, will not be preserved.`n`nUse the reset button to identify commonly used settings for each algorithm implementation.`n`nPlease note: the preview may not accurately match the output in the viewport.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "High-dynamic range images (HDRIs) must be converted to 24 bits to be displayed on screen. You can choose the algorithm to use for this and also configure it.`n`nWhen the option to load Camera RAW images with high quality is activated, the tone-mapping options can be applied to these as well. Colour management, when activated, is applied after the tone mapping.`n`nDeactivating tone-mapping for HDR, EXR and PFM image file formats is not possible.`n`nThe OpenCV implementations execute faster and may produce better results, but the alpha channel, if present, will not be preserved.`n`nUse the reset button to identify commonly used settings for each algorithm implementation.`n`nPlease note: the preview may not accurately match the output in the viewport.", -1, 0, 0)
 }
 
 killToneMapImageCacheObj() {
@@ -59227,7 +59227,7 @@ SetUItoneMapPanelInfoLine() {
     }
 
     tm := f.tm
-    thenCM := (f.displayICC=2 || f.displayICC=1 && f.keptLight) ? ", then color managed." : "."
+    thenCM := (f.displayICC=2 || f.displayICC=1 && f.keptLight) ? ", then colour managed." : "."
     ptmi := (allowToneMappingImg=1) ? "Tone-mapped (optional)" thenCM A_Space : "Tone-mapping optional. "
     If (tm="")
        msg := "ERROR. Unable to execute function in FreeImage.DLL."
@@ -59240,7 +59240,7 @@ SetUItoneMapPanelInfoLine() {
     Else If (f.GFT=34 && userHQraw!=1)
        msg := "Camera RAW loaded in low quality with no tone-mapping."
     Else If (userPerformColorManagement=1 && isVarEqualTo(f.tmNoCM, 1, 2, 3))
-       msg := "Image in linear light converted to display colors. Deactivate color management to tone-map it."
+       msg := "Image in linear light converted to display colours. Deactivate colour management to tone-map it."
     Else If isInRange(f.type, 2, 8)
        msg := "A single-channel image: displayed as 8-bit grey, not tone-mapped."
     Else
@@ -59720,18 +59720,18 @@ InvokeStandardDialogColorPicker(hC, event, c) {
   mods := (  GetKeyState("Ctrl", "P") || GetKeyState("Shift", "P") || GetKeyState("Alt", "P") ) ? 1 : 0
   If (mods=1)
   {
-     msg2show := "HEX color: " %ctrl% "`nShift + L-click to copy`nAlt+Click to paste"
+     msg2show := "HEX colour: " %ctrl% "`nShift + L-click to copy`nAlt+Click to paste"
      If GetKeyState("Shift", "P")
      {
         wasOkay := copyTextToClippy(%ctrl%)
-        msg2show := (wasOkay=0) ? " Failed to copy the color to the clipboard" : "HEX color copied to clipboard: " %ctrl%
+        msg2show := (wasOkay=0) ? " Failed to copy the colour to the clipboard" : "HEX colour copied to clipboard: " %ctrl%
      } Else If GetKeyState("Alt", "P")
      {
         Try clr := Trimmer(Clipboard)
         If (clr ~= "[^[:xdigit:]]") || (StrLen(clr)!=6)
            Return
 
-        msg2show := "HEX color pasted: " clr
+        msg2show := "HEX colour pasted: " clr
         pastedClr := 1
      }
 
@@ -59971,7 +59971,7 @@ PanelDefineEntireSlideshowLength() {
 }
 
 TimeLapseInfoBox() {
-    msgBoxWrapper(appTitle ": HELP", "The estimated slideshow duration displayed in the panel includes the time estimated to load each image. Based on previously loaded images, it takes about " groupDigits(drawModeCzeit) " milliseconds to load an image.`n `nIf the option to allow GIFs to play entirely during slideshows is selected, the duration of the slideshow will be influenced by how many GIFs are indexed and how long they are.`n `nFor optimal timelapses [or very fast slideshows] set zoom to 100`%, disable image rotation and color adjustments and «skip already seen images».", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "The estimated slideshow duration displayed in the panel includes the time estimated to load each image. Based on previously loaded images, it takes about " groupDigits(drawModeCzeit) " milliseconds to load an image.`n `nIf the option to allow GIFs to play entirely during slideshows is selected, the duration of the slideshow will be influenced by how many GIFs are indexed and how long they are.`n `nFor optimal timelapses [or very fast slideshows] set zoom to 100`%, disable image rotation and colour adjustments and «skip already seen images».", -1, 0, 0)
 }
 
 SetTimeLapseMode() {
@@ -60220,7 +60220,7 @@ saveHugeVPimageFile(imgPath, file2save, hFIFimgA, depth) {
    {
       If (usrColorDepth>1 || imgFxMode>1)
       {
-         msgResult := msgBoxWrapper(appTitle ": WARNING", "In the viewport, the image seems to be displayed with color adjustments. QPV cannot apply these to the image itself, because of its very large size. The image will be saved with its original colors.`n`nGo to Image > Filters > Adjust image colors to apply color filters to such images.`n`nDo you want to continue?", "&Yes|&No", 2, "exclamation")
+         msgResult := msgBoxWrapper(appTitle ": WARNING", "In the viewport, the image seems to be displayed with colour adjustments. QPV cannot apply these to the image itself, because of its very large size. The image will be saved with its original colours.`n`nGo to Image > Filters > Adjust image colours to apply colour filters to such images.`n`nDo you want to continue?", "&Yes|&No", 2, "exclamation")
          If (msgResult!="Yes")
             Return "user-abort"
       }
@@ -60229,7 +60229,7 @@ saveHugeVPimageFile(imgPath, file2save, hFIFimgA, depth) {
       RegExMatch(pixFmt, "^\d+", thisImgBPP)
       vpFmt := FreeImage_GetBPP(viewportQPVimage.imgHandle)
       If (thisImgBPP && vpFmt<thisImgBPP)
-         msgu := "The color format of the image file is " pixFmt ".`n`nWhen the image was loaded, " appTitle " converted it to " vpFmt " bits. Therefore, some color information was lost. The file will be saved from the " vpFmt "-bit image."
+         msgu := "The colour format of the image file is " pixFmt ".`n`nWhen the image was loaded, " appTitle " converted it to " vpFmt " bits. Therefore, some colour information was lost. The file will be saved from the " vpFmt "-bit image."
 
       pff := msgu ? "The image " : "The image you currently have open "
       If (currIMGdetails.Frames>1)
@@ -60437,7 +60437,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
 
       If (noQualityWarnings!=1 && hasAlpha && lostAlpha)
       {
-         msgResult := msgBoxWrapper(appTitle ": WARNING", "The selected image or color format does not support the alpha channel (RGBA). The image may look different after saving it in this format. Do you want to continue?", "&Yes|&No", 2, "exclamation")
+         msgResult := msgBoxWrapper(appTitle ": WARNING", "The selected image or colour format does not support the alpha channel (RGBA). The image may look different after saving it in this format. Do you want to continue?", "&Yes|&No", 2, "exclamation")
          If (msgResult!="Yes")
             Return
       }
@@ -60449,7 +60449,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
       lastInvoked := A_TickCount
       If (testWasImageEditedInVP()=1 && imgPath!=file2save && FileRexists(imgPath) && noQualityWarnings!=1)
       {
-         msgResult := dilemma := (oExt!=nExt) ? "Do you want QPV to preserve the original color depth? If the destination file format does not allow it, the next best match will be chosen." : "The destination image file format is the same as the original one. Do you want QPV to preserve the original color depth and pixel data, to avoid any potential quality loss? The image will not be re-encoded."
+         msgResult := dilemma := (oExt!=nExt) ? "Do you want QPV to preserve the original colour depth? If the destination file format does not allow it, the next best match will be chosen." : "The destination image file format is the same as the original one. Do you want QPV to preserve the original colour depth and pixel data, to avoid any potential quality loss? The image will not be re-encoded."
          If (desiredFrameIndex>0)
             dilemma := ""
 
@@ -60475,7 +60475,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
 
       If (quickieSave=1 && dilemma)
       {
-         showTOOLtip("Saving image, please wait`n" OutFileName "`nIntended color format: ORIGINAL bits")
+         showTOOLtip("Saving image, please wait`n" OutFileName "`nIntended colour format: ORIGINAL bits")
          If (oExt!=nExt)
          {
             r := coreConvertImgFormat(imgPath, file2save, 0, 1)
@@ -60493,7 +60493,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
       } Else
       {
          fdp := dephtus[userSaveBitsDepth] ? dephtus[userSaveBitsDepth] : "ORIGINAL"
-         showTOOLtip("Saving image, please wait`n" OutFileName "`nIntended color format: " fdp " bits")
+         showTOOLtip("Saving image, please wait`n" OutFileName "`nIntended colour format: " fdp " bits")
          huge := (viewportQPVimage.imgHandle) ? 1 : 0
          If (huge=1)
             r := saveHugeVPimageFile(viewportQPVimage.ImgFile, file2save, viewportQPVimage.imgHandle, dephtus[userSaveBitsDepth])
@@ -61069,14 +61069,14 @@ PanelCustomizeToolbar() {
 
     Gui, Tab, 2
     Gui, Add, Checkbox, x+15 y+15 Section Checked%ShowToolTipsToolbar% vShowToolTipsToolbar, Show tooltips on icon hover
-    Gui, Add, Checkbox, y+10 Checked%TLBRinvertColors% vTLBRinvertColors +hwndhTemp, Invert icon colors
-    ToolTip2ctrl(hTemp, "This option is useful when a bright background color is used")
+    Gui, Add, Checkbox, y+10 Checked%TLBRinvertColors% vTLBRinvertColors +hwndhTemp, Invert icon colours
+    ToolTip2ctrl(hTemp, "This option is useful when a bright background colour is used")
     Gui, Add, Checkbox, y+10 Checked%lockToolbar2Win% vlockToolbar2Win, Attached to the main &window
     Gui, Add, Checkbox, y+10 Checked%TLBRverticalAlign% vTLBRverticalAlign, Vertical toolbar
     Gui, Add, Checkbox, x+10 Checked%TLBRtwoColumns% vTLBRtwoColumns, Two-column vertical
-    Gui, Add, Text, xs y+10 h%thisBtnHeight% +0x200, Toolbar background color:
+    Gui, Add, Text, xs y+10 h%thisBtnHeight% +0x200, Toolbar background colour:
     GuiAddPickerColor("x+5 hp w35", "ToolbarBgrColor")
-    GuiAddColor("x+5 hp w" ml, "ToolbarBgrColor", "Toolbar background color")
+    GuiAddColor("x+5 hp w" ml, "ToolbarBgrColor", "Toolbar background colour")
     GuiAddSlider("ToolbarScaleFactor", 0.2, 5.0, "1.15f", "Icon scale: $€ x", "dummy", 1, "xs y+10 wp+100 hp")
 
     Gui, Tab
@@ -61325,7 +61325,7 @@ PanelAutoColors() {
        Gui, Add, Checkbox, xs y+10 Checked%EraseAreaUseAlpha% vEraseAreaUseAlpha, Apply alpha mas&k
        If (viewportQPVimage.imgHandle || InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
           GuiControl, Disable, EraseAreaUseAlpha
-       Gui, Add, Checkbox, xs y+10 Checked%userAutoColorAdjustAll% vuserAutoColorAdjustAll, &Adjust the colors based on the entire image,`nregardless of the selected area
+       Gui, Add, Checkbox, xs y+10 Checked%userAutoColorAdjustAll% vuserAutoColorAdjustAll, &Adjust the colours based on the entire image,`nregardless of the selected area
     } Else
        Gui, Add, Text, xs y+10, Selected files: %markedSelectFile%.`n`nImages in unsupported write formats will be skipped.
 
@@ -61334,7 +61334,7 @@ PanelAutoColors() {
     Gui, Add, Button, x+5 hp w%thisW% gBtnCloseWindow, C&ancel
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     Tooltip
-    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Auto-adjust image colors: " appTitle)
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Auto-adjust image colours: " appTitle)
     GuiRefreshSliders()
 }
 
@@ -63298,7 +63298,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, fallbackLev
          FreeImage_UnLoad(hFIFimgA)
          hFIFimgA := hFIFimgX
          FimBuffer := DestroyMemoryBuffer(FimBuffer)
-      } Else addJournalEntry(A_ThisFunc "(): the colors could not be converted to sRGB for a file format without color profiles:`n" file2save)
+      } Else addJournalEntry(A_ThisFunc "(): the colours could not be converted to sRGB for a file format without colour profiles:`n" file2save)
    }
 
    ColorsType := FreeImage_GetColorType(hFIFimgA)
@@ -65034,7 +65034,7 @@ LoadBitmapAsFreeImage(imgPath, allowHDR, allowFallback, ByRef oImgW, ByRef oImgH
             hFIFimgA := hFIFimgD
          } Else
          {
-            addJournalEntry(A_ThisFunc "(): Failed to convert imported image to 24/32-bit color depth.")
+            addJournalEntry(A_ThisFunc "(): Failed to convert imported image to 24/32-bit colour depth.")
             FreeImage_UnLoad(hFIFimgA)
             hFIFimgA := ""
          }
@@ -66640,7 +66640,7 @@ importSLDBintoSLDB(whichFile) {
       Return
    }
 
-   showTOOLtip("Finalising database import operations, please wait")
+   showTOOLtip("Finalizing database import operations, please wait")
    If (pixelsCarried=1)
    {
       ; COALESCE per column, not per row: the imported fingerprint wins when there is one,
@@ -68008,9 +68008,9 @@ createMenuSelectionAlign(modus:=0) {
    kMenu("PVselAlign", "Add", "&Right" kbdu, "alignImgSelectRight",, "Align selection: " sillySeparator,, ownu)
    Menu, PVselAlign, Add
    kbdu := (modus!="selProp") ? "`tCtrl+NumPad 5" : ""
-   kMenu("PVselAlign", "Add", "&Center horizontally" kbdu, "alignImgSelectCenterH",, "Align selection: " sillySeparator,, ownu)
+   kMenu("PVselAlign", "Add", "&Centre horizontally" kbdu, "alignImgSelectCenterH",, "Align selection: " sillySeparator,, ownu)
    kbdu := (modus!="selProp") ? "`tCtrl+NumPad 0" : ""
-   kMenu("PVselAlign", "Add", "Center &vertically" kbdu, "alignImgSelectCenterV",, "Align selection: " sillySeparator,, ownu)
+   kMenu("PVselAlign", "Add", "Centre &vertically" kbdu, "alignImgSelectCenterV",, "Align selection: " sillySeparator,, ownu)
    kMenu("PVselAlign", "Add", "Centre&d", "alignImgSelectCentered",, "Align selection: " sillySeparator,, ownu)
    If (isVarEqualTo(AnyWindowOpen, 74, 65, 32, 31, 24, 23) && !viewportQPVimage.imgHandle)
    {
@@ -68263,7 +68263,7 @@ createMenuConvertColorDepths() {
 
    kMenu("PVimgClrDepths", "Add", "Black and white (1-bit, dithered)", "MenuConvertClrBW", "grayscale")
    kMenu("PVimgClrDepths", "Add", "8-bit (greyscale)", "MenuConvertClrGray", "grayscale")
-   kMenu("PVimgClrDepths", "Add", "8-bit (dithered colors)", "MenuConvertClr8bit")
+   kMenu("PVimgClrDepths", "Add", "8-bit (dithered colours)", "MenuConvertClr8bit")
    kMenu("PVimgClrDepths", "Add", "16-bit", "MenuConvertClr16bit")
    kMenu("PVimgClrDepths", "Add", "24-bit", "MenuConvertClr24bit")
    kMenu("PVimgClrDepths", "Add", "32-bit", "MenuConvertClr32bit")
@@ -68304,11 +68304,11 @@ createMenuImageEditSubMenus(modus:=0) {
       kMenu("PVimgFilters", "Add", "S&harpen", "PanelSharpenImage", "effects", " image")
       Menu, PVimgFilters, Add
       kMenu("PVimgFilters", "Add", "A&utomatic contrast / levels", "PanelAutoColors")
-      kMenu("PVimgFilters", "Add", "&Invert colors`tShift+I", "InvertSelectedArea", "effects negative")
-      kMenu("PVimgFilters", "Add", "Desaturate color&s`tCtrl+G", "PanelDesatureSelectedArea", "grayscale effects")
-      kMenu("PVimgFilters", "Add", "Ad&just image colors`tU", "PanelAdjustColorsSimpleWindow", "grayscale effects lightness contrast saturation levels brightness")
+      kMenu("PVimgFilters", "Add", "&Invert colours`tShift+I", "InvertSelectedArea", "effects negative")
+      kMenu("PVimgFilters", "Add", "Desaturate colour&s`tCtrl+G", "PanelDesatureSelectedArea", "grayscale effects")
+      kMenu("PVimgFilters", "Add", "Ad&just image colours`tU", "PanelAdjustColorsSimpleWindow", "grayscale effects lightness contrast saturation levels brightness")
       If (AnyWindowOpen!=10)
-         kMenu("PVimgFilters", "Add", "Appl&y viewport color effects`tCtrl+Shift+U", "ApplyVPcolorAdjustSelectedArea")
+         kMenu("PVimgFilters", "Add", "Appl&y viewport colour effects`tCtrl+Shift+U", "ApplyVPcolorAdjustSelectedArea")
 
       Menu, PVimgFilters, Add
       kMenu("PVimgFilters", "Add", "&Add noise", "PanelAddNoiserImage", "effects clouds plasma")
@@ -68321,7 +68321,7 @@ createMenuImageEditSubMenus(modus:=0) {
       kMenu("PVimgDraw", "Add", "Define freeform &outline`tAlt+P", "MenuRealStartDrawingLines", "curve polygonal lines")
       kMenu("PVimgDraw", "Add", "&Paint brushes`tP", "PanelBrushTool", "pinch bulge effects draw deformer smudge cloner effects")
       kMenu("PVimgDraw", "Add", "&Erase or fade area`tDelete", "PanelEraseSelectedArea")
-      kMenu("PVimgDraw", "Add", "&Flood fill / color bucket`tK", "PanelFloodFillTool", "colorize similarity cartoon")
+      kMenu("PVimgDraw", "Add", "&Flood fill / colour bucket`tK", "PanelFloodFillTool", "colorize similarity cartoon")
       kMenu("PVimgDraw", "Add", "&Fill shapes`tAlt+Backspace", "tlbrFillShape", "curve polygonal glass effects blur pie ellipse triangle rhombus gradients rectangle")
       kMenu("PVimgDraw", "Add", "Fill be&hind image", "PanelFillBehindBgrImage", "background")
       kMenu("PVimgDraw", "Add", "Draw s&hape contours`tCtrl+L", "tlbrDrawShapesContour", "lines curve polygonal pie ellipse triangle rhombus rectangle arcs")
@@ -68394,7 +68394,7 @@ InvokeMenuBarVectorView(manuID:=0, modus:=0, justBuild:=0) {
    kMenu("pvMenuBarView", "Add", "Zoom adapt modes", ":PvImgAdapt")
    Menu, pvMenuBarView, Add
    createMenuImgColorsFX()
-   kMenu("pvMenuBarView", "Add", "Colors F&X and display modes", ":PVimgColorsFX")
+   kMenu("pvMenuBarView", "Add", "Colours F&X and display modes", ":PVimgColorsFX")
    kMenu("pvMenuBarView", "Add", "Reset vie&wport adjustments`t\", "ResetImageView", "image")
    Menu, pvMenuBarView, Add
    kMenu("pvMenuBarView", "Add", "Focus end point/first selected`tW", "focusVectorEndPoint")
@@ -68408,9 +68408,9 @@ InvokeMenuBarVectorView(manuID:=0, modus:=0, justBuild:=0) {
    kMenu("pvMenuBarView", "Add", "Increase grid size`tAlt+=", "MenuIncVPgridSize",,,1)
    kMenu("pvMenuBarView", "Add", "Decrease grid size`tAlt+-", "MenuDecVPgridSize",,,1)
    Menu, pvMenuBarView, Add
-   kMenu("pvMenuBarView", "Add/Uncheck", "Centered image &alignment`tA", "ToggleIMGalign", "viewport image position")
+   kMenu("pvMenuBarView", "Add/Uncheck", "Centred image &alignment`tA", "ToggleIMGalign", "viewport image position")
    If (imageAlignVPtopLeft=0)
-      kMenu("pvMenuBarView", "Check", "Centered image &alignment`tA")
+      kMenu("pvMenuBarView", "Check", "Centred image &alignment`tA")
 
    kMenu("pvMenuBarView", "Add/Uncheck", "Allo&w outside viewport image panning", "toggleFreeIMGpanning")
    If (allowFreeIMGpanning=1)
@@ -68725,10 +68725,10 @@ InvokeMenuBarEdit(manuID:=0, justBuild:=0) {
          {
             If isInRange(FillAreaColorMode, 2, 4)
             {
-               kMenu("pvMenuBarEdit", "Add", "&Reset gradient center", "BtnSetTextureSource")
-               kMenu("pvMenuBarEdit", "Add/Uncheck", "&Allow gradient center repositioning", "toggleClrGradientCenterRepose")
+               kMenu("pvMenuBarEdit", "Add", "&Reset gradient centre", "BtnSetTextureSource")
+               kMenu("pvMenuBarEdit", "Add/Uncheck", "&Allow gradient centre repositioning", "toggleClrGradientCenterRepose")
                If (userAllowClrGradientRecenter=1)
-                  kMenu("pvMenuBarEdit", "Check", "&Allow gradient center repositioning")
+                  kMenu("pvMenuBarEdit", "Check", "&Allow gradient centre repositioning")
             } Else If (FillAreaColorMode=6)
                kMenu("pvMenuBarEdit", "Add", "&Set texture fill source`tS", "BtnSetTextureSource")
          } Else If (AnyWindowOpen=64 && BrushToolType<4)
@@ -69029,7 +69029,7 @@ InvokeMenuBarImage(manuID:=0, justBuild:=0) {
         Try kMenu("pvMenuBarImage", "Add", "&Filters", ":PVimgFilters")
         Try kMenu("pvMenuBarImage", "Add", "&Draw", ":PVimgDraw")
         Try kMenu("pvMenuBarImage", "Add", "&Transform", ":PVimgTransform")
-        Try kMenu("pvMenuBarImage", "Add", "&Convert color depth", ":PVimgClrDepths")
+        Try kMenu("pvMenuBarImage", "Add", "&Convert colour depth", ":PVimgClrDepths")
      } Else If (editingSelectionNow=1 && dummy!="mbr")
      {
         createMenuImageEditSubMenus("filters")
@@ -69047,7 +69047,7 @@ InvokeMenuBarImage(manuID:=0, justBuild:=0) {
         kMenu("pvMenuBarImage", "Check", "&Use gamma correction")
 
      If (imgEditPanelOpened=1)
-        kMenu("pvMenuBarImage", "Add", "Pic&k color from image`tC", "changeBrushColorPicker", "pipette picker")
+        kMenu("pvMenuBarImage", "Add", "Pic&k colour from image`tC", "changeBrushColorPicker", "pipette picker")
 
      If !AnyWindowOpen
      {
@@ -69559,7 +69559,7 @@ createMenuAlphaMask(givenMenu:="PValpha") {
 
    If (liveDrawingBrushTool=1)
    {
-      kMenu(givenMenu, "Add", "&Reset brush colors to B/W`tD", "ResetColorsToBW")
+      kMenu(givenMenu, "Add", "&Reset brush colours to B/W`tD", "ResetColorsToBW")
       kMenu(givenMenu, "Check", "&Paint alpha mask`tCtrl+K")
       kMenu(givenMenu, "Check", "&Paint alpha mask`tCtrl+K")
    } Else If (editingSelectionNow=1)
@@ -69812,7 +69812,7 @@ createMenuBonusImageLiveEditMode() {
    }
 
    kMenu("PVmenu", "Add", "File actions", ":PVtActFile")
-   kMenu("PVmenu", "Add", "Pic&k color from image`tC", "changeBrushColorPicker", "picker pipette")
+   kMenu("PVmenu", "Add", "Pic&k colour from image`tC", "changeBrushColorPicker", "picker pipette")
    kMenu("PVmenu", "Add/Uncheck", "&Apply image gamma correction", "toggleImgEditGammaCorrect", "image colors")
    If (userimgGammaCorrect=1)
       kMenu("PVmenu", "Check", "&Apply image gamma correction")
@@ -69998,7 +69998,7 @@ createMenuImgVProtation() {
 }
 
 defineTransBgrColor() {
-   Static l := {1:"CHECKERS", 2:"GRAY", 3:"WHITE", 4:"BLACK", 5:"WINDOW BACKGROUND COLOR"}
+   Static l := {1:"CHECKERS", 2:"GREY", 3:"WHITE", 4:"BLACK", 5:"WINDOW BACKGROUND COLOUR"}
    Return l[UserVPalphaBgrStyle]
 }
 
@@ -70036,18 +70036,18 @@ createMenuWinAlphaBGRstyles() {
    kMenu("PVimgAlphaBGR", "Add/UnCheck", "Checkers", "MenuAlphaBgrCheckers")
    If (UserVPalphaBgrStyle=1)
       kMenu("PVimgAlphaBGR", "Check", "Checkers")
-   kMenu("PVimgAlphaBGR", "Add/UnCheck", "Gray", "MenuAlphaBgrGRAY")
+   kMenu("PVimgAlphaBGR", "Add/UnCheck", "Grey", "MenuAlphaBgrGRAY")
    If (UserVPalphaBgrStyle=2)
-      kMenu("PVimgAlphaBGR", "Check", "Gray")
+      kMenu("PVimgAlphaBGR", "Check", "Grey")
    kMenu("PVimgAlphaBGR", "Add/UnCheck", "White", "MenuAlphaBgrWHITE")
    If (UserVPalphaBgrStyle=3)
       kMenu("PVimgAlphaBGR", "Check", "White")
    kMenu("PVimgAlphaBGR", "Add/UnCheck", "Black", "MenuAlphaBgrBLACK")
    If (UserVPalphaBgrStyle=4)
       kMenu("PVimgAlphaBGR", "Check", "Black")
-   kMenu("PVimgAlphaBGR", "Add/UnCheck", "Window background color", "MenuAlphaBgrWinClr")
+   kMenu("PVimgAlphaBGR", "Add/UnCheck", "Window background colour", "MenuAlphaBgrWinClr")
    If (UserVPalphaBgrStyle=5)
-      kMenu("PVimgAlphaBGR", "Check", "Window background color")
+      kMenu("PVimgAlphaBGR", "Check", "Window background colour")
 }
 
 createMenuNavBox() {
@@ -70175,12 +70175,12 @@ createMenuImgSizeAdapt(dummy:=0) {
             kMenu("PVview", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw reinhard drago")
 
          If !AnyWindowOpen
-            kMenu("PVview", "Add", "Viewport and color adjustments panel`tShift+U", "PanelColorsAdjusterVPwindow")
+            kMenu("PVview", "Add", "Viewport and colour adjustments panel`tShift+U", "PanelColorsAdjusterVPwindow")
 
          kMenu("PVview", "Add", "Reset vie&wport adjustments`t\", "ResetImageView", "image")
-         kMenu("PVview", "Add/Uncheck", "Centered &alignment`tA", "ToggleIMGalign", "viewport image position", " (image)")
+         kMenu("PVview", "Add/Uncheck", "Centred &alignment`tA", "ToggleIMGalign", "viewport image position", " (image)")
          If (imageAlignVPtopLeft=0)
-            kMenu("PVview", "Check", "Centered &alignment`tA",,, " (image)")
+            kMenu("PVview", "Check", "Centred &alignment`tA",,, " (image)")
 
          If (thumbsDisplaying!=1)
          {
@@ -70198,8 +70198,8 @@ createMenuImgSizeAdapt(dummy:=0) {
 
          kMenu("PVview", "Add", "C&ycle histogram modes`tG", "ToggleImgHistogram",,,1)
          keyu := (liveDrawingBrushTool=1 && thumbsDisplaying!=1 || AnyWindowOpen=63) ? "" : "`tQ"
-         kMenu("PVview", "Add", "C&ycle simulated color depths" keyu, "ToggleImgColorDepth",,,1)
-         kMenu("PVview", "Add", "C&ycle color display modes`tF", "ToggleImgFX",,,1)
+         kMenu("PVview", "Add", "C&ycle simulated colour depths" keyu, "ToggleImgColorDepth",,,1)
+         kMenu("PVview", "Add", "C&ycle colour display modes`tF", "ToggleImgFX",,,1)
 
          infoThumbsList := defineListViewModes()
          infoThumbsMode := (thumbsDisplaying=1) ? "Switch to image view" : "Switch to " infoThumbsList " list view"
@@ -70224,9 +70224,9 @@ createMenuImgSizeAdapt(dummy:=0) {
          kMenu("PvImgAdapt", "Add", "&More options", ":PVview")
       } Else
       {
-         kMenu("PvImgAdapt", "Add/Uncheck", "Centered image &alignment`tA", "ToggleIMGalign", "viewport image position")
+         kMenu("PvImgAdapt", "Add/Uncheck", "Centred image &alignment`tA", "ToggleIMGalign", "viewport image position")
          If (imageAlignVPtopLeft=0)
-            kMenu("PvImgAdapt", "Check", "Centered image &alignment`tA")
+            kMenu("PvImgAdapt", "Check", "Centred image &alignment`tA")
 
          If (thumbsDisplaying!=1)
          {
@@ -70252,17 +70252,17 @@ createMenuMainPreferences() {
 
    kMenu("PVperfs", "Add/Uncheck", "&Load Camera RAW files at high quality", "ToggleRAWquality")
    kMenu("PVperfs", "Add/Uncheck", "&High quality image resampling", "ToggleImgQuality")
-   kMenu("PVperfs", "Add/Uncheck", "&Perform dithering on color depth changes", "ToggleImgColorDepthDithering")
+   kMenu("PVperfs", "Add/Uncheck", "&Perform dithering on colour depth changes", "ToggleImgColorDepthDithering")
    kMenu("PVperfs", "Add/Uncheck", "&Apply gamma correction", "toggleImgEditGammaCorrect", "image colors")
-   kMenu("PVperfs", "Add/Uncheck", "&Apply color management", "ToggleColorProfileManage", "profiles icc icm performance")
+   kMenu("PVperfs", "Add/Uncheck", "&Apply colour management", "ToggleColorProfileManage", "profiles icc icm performance")
    If (userPerformColorManagement=1)
-      kMenu("PVperfs", "Check", "&Apply color management")
+      kMenu("PVperfs", "Check", "&Apply colour management")
    If (userimgGammaCorrect=1)
       kMenu("PVperfs", "Check", "&Apply gamma correction")
    If (minimizeMemUsage=1)
       kMenu("PVperfs", "Check", "&Limit memory usage")
    If (ColorDepthDithering=1)
-      kMenu("PVperfs", "Check", "&Perform dithering on color depth changes")
+      kMenu("PVperfs", "Check", "&Perform dithering on colour depth changes")
    If (userimgQuality=1)
       kMenu("PVperfs", "Check", "&High quality image resampling")
    If (userHQraw=1)
@@ -70419,7 +70419,7 @@ createMenuMainView() {
          kMenu("PVview", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw")
 
       If (!AnyWindowOpen || isNowAlphaPainting()!=1 && imgEditPanelOpened=1 && AnyWindowOpen!=24 && AnyWindowOpen!=31)
-         kMenu("PVview", "Add", "Viewport and color adjustments panel`tShift+U", "PanelColorsAdjusterVPwindow")
+         kMenu("PVview", "Add", "Viewport and colour adjustments panel`tShift+U", "PanelColorsAdjusterVPwindow")
 
       ; createMenuVPhudHisto()
       ; kMenu("PVview", "Add", "Show histogram", ":PVimgHistos")
@@ -70435,11 +70435,11 @@ createMenuMainView() {
       createMenuColorDepth()
       dontShow := (thumbsDisplaying=1 && minimizeMemUsage=1) ? 1 : 0
       Menu, PVview, Add
-      kMenu("PVview", "Add", "Simulated color &depth", ":PVimgSdepth")
+      kMenu("PVview", "Add", "Simulated colour &depth", ":PVimgSdepth")
       If (dontShow!=1)
       {
          createMenuImgColorsFX()
-         kMenu("PVview", "Add", "Colors F&X and display modes", ":PVimgColorsFX")
+         kMenu("PVview", "Add", "Colours F&X and display modes", ":PVimgColorsFX")
       }
 
       If (currIMGdetails.HasAlpha=1 || thumbsDisplaying=1)
@@ -70449,9 +70449,9 @@ createMenuMainView() {
       }
 
       Menu, PVview, Add
-      kMenu("PVview", "Add/Uncheck", "Centered &alignment`tA", "ToggleIMGalign", "viewport image position")
+      kMenu("PVview", "Add/Uncheck", "Centred &alignment`tA", "ToggleIMGalign", "viewport image position")
       If (imageAlignVPtopLeft=0)
-         kMenu("PVview", "Check", "Centered &alignment`tA")
+         kMenu("PVview", "Check", "Centred &alignment`tA")
 
       kMenu("PVview", "Add/Uncheck", "Mirror &vertically`tV", "VPflipImgV", "viewport flip image")
       If (FlipImgV=1)
@@ -70463,9 +70463,9 @@ createMenuMainView() {
       kMenu("PVview", "Check", "Mirror &horizontally`tH")
 
    Menu, PVview, Add
-   kMenu("PVview", "Add/Uncheck", "&Apply color management", "ToggleColorProfileManage", "profiles icc icm performance")
+   kMenu("PVview", "Add/Uncheck", "&Apply colour management", "ToggleColorProfileManage", "profiles icc icm performance")
    If (userPerformColorManagement=1)
-      kMenu("PVview", "Check", "&Apply color management")
+      kMenu("PVview", "Check", "&Apply colour management")
 
    kMenu("PVview", "Add/Uncheck", "&High quality image resampling", "ToggleImgQuality")
    If (userimgQuality=1)
@@ -70618,8 +70618,8 @@ createMenuImageFileActions(whichMenu) {
       pk := (markedSelectFile>1) ? "s" : ""
       Menu, % whichMenu, Add
       infoKbd := (thumbsDisplaying=1) ? "`tShift+U" : ""
-      kMenu(whichMenu, "Add", "Apply vie&wport color adjustments" infoKbd, "filesListApplyColors", "image")
-      kMenu(whichMenu, "Add", "Apply advanced color adjustments", "PanelAdjustColorsSimpleWindow", "image")
+      kMenu(whichMenu, "Add", "Apply vie&wport colour adjustments" infoKbd, "filesListApplyColors", "image")
+      kMenu(whichMenu, "Add", "Apply advanced colour adjustments", "PanelAdjustColorsSimpleWindow", "image")
       kMenu(whichMenu, "Add", "A&utomatic contrast / levels", "PanelAutoColors", "image")
       infoKbd := (thumbsDisplaying=1) ? "`tShift+H" : ""
       kMenu(whichMenu, "Add", "Flip image" pk " &horizontally" infoKbd, "filesListFlipHimage")
@@ -71025,42 +71025,42 @@ createMenuVPhudHisto() {
 createMenuColorDepth() {
    infoColorDepth := (usrColorDepth>1) ? "Original / reset" : defineColorDepth()
    keyu := (liveDrawingBrushTool=1 && thumbsDisplaying!=1 || AnyWindowOpen=64) ? "" : "`tQ"
-   kMenu("PVimgSdepth", "Add", "C&ycle simulated color depths" keyu, "ToggleImgColorDepth",,,1)
+   kMenu("PVimgSdepth", "Add", "C&ycle simulated colour depths" keyu, "ToggleImgColorDepth",,,1)
    Menu, PVimgSdepth, Add
    kMenu("PVimgSdepth", "Add/Uncheck", infoColorDepth, "MenuResetImageColorDepth")
-   kMenu("PVimgSdepth", "Add/Uncheck", "2 bits (4 colors)", "MenuSetImageDepth2bits",, "Color depth: " sillySeparator)
-   kMenu("PVimgSdepth", "Add/Uncheck", "3 bits (8 colors)", "MenuSetImageDepth3bits",, "Color depth: " sillySeparator)
-   kMenu("PVimgSdepth", "Add/Uncheck", "4 bits (16 colors)", "MenuSetImageDepth4bits",, "Color depth: " sillySeparator)
-   kMenu("PVimgSdepth", "Add/Uncheck", "5 bits (32 colors)", "MenuSetImageDepth5bits",, "Color depth: " sillySeparator)
-   kMenu("PVimgSdepth", "Add/Uncheck", "6 bits (64 colors)", "MenuSetImageDepth6bits",, "Color depth: " sillySeparator)
-   kMenu("PVimgSdepth", "Add/Uncheck", "7 bits (128 colors)", "MenuSetImageDepth7bits",, "Color depth: " sillySeparator)
-   kMenu("PVimgSdepth", "Add/Uncheck", "8 bits (256 colors)", "MenuSetImageDepth8bits",, "Color depth: " sillySeparator)
-   kMenu("PVimgSdepth", "Add/Uncheck", "16 bits (65536 colors)", "MenuSetImageDepth16bits",, "Color depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "2 bits (4 colours)", "MenuSetImageDepth2bits",, "Colour depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "3 bits (8 colours)", "MenuSetImageDepth3bits",, "Colour depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "4 bits (16 colours)", "MenuSetImageDepth4bits",, "Colour depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "5 bits (32 colours)", "MenuSetImageDepth5bits",, "Colour depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "6 bits (64 colours)", "MenuSetImageDepth6bits",, "Colour depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "7 bits (128 colours)", "MenuSetImageDepth7bits",, "Colour depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "8 bits (256 colours)", "MenuSetImageDepth8bits",, "Colour depth: " sillySeparator)
+   kMenu("PVimgSdepth", "Add/Uncheck", "16 bits (65536 colours)", "MenuSetImageDepth16bits",, "Colour depth: " sillySeparator)
    If (usrColorDepth<2)
    {
       kMenu("PVimgSdepth", "Check", infoColorDepth)
       kMenu("PVimgSdepth", "Disable", infoColorDepth)
    } Else If (usrColorDepth=2)
-      kMenu("PVimgSdepth", "Check", "2 bits (4 colors)",,, "Color depth: " sillySeparator)
+      kMenu("PVimgSdepth", "Check", "2 bits (4 colours)",,, "Colour depth: " sillySeparator)
    Else If (usrColorDepth=3)
-      kMenu("PVimgSdepth", "Check", "3 bits (8 colors)",,, "Color depth: " sillySeparator)
+      kMenu("PVimgSdepth", "Check", "3 bits (8 colours)",,, "Colour depth: " sillySeparator)
    Else If (usrColorDepth=4)
-      kMenu("PVimgSdepth", "Check", "4 bits (16 colors)",,, "Color depth: " sillySeparator)
+      kMenu("PVimgSdepth", "Check", "4 bits (16 colours)",,, "Colour depth: " sillySeparator)
    Else If (usrColorDepth=5)
-      kMenu("PVimgSdepth", "Check", "5 bits (32 colors)",,, "Color depth: " sillySeparator)
+      kMenu("PVimgSdepth", "Check", "5 bits (32 colours)",,, "Colour depth: " sillySeparator)
    Else If (usrColorDepth=6)
-      kMenu("PVimgSdepth", "Check", "6 bits (64 colors)",,, "Color depth: " sillySeparator)
+      kMenu("PVimgSdepth", "Check", "6 bits (64 colours)",,, "Colour depth: " sillySeparator)
    Else If (usrColorDepth=7)
-      kMenu("PVimgSdepth", "Check", "7 bits (128 colors)",,, "Color depth: " sillySeparator)
+      kMenu("PVimgSdepth", "Check", "7 bits (128 colours)",,, "Colour depth: " sillySeparator)
    Else If (usrColorDepth=8)
-      kMenu("PVimgSdepth", "Check", "8 bits (256 colors)",,, "Color depth: " sillySeparator)
+      kMenu("PVimgSdepth", "Check", "8 bits (256 colours)",,, "Colour depth: " sillySeparator)
    Else If (usrColorDepth=9)
-      kMenu("PVimgSdepth", "Check", "16 bits (65536 colors)",,, "Color depth: " sillySeparator)
+      kMenu("PVimgSdepth", "Check", "16 bits (65536 colours)",,, "Colour depth: " sillySeparator)
 
    Menu, PVimgSdepth, Add
-   kMenu("PVimgSdepth", "Add/Uncheck", "&Perform dithering", "ToggleImgColorDepthDithering", "settings performance quality", " on color depth changes")
+   kMenu("PVimgSdepth", "Add/Uncheck", "&Perform dithering", "ToggleImgColorDepthDithering", "settings performance quality", " on colour depth changes")
    If (ColorDepthDithering=1)
-      kMenu("PVimgSdepth", "Check", "&Perform dithering",,, " on color depth changes")
+      kMenu("PVimgSdepth", "Check", "&Perform dithering",,, " on colour depth changes")
 }
 
 createMenuImgColorsFX() {
@@ -71077,41 +71077,41 @@ createMenuImgColorsFX() {
    }
 
    Menu, PVimgColorsFX, Add
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Original colors", "MenuSetColorModeOriginal",, "Viewport colors: " sillySeparator)
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Personalized colors", "MenuSetColorModePersonalized",, "Viewport colors: " sillySeparator)
-   kMenu("PVimgColorsFX", "Add/Uncheck", "Grays&cale", "MenuSetColorModeGrayscale",, "Viewport colors: " sillySeparator)
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Red channel", "MenuSetColorModeRedC",, "Viewport colors: " sillySeparator)
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Green channel", "MenuSetColorModeGreenC",, "Viewport colors: " sillySeparator)
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Blue channel", "MenuSetColorModeBlueC",, "Viewport colors: " sillySeparator)
-   kMenu("PVimgColorsFX", "Add/Uncheck", "Alp&ha channel", "MenuSetColorModeAlphaC",, "Viewport colors: " sillySeparator)
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Inverted colors", "MenuSetColorModeInverted",, "Viewport colors: " sillySeparator)
-   kMenu("PVimgColorsFX", "Add/Uncheck", "&Sepia", "MenuSetColorModeSepia",, "Viewport colors: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Original colours", "MenuSetColorModeOriginal",, "Viewport colours: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Personalized colours", "MenuSetColorModePersonalized",, "Viewport colours: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "Greys&cale", "MenuSetColorModeGrayscale",, "Viewport colours: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Red channel", "MenuSetColorModeRedC",, "Viewport colours: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Green channel", "MenuSetColorModeGreenC",, "Viewport colours: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Blue channel", "MenuSetColorModeBlueC",, "Viewport colours: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "Alp&ha channel", "MenuSetColorModeAlphaC",, "Viewport colours: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Inverted colours", "MenuSetColorModeInverted",, "Viewport colours: " sillySeparator)
+   kMenu("PVimgColorsFX", "Add/Uncheck", "&Sepia", "MenuSetColorModeSepia",, "Viewport colours: " sillySeparator)
    If (thumbsDisplaying=1)
-      kMenu("PVimgColorsFX", "Disable", "Alp&ha channel",,,"Viewport colors: " sillySeparator)
+      kMenu("PVimgColorsFX", "Disable", "Alp&ha channel",,,"Viewport colours: " sillySeparator)
 
    If (imgFxMode=1)
-      kMenu("PVimgColorsFX", "Check", "&Original colors",,,"Viewport colors: " sillySeparator)
+      kMenu("PVimgColorsFX", "Check", "&Original colours",,,"Viewport colours: " sillySeparator)
    Else If (imgFxMode=2)
-      kMenu("PVimgColorsFX", "Check", "&Personalized colors",,,"Viewport colors: " sillySeparator)
+      kMenu("PVimgColorsFX", "Check", "&Personalized colours",,,"Viewport colours: " sillySeparator)
    Else If (imgFxMode=4)
-      kMenu("PVimgColorsFX", "Check", "Grays&cale",,,"Viewport colors: " sillySeparator)
+      kMenu("PVimgColorsFX", "Check", "Greys&cale",,,"Viewport colours: " sillySeparator)
    Else If (imgFxMode=5)
-      kMenu("PVimgColorsFX", "Check", "&Red channel",,,"Viewport colors: " sillySeparator)
+      kMenu("PVimgColorsFX", "Check", "&Red channel",,,"Viewport colours: " sillySeparator)
    If (imgFxMode=6)
-      kMenu("PVimgColorsFX", "Check", "&Green channel",,,"Viewport colors: " sillySeparator)
+      kMenu("PVimgColorsFX", "Check", "&Green channel",,,"Viewport colours: " sillySeparator)
    Else If (imgFxMode=7)
-      kMenu("PVimgColorsFX", "Check", "&Blue channel",,,"Viewport colors: " sillySeparator)
+      kMenu("PVimgColorsFX", "Check", "&Blue channel",,,"Viewport colours: " sillySeparator)
    Else If (imgFxMode=8)
-      kMenu("PVimgColorsFX", "Check", "Alp&ha channel",,,"Viewport colors: " sillySeparator)
+      kMenu("PVimgColorsFX", "Check", "Alp&ha channel",,,"Viewport colours: " sillySeparator)
    Else If (imgFxMode=9)
-      kMenu("PVimgColorsFX", "Check", "&Inverted colors",,,"Viewport colors: " sillySeparator)
+      kMenu("PVimgColorsFX", "Check", "&Inverted colours",,,"Viewport colours: " sillySeparator)
    Else If (imgFxMode=10)
-      kMenu("PVimgColorsFX", "Check", "&Sepia",,,"Viewport colors: " sillySeparator)
+      kMenu("PVimgColorsFX", "Check", "&Sepia",,,"Viewport colours: " sillySeparator)
 
    If (thumbsDisplaying!=1 && imgFxMode>1)
    {
       Menu, PVimgColorsFX, Add
-      kMenu("PVimgColorsFX", "Add", "Toggle colors for 2 seconds`tShift+\", "MenuToggleColorAdjustments",, " (viewport)")
+      kMenu("PVimgColorsFX", "Add", "Toggle colours for 2 seconds`tShift+\", "MenuToggleColorAdjustments",, " (viewport)")
    }
 }
 
@@ -71168,7 +71168,7 @@ createMenuLiveTools(dummy:=0) {
    Menu, PVlTools, Add
    kMenu("PVlTools", "Add", "&Paint brushes`tP", "PanelBrushTool", "pinch bulge effects draw deformer smudge cloner effects eraser")
    kMenu("PVlTools", "Add", "&Erase or fade area`tDelete", "PanelEraseSelectedArea")
-   kMenu("PVlTools", "Add", "F&lood fill / color bucket`tK", "PanelFloodFillTool", "colorize similarity")
+   kMenu("PVlTools", "Add", "F&lood fill / colour bucket`tK", "PanelFloodFillTool", "colorize similarity")
    kMenu("PVlTools", "Add", "&Fill shapes`tAlt+Backspace", "tlbrFillShape", "curve polygonal glass effects blur pie ellipse triangle rhombus gradients rectangle")
    kMenu("PVlTools", "Add", "Fill be&hind image", "PanelFillBehindBgrImage", "background")
    kMenu("PVlTools", "Add", "Draw s&hape contours`tCtrl+L", "tlbrDrawShapesContour", "lines curve polygonal pie ellipse triangle rhombus rectangle arcs")
@@ -71176,11 +71176,11 @@ createMenuLiveTools(dummy:=0) {
    kMenu("PVlTools", "Add", "Define alpha mas&k", "PanelSoloAlphaMasker")
    kMenu("PVlTools", "Add", "&Insert te&xt`tShift+T", "PanelInsertTextArea")
    kMenu("PVlTools", "Add", "S&ymmetry patterns", "PanelSymmetricaImage")
-   kMenu("PVlTools", "Add", "&Adjust image colors`tU", "PanelAdjustColorsSimpleWindow")
-   kMenu("PVlTools", "Add", "Adjust vie&wport colors and effects`tShift+U", "PanelColorsAdjusterVPwindow")
-   kMenu("PVlTools", "Add", "Desaturate color&s`tCtrl+G", "PanelDesatureSelectedArea")
+   kMenu("PVlTools", "Add", "&Adjust image colours`tU", "PanelAdjustColorsSimpleWindow")
+   kMenu("PVlTools", "Add", "Adjust vie&wport colours and effects`tShift+U", "PanelColorsAdjusterVPwindow")
+   kMenu("PVlTools", "Add", "Desaturate colour&s`tCtrl+G", "PanelDesatureSelectedArea")
    If (AnyWindowOpen=10)
-      kMenu("PVlTools", "Check/Disable", "Adjust vie&wport colors and effects`tShift+U")
+      kMenu("PVlTools", "Check/Disable", "Adjust vie&wport colours and effects`tShift+U")
    Else If (AnyWindowOpen=23)
       kMenu("PVlTools", "Check/Disable", "&Fill shapes`tAlt+Backspace")
    Else If (AnyWindowOpen=25)
@@ -71190,19 +71190,19 @@ createMenuLiveTools(dummy:=0) {
    Else If (AnyWindowOpen=32)
       kMenu("PVlTools", "Check/Disable", "&Insert te&xt`tShift+T")
    Else If (AnyWindowOpen=55)
-      kMenu("PVlTools", "Check/Disable", "Desaturate color&s`tCtrl+G")
+      kMenu("PVlTools", "Check/Disable", "Desaturate colour&s`tCtrl+G")
    Else If (AnyWindowOpen=64)
       kMenu("PVlTools", "Check/Disable", "&Paint brushes`tP")
    Else If (AnyWindowOpen=65)
       kMenu("PVlTools", "Check/Disable", "Draw s&hape contours`tCtrl+L")
    Else If (AnyWindowOpen=66)
-      kMenu("PVlTools", "Check/Disable", "F&lood fill / color bucket`tK")
+      kMenu("PVlTools", "Check/Disable", "F&lood fill / colour bucket`tK")
    Else If (AnyWindowOpen=68)
       kMenu("PVlTools", "Check/Disable", "Fill be&hind image")
    Else If (AnyWindowOpen=70)
       kMenu("PVlTools", "Check/Disable", "Define alpha mas&k")
    Else If (AnyWindowOpen=74)
-      kMenu("PVlTools", "Check/Disable", "&Adjust image colors`tU")
+      kMenu("PVlTools", "Check/Disable", "&Adjust image colours`tU")
    Else If (AnyWindowOpen=81)
       kMenu("PVlTools", "Check/Disable", "Create image s&ymmetry or patterns")
 
@@ -71215,7 +71215,7 @@ createMenuLiveTools(dummy:=0) {
       kMenu("PVlTools", "Add", "Flip selected &horizontally" keyu, "FlipSelectedAreaH")
       keyu := (AnyWindowOpen) ? "" : "`tShift+V"
       kMenu("PVlTools", "Add", "Flip selected &vertically" keyu, "FlipSelectedAreaV")
-      kMenu("PVlTools", "Add", "&Invert colors`tShift+I", "InvertSelectedArea")
+      kMenu("PVlTools", "Add", "&Invert colours`tShift+I", "InvertSelectedArea")
    }
 }
 
@@ -71223,8 +71223,8 @@ toggleAlphaGradientCenterReposition() {
    userAllowClrGradientRecenter := 0
    userAllowsGradientRecentering := !userAllowsGradientRecentering
    friendly := (userAllowsGradientRecentering=1) ? "ACTIVATED" : "DEACTIVATED"
-   friendly2 := (userAllowsGradientRecentering=1) ? "`nClick and drag inside the selection area to adjust the center" : ""
-   showTOOLtip("Alpha mask gradient center repositioning: " friendly friendly2, A_ThisFunc, 1)
+   friendly2 := (userAllowsGradientRecentering=1) ? "`nClick and drag inside the selection area to adjust the centre" : ""
+   showTOOLtip("Alpha mask gradient centre repositioning: " friendly friendly2, A_ThisFunc, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -71236,8 +71236,8 @@ toggleSpiralRaysCenterReposition() {
    If (DrawLineAreaBorderCenter=5)
       f := "Grid"
 
-   friendly2 := (userAllowsGradientRecentering=1) ? "`nClick and drag inside the selection area to adjust the center" : ""
-   showTOOLtip(f " center repositioning: " friendly friendly2, A_ThisFunc, 1)
+   friendly2 := (userAllowsGradientRecentering=1) ? "`nClick and drag inside the selection area to adjust the centre" : ""
+   showTOOLtip(f " centre repositioning: " friendly friendly2, A_ThisFunc, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -71245,8 +71245,8 @@ toggleClrGradientCenterRepose() {
    userAllowsGradientRecentering := 0
    userAllowClrGradientRecenter := !userAllowClrGradientRecenter
    friendly := (userAllowClrGradientRecenter=1) ? "ACTIVATED" : "DEACTIVATED"
-   friendly2 := (userAllowClrGradientRecenter=1) ? "`nClick and drag inside the selection area to adjust the center" : ""
-   showTOOLtip("Color gradient center repositioning: " friendly friendly2, A_ThisFunc, 1)
+   friendly2 := (userAllowClrGradientRecenter=1) ? "`nClick and drag inside the selection area to adjust the centre" : ""
+   showTOOLtip("Colour gradient centre repositioning: " friendly friendly2, A_ThisFunc, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -71359,11 +71359,11 @@ addMenuBonusesBrushTools() {
       kMenu("PVmenu", "Add", "Toggle simple/soft brush types`tB", "toggleBrushTypes")
       kMenu("PVmenu", "Add", "Toggle brush double size`tShift+S", "toggleBrushDoubleSize")
       kMenu("PVmenu", "Add", "Toggle airbrush mode`tT", "toggleBrushAirMode")
-      kMenu("PVmenu", "Add", "Reset colors to black and white`tD", "ResetColorsToBW")
+      kMenu("PVmenu", "Add", "Reset colours to black and white`tD", "ResetColorsToBW")
       kMenu("PVmenu", "Add", "Reset brush aspect ratio and rotation", "MenuResetBrushAsRatio")
       If (AnyWindowOpen=64)
       {
-         kMenu("PVmenu", "Add", "Color Effects brush`tQ", "toggleBrushTypeFX")
+         kMenu("PVmenu", "Add", "Colour Effects brush`tQ", "toggleBrushTypeFX")
          kMenu("PVmenu", "Add", "Eraser brush`tR", "toggleBrushTypeEraser")
          kMenu("PVmenu", "Add", "Cloner brush`tJ", "toggleBrushTypeCloner")
          kMenu("PVmenu", "Add", "Deformer brushes`tP", "toggleBrushDeformers")
@@ -71399,13 +71399,13 @@ BuildImgLiveEditMenu(givenCoords:=0) {
       Menu, PVmenu, Add
       If (editingSelectionNow=1)
       {
-         kMenu("PVmenu", "Add", "Appl&y color effects inside selection`tCtrl+Shift+U", "ApplyVPcolorAdjustSelectedArea")
+         kMenu("PVmenu", "Add", "Appl&y colour effects inside selection`tCtrl+Shift+U", "ApplyVPcolorAdjustSelectedArea")
          kMenu("PVmenu", "Add", "&... outside the selection", "ApplyVPcolorAdjustSelectedArea")
       }
 
-      kMenu("PVmenu", "Add/Uncheck", "&Activate viewport color adjustments`t\", "BtnToggleNoColorsFX")
+      kMenu("PVmenu", "Add/Uncheck", "&Activate viewport colour adjustments`t\", "BtnToggleNoColorsFX")
       If (ForceNoColorMatrix!=1)
-         kMenu("PVmenu", "Check", "&Activate viewport color adjustments`t\")
+         kMenu("PVmenu", "Check", "&Activate viewport colour adjustments`t\")
       kMenu("PVmenu", "Add", "&Reset all adjustments to defaults`tCtrl+\", "BtnResetImageView")
    }
 
@@ -71437,7 +71437,7 @@ BuildImgLiveEditMenu(givenCoords:=0) {
 
    Menu, PVmenu, Add
    If (mustPreventMenus=1)
-      kMenu("PVmenu", "Add", "Swap tool colors: A / B`tX", "ToggleBrushColors")
+      kMenu("PVmenu", "Add", "Swap tool colours: A / B`tX", "ToggleBrushColors")
 
    If (editingSelectionNow=1)
    {
@@ -71449,10 +71449,10 @@ BuildImgLiveEditMenu(givenCoords:=0) {
          If (DrawLineAreaBorderCenter=5)
             f := "grid"
 
-         kMenu("PVmenu", "Add/Uncheck", "&Allow " f " center repositioning", "toggleSpiralRaysCenterReposition")
-         kMenu("PVmenu", "Add", "&Reset " f " center", "BtnResetSpiralRayCenter")
+         kMenu("PVmenu", "Add/Uncheck", "&Allow " f " centre repositioning", "toggleSpiralRaysCenterReposition")
+         kMenu("PVmenu", "Add", "&Reset " f " centre", "BtnResetSpiralRayCenter")
          If (userAllowsGradientRecentering=1)
-            kMenu("PVmenu", "Check", "&Allow " f " center repositioning")
+            kMenu("PVmenu", "Check", "&Allow " f " centre repositioning")
       }
 
       If (isAlphaMaskWindow()=1)
@@ -71513,9 +71513,9 @@ BuildImgLiveEditMenu(givenCoords:=0) {
    } Else If isVarEqualTo(AnyWindowOpen, 31, 24)
    {
       kMenu("PVmenu", "Add", "Cycle adapt to selection modes`tS", "togglePasteInPlaceAdaptModes")
-      kMenu("PVmenu", "Add/Uncheck", "Color adjustments on object`tU", "togglePasteInPlaceColorsFX")
+      kMenu("PVmenu", "Add/Uncheck", "Colour adjustments on object`tU", "togglePasteInPlaceColorsFX")
       If (PasteInPlaceApplyColorFX=1)
-         kMenu("PVmenu", "Check", "Color adjustments on object`tU")
+         kMenu("PVmenu", "Check", "Colour adjustments on object`tU")
 
       If (PasteInPlaceToolMode=1)
       {
@@ -71865,7 +71865,7 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
       Try kMenu("PVedit", "Add", "&Filters", ":PVimgFilters")
       Try kMenu("PVedit", "Add", "&Draw", ":PVimgDraw")
       Try kMenu("PVedit", "Add", "&Transform", ":PVimgTransform")
-      Try kMenu("PVedit", "Add", "&Convert color depth", ":PVimgClrDepths")
+      Try kMenu("PVedit", "Add", "&Convert colour depth", ":PVimgClrDepths")
    }
 
    createMenuFavourites()
@@ -74656,7 +74656,7 @@ ToggleColorProfileManage() {
     }
 
     friendly := (userPerformColorManagement=1) ? "ACTIVATED`nThe viewport performance may decrease." : "DEACTIVATED"
-    showTOOLtip("Color management on image load: " friendly, A_ThisFunc, 1)
+    showTOOLtip("Colour management on image load: " friendly, A_ThisFunc, 1)
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -74842,7 +74842,7 @@ ToggleImgColorDepthDithering() {
        RefreshImageFile()
 
     friendly := (ColorDepthDithering=1) ? "ACTIVATED" : "DEACTIVATED"
-    showTOOLtip("Color depth dithering: " friendly, A_ThisFunc, 1)
+    showTOOLtip("Colour depth dithering: " friendly, A_ThisFunc, 1)
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -76944,7 +76944,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
     }
 
     If (usrColorDepth>1)
-       infoColorDepth := "`nSimulated color depth: " defineColorDepth()
+       infoColorDepth := "`nSimulated colour depth: " defineColorDepth()
 
     If (StrLen(filesFilter)>1)
     {
@@ -78775,7 +78775,7 @@ createVPnavBox(ByRef pBitmap, ByRef imgW, ByRef imgH, ByRef posX, ByRef posY, By
       entireString := "Image navigator box: " ((HUDnavBoxSize<76) ? "small size." : "large size.")
 
    If (usrColorDepth>1 || imgFxMode>1) 
-      entireString .= "`nViewport color effects are applied."
+      entireString .= "`nViewport colour effects are applied."
 
    If (thumbsDisplaying=1)
    {
@@ -79356,7 +79356,7 @@ toggleBrushSymmetryModes() {
    SetTimer, RemoveTooltip, % -msgDisplayTime
    SetTimer, dummyRefreshImgSelectionWindow, -200
    If (friendly3!="NONE" && isPaintSymmetryModeAllowed())
-      quickBarLater("Set symmetry center,,BtnSetBrushSymmetryCoords")
+      quickBarLater("Set symmetry centre,,BtnSetBrushSymmetryCoords")
 }
 
 discardUserPaintedAlpha() {
@@ -79625,7 +79625,7 @@ toggleBrushTypes(modus:=0) {
 
    endCaptureCloneBrush()
    liveDrawingBrushTool := 1
-   friendly := (BrushToolType=1) ? "Simple color brush" : "Soft edges color brush"
+   friendly := (BrushToolType=1) ? "Simple colour brush" : "Soft edges colour brush"
    thisOpacity := (BrushToolUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
    moreInfos := "`nOpacity: " Round(thisOpacity/255*100) "%"
    If (BrushToolSoftness<5)
@@ -79715,7 +79715,7 @@ toggleBrushTypeFX(modus:=0) {
       updateUIbrushTool()
    }
 
-   msgBeepTimer("Color effects brush:" moreinfos, 0)
+   msgBeepTimer("Colour effects brush:" moreinfos, 0)
    If (modus="tlbr")
       tlbrBrushSlidersInvoker(8)
 }
@@ -79740,7 +79740,7 @@ togglePresetsBrushes(modus, dir:=1) {
    {
       BrushToolApplyColorFX := 1
       BrushToolBlurStrength := 0
-      friendly := "Effects brush: color adjustments"
+      friendly := "Effects brush: colour adjustments"
    } Else If (modus=3)
    {
       BrushToolType := 2
@@ -79926,7 +79926,7 @@ preventColorChange() {
           msgBeepTimer("WARNING: You are currently using the cloner brush tool.`nTo define the source pattern, press S.")
           CreateTempGuiButton("Define cloner source,,BtnSetClonerBrushSource", 0)
        } Else
-          msgBeepTimer("WARNING: You are currently using a brush that does not rely on a given color")
+          msgBeepTimer("WARNING: You are currently using a brush that does not rely on a given colour")
 
        Return 1
     }
@@ -80215,7 +80215,7 @@ createClonedBrushBitmap(brushSize, brushSofty, brushAngle, thisAR, whichBitmap, 
       SoundBeep , 900, 100
       If (BrushToolApplyColorFX=1 || BrushToolBlurStrength>1) && (noPrompting=0)
       {
-         msgResult := msgBoxWrapper(appTitle ": Cloner effects", "The cloner tool has color effects activated. Do you want to deactivate the brush cloner effects?", 4, 0, "question", "&Do not prompt me again in this session")
+         msgResult := msgBoxWrapper(appTitle ": Cloner effects", "The cloner tool has colour effects activated. Do you want to deactivate the brush cloner effects?", 4, 0, "question", "&Do not prompt me again in this session")
          noPrompting := msgResult.check
          If (msgResult.btn="Yes")
          {
@@ -85259,7 +85259,7 @@ MenuResetSelAreaCavityRotation() {
 }
 
 alignImgSelection(keyu, outside:=0) {
-    static K := 0, listu := {0:"Center V.", 1:"Bottom-left", 2:"Bottom", 3:"Bottom-right", 4:"Left", 5:"Center H.", 6:"Right", 7:"Top-left", 8:"Top", 9:"Top-right"}
+    static K := 0, listu := {0:"Centre V.", 1:"Bottom-left", 2:"Bottom", 3:"Bottom-right", 4:"Left", 5:"Centre H.", 6:"Right", 7:"Top-left", 8:"Top", 9:"Top-right"}
     If (thumbsDisplaying=1 || editingSelectionNow!=1 || liveDrawingBrushTool=1)
        Return
 
@@ -88295,9 +88295,9 @@ RegenerateEntireList() {
           Sleep, 250
        } Else
        {
-          showTOOLtip("Finalising database operations, please wait", 0, 0, 1/5)
+          showTOOLtip("Finalizing database operations, please wait", 0, 0, 1/5)
           SQLdeleteEntriesMarked(2)   ; every folder of the list was marked
-          showTOOLtip("Finalising database operations, please wait", 0, 0, 2/5)
+          showTOOLtip("Finalizing database operations, please wait", 0, 0, 2/5)
           If !activeSQLdb.Exec("COMMIT TRANSACTION;")
              throwSQLqueryDBerror(A_ThisFunc)
 
@@ -90640,11 +90640,11 @@ calcImgSelection2bmp(boundLess, imgW, imgH, newW, newH, ByRef imgSelPx, ByRef im
 
 BtnHelpResizePanel() {
     friendly := (thumbsDisplaying=1) ? "" : "This tool applies the image actions utilizing the original file, not the viewport image data.`n`n"
-    msgBoxWrapper(appTitle ": HELP", friendly "In «Advanced mode» the support for color depths other than 24 and 32 bits is very limited. All images are converted to 24 bits per pixel, or to 32 bits, if an alpha channel is present. When saving images in formats that do not support an alpha channel, the window background color is used.`n`nUse «Simple mode» to better preserve color depths or work with images larger than 536 MPx or larger than 199000 px in width or height [if the given file format allows it]. This mode supports 1-, 8-, 24-, 32-, 16- (UINT16), 48- (RGB16), 64- (RGBA16), 32- (FLOAT), 96- (RGBF) and 128- (RGBAF) bit images. High-dynamic range formats supported: .EXR, .HDR, .JXR, .HDP, .PFM and .TIFF.`n`nPlease also note, while there is full support for multi-frame/paged images [for WEBP, PDFs, GIFs and TIFFs] in the viewport... on file (re)save, resize or format conversions, only the first frame will be preserved.`n`nSome file formats have image dimensions limited by design. The WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. When this panel is used to resize images, the resulting image dimensions may be capped to the format-specific limits. For any format, including TIFF, PNG and JPEG, the limit is 13579 megapixels, even when the «Simple mode» is used.", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", friendly "In «Advanced mode» the support for colour depths other than 24 and 32 bits is very limited. All images are converted to 24 bits per pixel, or to 32 bits, if an alpha channel is present. When saving images in formats that do not support an alpha channel, the window background colour is used.`n`nUse «Simple mode» to better preserve colour depths or work with images larger than 536 MPx or larger than 199000 px in width or height [if the given file format allows it]. This mode supports 1-, 8-, 24-, 32-, 16- (UINT16), 48- (RGB16), 64- (RGBA16), 32- (FLOAT), 96- (RGBF) and 128- (RGBAF) bit images. High-dynamic range formats supported: .EXR, .HDR, .JXR, .HDP, .PFM and .TIFF.`n`nPlease also note, while there is full support for multi-frame/paged images [for WEBP, PDFs, GIFs and TIFFs] in the viewport... on file (re)save, resize or format conversions, only the first frame will be preserved.`n`nSome file formats have image dimensions limited by design. The WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. When this panel is used to resize images, the resulting image dimensions may be capped to the format-specific limits. For any format, including TIFF, PNG and JPEG, the limit is 13579 megapixels, even when the «Simple mode» is used.", -1, 0, 0)
 }
 
 BtnHelpSimpleResizePanel() {
-    msgBoxWrapper(appTitle ": HELP", "This tool applies the image actions utilizing the original file, not the viewport image data. It can better preserve color depths and it works with images larger than 536 MPx, if the file format allows it. The tool relies on the FreeImage library and it supports 1-, 8-, 24-, 32-, 16- (UINT16), 48- (RGB16), 64- (RGBA16), 32- (FLOAT), 96- (RGBF) and 128- (RGBAF) bit images. High-dynamic range formats supported: .EXR, .HDR, .JXR, .HDP, .PFM and .TIFF.`n`nPlease also note, while there is full support for multi-frame/paged images [for WEBP, PDFs, GIFs and TIFFs] in the viewport... on file (re)save, resize or format conversions, only the first frame will be preserved.`n`nSome file formats have image dimensions limited by design. The WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. When this panel is used to resize images, the resulting image dimensions may be capped to the format-specific limits. For any format, including TIFF, PNG and JPEG, the limit is 13579 megapixels.", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "This tool applies the image actions utilizing the original file, not the viewport image data. It can better preserve colour depths and it works with images larger than 536 MPx, if the file format allows it. The tool relies on the FreeImage library and it supports 1-, 8-, 24-, 32-, 16- (UINT16), 48- (RGB16), 64- (RGBA16), 32- (FLOAT), 96- (RGBF) and 128- (RGBAF) bit images. High-dynamic range formats supported: .EXR, .HDR, .JXR, .HDP, .PFM and .TIFF.`n`nPlease also note, while there is full support for multi-frame/paged images [for WEBP, PDFs, GIFs and TIFFs] in the viewport... on file (re)save, resize or format conversions, only the first frame will be preserved.`n`nSome file formats have image dimensions limited by design. The WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. When this panel is used to resize images, the resulting image dimensions may be capped to the format-specific limits. For any format, including TIFF, PNG and JPEG, the limit is 13579 megapixels.", -1, 0, 0)
 }
 
 OpenGitHub() {
@@ -90755,7 +90755,7 @@ drawViewportHelpMap() {
 }
 
 ShowContextualHelp() {
-   Static blushTypes := {1:"Simple solid color", 2:"Soft edges brush", 3:"Cloner", 4:"Eraser", 5:"Effects", 6:"Smudge", 7:"Pinch", 8:"Bulge"}
+   Static blushTypes := {1:"Simple solid colour", 2:"Soft edges brush", 3:"Cloner", 4:"Eraser", 5:"Effects", 6:"Smudge", 7:"Pinch", 8:"Bulge"}
 
    infoThumbsList := defineListViewModes()
    If (thumbsDisplaying=1)
@@ -91296,7 +91296,7 @@ PanelFindDupes(dummy:=0) {
     Gui, Add, UpDown, vuserFindDupesHamDistLvl gupdateUIdupesPanel Range0-15, % userFindDupesHamDistLvl
     GuiAddButton("x+5 w" sml " hp gBtnHelpDupesHashes", " ?", "Help")
     Gui, Add, Checkbox, xs y+15 Checked%findFlippedDupes% vfindFlippedDupes, Identify horizontally flipped images
-    Gui, Add, Checkbox, xp y+15 Checked%findInvertedDupes% vfindInvertedDupes, Attempt to identify color inverted images
+    Gui, Add, Checkbox, xp y+15 Checked%findInvertedDupes% vfindInvertedDupes, Attempt to identify colour inverted images
     Gui, Add, Checkbox, xs y+15 Checked%BreakDupesGroups%  vBreakDupesGroups, Break the groups based on Hamming distance [similarity]
     Gui, Add, Checkbox, xp y+15 Checked%PerformMSDonDupes% gupdateUIdupesPanel vPerformMSDonDupes, Filter results using Mean-Squared Difference [32x32]
     GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit3 veditFr", userFindDupesMSElvl, "MSD hash threshold")
@@ -91311,8 +91311,8 @@ PanelFindDupes(dummy:=0) {
 
     Gui, Add, Text, xs y+15, For these to take effect, refresh only the image hashes:
     Gui, Add, Checkbox, xs+15 y+15 Checked%userpHashMode% vuserpHashMode, pHashes based on averages instead of medians
-    Gui, Add, Text, xp y+20 hp +0x200, Compress gray levels by a factor of
-    GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit1 veditFc", graylevelCompressor, "Gray levels compression factor")
+    Gui, Add, Text, xp y+20 hp +0x200, Compress grey levels by a factor of
+    GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit1 veditFc", graylevelCompressor, "Grey levels compression factor")
     Gui, Add, UpDown, vgraylevelCompressor gupdateUIdupesPanel Range1-9, % graylevelCompressor
     Gui, Add, Button, xs y+15 h%thisBtnHeight% gBtnPurgeCachedSQLdata, Pur&ge cached data
     Gui, Add, Button, x+5 hp gBtnCollectDupesData, Collect image pi&xel data
@@ -91709,15 +91709,15 @@ dupesPrecisionFromUI(indexu) {
 }
 
 BtnHelpDupesPrecision() {
-   msgBoxWrapper(appTitle ": HELP", "The «Matching precision» option sets how closely the floating point numeric image properties must agree for two images to be grouped: aspect ratio, megapixels and the histogram values.`n`n«Exact» compares them as stored; «Close» rounds them to two decimals first, so small differences are ignored - an aspect ratio of 1.778 matches 1.783, a histogram value matches within two or three gray levels; «Loose» rounds to one decimal and is far more forgiving - only broad families of aspect ratios such as 4:3, 3:2 and 16:9 stay apart, and the histogram values match within about 25 levels.`n`nThis setting does not apply to file names, dates, sizes, width, height, frames and pixel format.`n`nWith an image hash selected, the aspect ratio is also what limits which images are compared with each other, so «Exact» will miss resized copies whose dimensions were rounded. «Close» or «Loose» is advised there.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "The «Matching precision» option sets how closely the floating point numeric image properties must agree for two images to be grouped: aspect ratio, megapixels and the histogram values.`n`n«Exact» compares them as stored; «Close» rounds them to two decimals first, so small differences are ignored - an aspect ratio of 1.778 matches 1.783, a histogram value matches within two or three grey levels; «Loose» rounds to one decimal and is far more forgiving - only broad families of aspect ratios such as 4:3, 3:2 and 16:9 stay apart, and the histogram values match within about 25 levels.`n`nThis setting does not apply to file names, dates, sizes, width, height, frames and pixel format.`n`nWith an image hash selected, the aspect ratio is also what limits which images are compared with each other, so «Exact» will miss resized copies whose dimensions were rounded. «Close» or «Loose» is advised there.", -1, 0, 0)
 }
 
 BtnHelpDupesHashes() {
-   msgBoxWrapper(appTitle ": HELP", "Each image is reduced to a grayscale fingerprint of 9x8 and 32x32 pixels, optionally blurred, and a hash packs 64 yes/no answers about it into a 64-bit value:`n`n- dHash 8x8: from the 9x8 fingerprint; each bit tells whether a pixel is darker than its right-hand neighbour, i.e. the sign of the horizontal gradient. Robust to brightness and contrast changes.`n`n- pHash DCT 32x32: a two-dimensional discrete cosine transform of the 32x32 fingerprint; only the 8x8 lowest frequencies are kept and each bit tells whether that coefficient is above the median (or the average, see the «Collect data» tab) of the 64. It captures the coarse structure of the image and is the most robust to rescaling, compression and mild edits.`n`n- lHash 8x8: from the left 8x8 block of the 9x8 fingerprint; each bit tells whether a pixel is brighter than the mean of its row average and its column average. The cheapest and the loosest of the three.`n`nTwo hashes are compared by their Hamming distance: the number of bits that differ, out of 64 (an XOR followed by a bit count). Zero means identical hashes; the threshold is the largest distance still accepted as a match, so higher values yield more matches and more false positives. The left and right crops discard that many bits at either end of the hash before counting; the blue dots in the preview show what remains: image areas for dHash and lHash, DCT frequencies for pHash, from the lowest at the top-left.`n`nFlipped images are matched through a second hash computed on the mirrored fingerprint, inverted images by comparing against the bitwise complement of the hash.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "Each image is reduced to a greyscale fingerprint of 9x8 and 32x32 pixels, optionally blurred, and a hash packs 64 yes/no answers about it into a 64-bit value:`n`n- dHash 8x8: from the 9x8 fingerprint; each bit tells whether a pixel is darker than its right-hand neighbour, i.e. the sign of the horizontal gradient. Robust to brightness and contrast changes.`n`n- pHash DCT 32x32: a two-dimensional discrete cosine transform of the 32x32 fingerprint; only the 8x8 lowest frequencies are kept and each bit tells whether that coefficient is above the median (or the average, see the «Collect data» tab) of the 64. It captures the coarse structure of the image and is the most robust to rescaling, compression and mild edits.`n`n- lHash 8x8: from the left 8x8 block of the 9x8 fingerprint; each bit tells whether a pixel is brighter than the mean of its row average and its column average. The cheapest and the loosest of the three.`n`nTwo hashes are compared by their Hamming distance: the number of bits that differ, out of 64 (an XOR followed by a bit count). Zero means identical hashes; the threshold is the largest distance still accepted as a match, so higher values yield more matches and more false positives. The left and right crops discard that many bits at either end of the hash before counting; the blue dots in the preview show what remains: image areas for dHash and lHash, DCT frequencies for pHash, from the lowest at the top-left.`n`nFlipped images are matched through a second hash computed on the mirrored fingerprint, inverted images by comparing against the bitwise complement of the hash.", -1, 0, 0)
 }
 
 BTNhelpFindDupes() {
-   msgBoxWrapper(appTitle ": HELP", "This panel lets you identify duplicate images based on the collected file and image properties, fingerprints and histogram data points.`n`nThe functionality provided in this panel relies on collected data; please ensure you allow " appTitle " to scan the image files.`n`nFor optimal results in «Custom mode», activate «Aspect ratio (W/H)», set «Matching precision» to «Close», and choose «dHash 8x8» with a threshold of 3 in the «Image hashes» tab.`n`nA low threshold for the hashes means stricter matching. Increase it for looser matches. The same applies to MSD.`n`nBefore hashing, images are normalized to 9x8 and 32x32 sizes, grayscale. Optionally, a 4x4 blurring filter can be applied as well, but it may lead to an increase in false positives.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "This panel lets you identify duplicate images based on the collected file and image properties, fingerprints and histogram data points.`n`nThe functionality provided in this panel relies on collected data; please ensure you allow " appTitle " to scan the image files.`n`nFor optimal results in «Custom mode», activate «Aspect ratio (W/H)», set «Matching precision» to «Close», and choose «dHash 8x8» with a threshold of 3 in the «Image hashes» tab.`n`nA low threshold for the hashes means stricter matching. Increase it for looser matches. The same applies to MSD.`n`nBefore hashing, images are normalized to 9x8 and 32x32 sizes, greyscale. Optionally, a 4x4 blurring filter can be applied as well, but it may lead to an increase in false positives.", -1, 0, 0)
 }
 
 GuiCtrlGet(varu) {
@@ -92486,9 +92486,9 @@ coreColorsAdjusterWindow(modus:=0) {
     moru := (idu=10) ? "|Other options" : "|Alpha mask|Paint mask"
     slide3wid := slide2wid - 40
     thisW := (idu=10) ? txtWid : slide3wid
-    Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Color matrix|More adjustments%moru%
+    Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Colour matrix|More adjustments%moru%
     Gui, Tab, 1 ; general
-    GuiAddDropDownList("x+15 y+15 Section w" thisW " gUpdateUIadjustVPcolors AltSubmit Choose" UIimgFxMode " vUIimgFxMode", "Original image colors|Personalized colors|Grayscale|Red channel|Green channel|Blue channel|Alpha channel|Inverted colors|Sepia", "Colour mode")
+    GuiAddDropDownList("x+15 y+15 Section w" thisW " gUpdateUIadjustVPcolors AltSubmit Choose" UIimgFxMode " vUIimgFxMode", "Original image colours|Personalized colours|Greyscale|Red channel|Green channel|Blue channel|Alpha channel|Inverted colours|Sepia", "Colour mode")
     If (idu!=10)
        Gui, Add, Button, x+5 hp wp gPanelAutoColors vbtn1, A&uto-adjust panel
 
@@ -92514,14 +92514,14 @@ coreColorsAdjusterWindow(modus:=0) {
     }
 
     Gui, Tab, 2 ; more
-    GuiAddDropDownList("x+15 y+15 Section w" slide3Wid " gUpdateUIadjustVPcolors AltSubmit Choose" specialColorFXmode " vspecialColorFXmode", "None|Brightness / Contrast|Hue / Saturation / Lightness|Levels adjust|Color tint|Colour balance|Color curve per channel", "Additional colour adjustments")
+    GuiAddDropDownList("x+15 y+15 Section w" slide3Wid " gUpdateUIadjustVPcolors AltSubmit Choose" specialColorFXmode " vspecialColorFXmode", "None|Brightness / Contrast|Hue / Saturation / Lightness|Levels adjust|Colour tint|Colour balance|Colour curve per channel", "Additional colour adjustments")
     If (idu=10)
        GuiAddSlider("userImgChannelAlvl", 1.0,30.0, "1.0f", "Alpha multiplier: $€x", "UpdateUIadjustVPcolors", 1, "x+5 wp hp")
     Else
        GuiAddSlider("userImgChannelAlphaAdd", 0,255, 0, "Alpha channel: +$€", "UpdateUIadjustVPcolors", 1, "x+5 wp hp")
 
-    GuiAddDropDownList("xs y+2 wp gUpdateUIadjustVPcolors AltSubmit Choose" uiColorCurveFXmode " vuiColorCurveFXmode", "Brightness (density)|Contrast|Highlights|Shadows|Mid-tones|White saturation|Black saturation", "Color curve mode")
-    GuiAddDropDownList("x+5 wp gUpdateUIadjustVPcolors AltSubmit Choose" uiColorCurveFXchannel " vuiColorCurveFXchannel", "Red|Green|Blue|All", "Color channel")
+    GuiAddDropDownList("xs y+2 wp gUpdateUIadjustVPcolors AltSubmit Choose" uiColorCurveFXmode " vuiColorCurveFXmode", "Brightness (density)|Contrast|Highlights|Shadows|Mid-tones|White saturation|Black saturation", "Colour curve mode")
+    GuiAddDropDownList("x+5 wp gUpdateUIadjustVPcolors AltSubmit Choose" uiColorCurveFXchannel " vuiColorCurveFXchannel", "Red|Green|Blue|All", "Colour channel")
 
     sml := (PrefsLargeFonts=1) ? 1 : 5
     GuiAddSlider("hueAdjust", -300,300, 0, "Param A", "UpdateUIadjustVPcolors", 2, "xs y+10 w" slideWid " hp")
@@ -92529,11 +92529,11 @@ coreColorsAdjusterWindow(modus:=0) {
     GuiAddSlider("lummyAdjust", -300,300, 0, "Param C", "UpdateUIadjustVPcolors", 2, "xs y+5 wp hp")
     If (idu=10)
     {
-       GuiAddDropDownList("xs y+10 w" slide3Wid " gUpdateUIadjustVPcolors AltSubmit Choose" usrColorDepth " vusrColorDepth", "Default color depth: 32 bits|2 bits [4 colors]|3 bits [8 colors]|4 bits [16 colors]|5 bits [32 colors]|6 bits [64 colors]|7 bits [128 colors]|8 bits [256 colors]|16 bits [65536 colors]", "Color depth to simulate")
+       GuiAddDropDownList("xs y+10 w" slide3Wid " gUpdateUIadjustVPcolors AltSubmit Choose" usrColorDepth " vusrColorDepth", "Default colour depth: 32 bits|2 bits [4 colours]|3 bits [8 colours]|4 bits [16 colours]|5 bits [32 colours]|6 bits [64 colours]|7 bits [128 colours]|8 bits [256 colours]|16 bits [65536 colours]", "Colour depth to simulate")
        Gui, Add, Checkbox, x+10 hp gUpdateUIadjustVPcolors Checked%ColorDepthDithering% vColorDepthDithering, Dithering
     } Else
     {
-       GuiAddDropDownList("xs y+10 w" slide3Wid " gUpdateUIadjustVPcolors AltSubmit Choose" DesaturateAreaLevels " vDesaturateAreaLevels", "Default color depth: 32 bits|2 bits [4 colors]|3 bits [8 colors]|4 bits [16 colors]|5 bits [32 colors]|6 bits [64 colors]|7 bits [128 colors]|8 bits [256 colors]|16 bits [65536 colors]", "Color depth to simulate")
+       GuiAddDropDownList("xs y+10 w" slide3Wid " gUpdateUIadjustVPcolors AltSubmit Choose" DesaturateAreaLevels " vDesaturateAreaLevels", "Default colour depth: 32 bits|2 bits [4 colours]|3 bits [8 colours]|4 bits [16 colours]|5 bits [32 colours]|6 bits [64 colours]|7 bits [128 colours]|8 bits [256 colours]|16 bits [65536 colours]", "Colour depth to simulate")
        Gui, Add, Checkbox, x+10 hp gUpdateUIadjustVPcolors Checked%DesaturateAreaDither% vDesaturateAreaDither, Dithering
     }
 
@@ -92543,7 +92543,7 @@ coreColorsAdjusterWindow(modus:=0) {
        Gui, Tab, 3 ; others
        GuiAddDropDownList("x+15 y+15 Section w" txtWid " gUpdateUIadjustVPcolors AltSubmit Choose" uiIMGresizingMode " vuiIMGresizingMode", "Adapt all images to fit window|Adapt only large images into view|Original resolution (100%)|Custom zoom level|Stretched to window dimensions|Adapt to window width|Adapt to window height", "Image to window adapt mode")
        GuiAddSlider("vpIMGrotation", 0,359, 0, "Image rotation: $€°", "UpdateUIadjustVPcolors", 1, "xs y+10 w" slide2Wid " hp")
-       Gui, Add, Checkbox, x+6 hp gUpdateUIadjustVPcolors Checked%UIvpImgAlignCenter% vUIvpImgAlignCenter, Align to center
+       Gui, Add, Checkbox, x+6 hp gUpdateUIadjustVPcolors Checked%UIvpImgAlignCenter% vUIvpImgAlignCenter, Align to centre
        Gui, Add, Checkbox, xs y+10 +0x1000 hp gUpdateUIadjustVPcolors Checked%FlipImgV% vFlipImgV, Flip vertical
        Gui, Add, Checkbox, x+5 +0x1000 hp gUpdateUIadjustVPcolors Checked%FlipImgH% vFlipImgH, Flip horizontal
        Gui, Add, Text, xs y+10 hp +0x200, Display histogram:
@@ -92584,7 +92584,7 @@ coreColorsAdjusterWindow(modus:=0) {
     }
 
     Gui, Add, Button, x+5 hp wp+15 gBtnResetImageView vbtnReset, &Reset all
-    titlu := (idu=10) ? "Adjust viewport image view: " : "Adjust image colors (legacy): "
+    titlu := (idu=10) ? "Adjust viewport image view: " : "Adjust image colours (legacy): "
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, titlu appTitle, winPos)
     Sleep, 1
@@ -92687,7 +92687,7 @@ PanelAdjustColorsSimpleWindow() {
        RegAction(0, "userImgAdjustConvertDepth",, 1)
     }
 
-    Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Colors|Threshold%bonusTabs%
+    Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Colours|Threshold%bonusTabs%
     Gui, Tab, 1 ; general
     If (toneMapPanelApplies() && testWasImageEditedInVP())
        Gui, Add, Button, x+15 y+15 Section h%thisBtnHeight% w%thisW% gBtnOpenPanelAdjustToneMapping, &HDR tone-mapping
@@ -92723,7 +92723,7 @@ PanelAdjustColorsSimpleWindow() {
     ToolTip2ctrl(hTemp, "When possible, the pixel values will not be clamped internally when calculating the different`ncolor filters. The final output will still be an RGB image with values between 0 and 255.`nThis mode is much more computationally intensive.")
 
     Gui, Tab, 2 ; colors
-    Gui, Add, Text, x+15 y+15 Section h%thisBtnHeight%, Transform the colors of the image.
+    Gui, Add, Text, x+15 y+15 Section h%thisBtnHeight%, Transform the colours of the image.
     GuiAddSlider("userImgAdjustHue", -180,180, 0, "Hue: $€°", "UpdateUIsimpleAdjustColors", 2, "xs y+5 w" slideWid " hp")
     GuiAddSlider("userImgAdjustSat", -65535, 65535, 0, "Saturation", "UpdateUIsimpleAdjustColors", 2, "xs y+5 w" slideWid " hp")
     GuiAddCheckbox("x+1 hp+1 w" sml " gUpdateUIsimpleAdjustColors Checked" userImgAdjustAltSat " vuserImgAdjustAltSat", "Alternate saturation adjustment mode", "A")
@@ -92735,7 +92735,7 @@ PanelAdjustColorsSimpleWindow() {
     GuiAddSlider("userImgAdjustOffG", -65535,65535, 0, "G offset", "UpdateUIsimpleAdjustColors", 2, "x+5 wp hp")
     GuiAddSlider("userImgAdjustOffB", -65535,65535, 0, "B offset", "UpdateUIsimpleAdjustColors", 2, "xs y+5 wp hp")
     GuiAddSlider("userImgAdjustOffA", -65535,65535, 0, "A offset", "UpdateUIsimpleAdjustColors", 2, "x+5 wp hp")
-    Gui, Add, Checkbox, xs y+5 wp+5 hp -wrap gUpdateUIsimpleAdjustColors Checked%userImgAdjustInvertColors% vuserImgAdjustInvertColors, &Invert colors
+    Gui, Add, Checkbox, xs y+5 wp+5 hp -wrap gUpdateUIsimpleAdjustColors Checked%userImgAdjustInvertColors% vuserImgAdjustInvertColors, &Invert colours
     Gui, Tab, 3 ; threshold
     Gui, Add, Text, x+15 y+15 Section w%slideWid%, Transform any image channel into two tones based on the defined intensity thresholds.
     GuiAddSlider("userImgAdjustThreR", -1,65535, -1, "Red", "UpdateUIsimpleAdjustColors", 1, "xs y+10 w" slideWid " h" thisBtnHeight)
@@ -92757,7 +92757,7 @@ PanelAdjustColorsSimpleWindow() {
        Gui, Font, Normal
        Gui, Add, Text, xs y+10 w%txtWid%, Files in unsupported write formats will be skipped.
 
-       Gui, Add, Checkbox, xs y+10 Checked%userImgAdjustConvertDepth% vuserImgAdjustConvertDepth +hwndhTemp, &Convert unsupported color depths to 24 or 32 bits
+       Gui, Add, Checkbox, xs y+10 Checked%userImgAdjustConvertDepth% vuserImgAdjustConvertDepth +hwndhTemp, &Convert unsupported colour depths to 24 or 32 bits
        ToolTip2ctrl(hTemp, "This tool works only with 24- or 32-bit image colour formats.")
        Gui, Add, Checkbox, xs y+10 Checked%SimpleOperationsFlipV% vSimpleOperationsFlipV, Flip vertical
        Gui, Add, Checkbox, x+10 hp Checked%SimpleOperationsFlipH% vSimpleOperationsFlipH, Horizontal
@@ -92796,7 +92796,7 @@ PanelAdjustColorsSimpleWindow() {
 
     dummyTimerDelayiedImageDisplay(150)
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
-    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Adjust image colors: " appTitle, winPos)
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Adjust image colours: " appTitle, winPos)
     GuiRefreshSliders()
     SetTimer, RemoveTooltip, -100
     SetTimer, ResetImgLoadStatus, -50
@@ -92821,7 +92821,7 @@ BtnBatchSimpleColorAdjuster() {
    threG := (userImgAdjustLinkThresholds=1) ? userImgAdjustThreR : userImgAdjustThreG
    thisIDu := "a" userImgAdjustInvertColors userImgAdjustSat  userImgAdjustBright userImgAdjustContra userImgAdjustShadows userImgAdjustHighs userImgAdjustHue userImgAdjustTintAmount userImgAdjustGamma userImgAdjustOffR userImgAdjustOffG userImgAdjustOffB userImgAdjustOffA userImgAdjustThreR ThreG ThreB userImgAdjustThreA userImgAdjustWhitePoint userImgAdjustBlackPoint
    If (thisIDu="a000000003000000-1-1-1-1655350")
-      Return msgBeepTimer("WARNING: No color filters to apply.")
+      Return msgBeepTimer("WARNING: No colour filters to apply.")
 
    filesElected := getSelectedFiles(0, 1)
    If (filesElected<3)
@@ -93322,7 +93322,7 @@ PanelFileFormatConverter() {
     GuiAddButton("x+5 w" zml " hp gbtnHelpSaveImgPanel vbtnConvertFmtHelp", " ?", "Help")
     GuiAddSavePaletteTransparency("xp-" (pww + 5) " yp w" (pww + zml + 5) " hp")
     Gui, Add, Text, xs y+10 w%sml% hp +0x200, Format options:
-    GuiAddDropDownList("x+5 yp w" pww " AltSubmit gUIsaveFormatOptionsChanged Choose" userJpegSubsampling " vuserJpegSubsampling", "1/4 color details|1/2 color details|1/1 full color", "JPEG chroma subsampling", "JPEG chroma subsampling: the resolution at which the colors are stored.`n1/4 | 4:2:0 - a quarter of the image resolution: the smallest files.`n1/2 | 4:2:2 - half of the horizontal resolution.`n1/1 | 4:4:4 - full resolution: sharp colored text and lines, larger files.")
+    GuiAddDropDownList("x+5 yp w" pww " AltSubmit gUIsaveFormatOptionsChanged Choose" userJpegSubsampling " vuserJpegSubsampling", "1/4 colour details|1/2 colour details|1/1 full colour", "JPEG chroma subsampling", "JPEG chroma subsampling: the resolution at which the colours are stored.`n1/4 | 4:2:0 - a quarter of the image resolution: the smallest files.`n1/2 | 4:2:2 - half of the horizontal resolution.`n1/1 | 4:4:4 - full resolution: sharp coloured text and lines, larger files.")
     GuiAddDropDownList("xp yp wp AltSubmit gUIsaveFormatOptionsChanged Choose" userSaveImgCompressionLvl " vuserSaveImgCompressionLvl", "No compression|Fast compression|Normal compression|Best compression", "PNG and TIFF compression", "Lossless image format.`n`nThe compression level only trades the saving speed for the file size.`nPNG uses zlib for compression.`nTIFF: LZW is used with Fast and Normal, and ZIP Deflate for Best.`n«Best» can be very slow on large PNG photos.`nTIFFs with no compression open in more applications.")
     GuiAddSaveLossless("xp yp wp hp")
     GuiAddSaveGifPaletteDithering("xp yp wp hp")
@@ -93369,7 +93369,7 @@ PanelFileFormatConverter() {
 }
 
 BTNhelpConvertImgFmt() {
-    msgBoxWrapper(appTitle ": HELP", "On file format conversion, QPV will attempt to preserve the color depth of the images. If it is not possible, the images will be converted to 24 bits or 32 bits or to the color depth supported by the destination format.`n`nFiles already in the destination format, as their content tells, are not converted again: they are skipped, or copied or moved unchanged to the destination folder when one is used.`n`nMultipage and animated files: with «Convert multipage files to the multipage file format selected», GIF, WEBP, JXL, TIF and PDF files get all their pages or frames, and the frames keep their delays. Otherwise, «Extract pages/frames on conversion» saves each page as a file of its own: «name_1», «name_2» and so on. Without these options, only the first page is converted. An original file is removed only when all its pages were converted.`n`nPDF files are made as «Convert active file to PDF» makes them: each page is the size of its image, JPEG files go in as they are, and the other images are stored as JPEG at the chosen quality. PDF and SVG files are rendered at the resolutions set above.`n`nFailures can occur if there is insufficient system memory or... if file access is denied when attempting to write files.`n`nThe image quality option applies only to the JPG, JNG, WEBP, JXL, JXR, JP2 and PDF file formats. The options of the destination format are shown under «Output image» and «Format options»; they also apply when images are saved from the «Save image» panel.`n`nSome file formats have image dimensions limited by design. The WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. Therefore, on format conversions, the resulting image dimensions may reflect the format-specific limits.`n`nThis feature relies on the FreeImage library.", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "On file format conversion, QPV will attempt to preserve the colour depth of the images. If it is not possible, the images will be converted to 24 bits or 32 bits or to the colour depth supported by the destination format.`n`nFiles already in the destination format, as their content tells, are not converted again: they are skipped, or copied or moved unchanged to the destination folder when one is used.`n`nMultipage and animated files: with «Convert multipage files to the multipage file format selected», GIF, WEBP, JXL, TIF and PDF files get all their pages or frames, and the frames keep their delays. Otherwise, «Extract pages/frames on conversion» saves each page as a file of its own: «name_1», «name_2» and so on. Without these options, only the first page is converted. An original file is removed only when all its pages were converted.`n`nPDF files are made as «Convert active file to PDF» makes them: each page is the size of its image, JPEG files go in as they are, and the other images are stored as JPEG at the chosen quality. PDF and SVG files are rendered at the resolutions set above.`n`nFailures can occur if there is insufficient system memory or... if file access is denied when attempting to write files.`n`nThe image quality option applies only to the JPG, JNG, WEBP, JXL, JXR, JP2 and PDF file formats. The options of the destination format are shown under «Output image» and «Format options»; they also apply when images are saved from the «Save image» panel.`n`nSome file formats have image dimensions limited by design. The WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. Therefore, on format conversions, the resulting image dimensions may reflect the format-specific limits.`n`nThis feature relies on the FreeImage library.", -1, 0, 0)
 }
 
 TglKeepOriginals() {
@@ -93508,19 +93508,19 @@ PanelAdjustImageCanvasSize() {
     GuiAddEdit("x+5 w" editWid " r1 limit5 -multi number -wrap gEditResizeHeight vuserEditHeight", (ResizeInPercentage=1) ? 100 : oImgH, "Height")
     Gui, Add, Checkbox, x+5 hp gTglRszInPercentage Checked%ResizeInPercentage% vResizeInPercentage, Use `% percentages
     Gui, Add, Checkbox, xs+15 y+5 hp gTglRszKeepAratio Checked%ResizeKeepAratio% vResizeKeepAratio, Keep aspect ratio
-    Gui, Add, Checkbox, x+5 hp Checked%adjustCanvasCentered% vadjustCanvasCentered, Centered image
+    Gui, Add, Checkbox, x+5 hp Checked%adjustCanvasCentered% vadjustCanvasCentered, Centred image
 
-    Gui, Add, Text, xs y+15, Resulting dimensions and background color:
+    Gui, Add, Text, xs y+15, Resulting dimensions and background colour:
     GuiAddEdit("xs+15 y+5 w" editWid " r1 Disabled -wrap vResultEditWidth", oImgW, "Calculated width")
     GuiAddEdit("x+5 wp r1 Disabled -wrap vResultEditHeight", oImgH, "Calculated height")
     Gui, Add, Text, x+5 hp wp+45 +0x200 vinfoLine -wrap, -
 
     sml := (PrefsLargeFonts=1) ? 140 : 80
-    Gui, Add, Checkbox, xs y+10 hp Checked%adjustCanvasDoBgr% vadjustCanvasDoBgr gupdateUIadjustCanvasPanel, Fill with a background color
+    Gui, Add, Checkbox, xs y+10 hp Checked%adjustCanvasDoBgr% vadjustCanvasDoBgr gupdateUIadjustCanvasPanel, Fill with a background colour
     ha := (PrefsLargeFonts=1) ? 28 : 19
     clrW := (PrefsLargeFonts=1) ? 65 : 45
     GuiAddPickerColor("xs+15 y+10 w26 h" ha, "OutlierFillColor")
-    GuiAddColor("x+2 hp w" clrW, "OutlierFillColor", "Background color")
+    GuiAddColor("x+2 hp w" clrW, "OutlierFillColor", "Background colour")
     txtWid -= 95
     GuiAddSlider("OutlierFillOpacity", 3,255, 255, "Opacity", "iniSaveOutlierClrOpaciy", 1, "x+5 w" clrW*2 + 20 " hp")
 
@@ -93772,7 +93772,7 @@ PanelResizeImageWindow() {
     Gui, Add, Checkbox, x+5 hp gTglRszQualityHigh Checked%ResizeQualityHigh% vResizeQualityHigh, High quality resampling
     Gui, Add, Checkbox, xs y+10 gTglRszCropping Checked%ResizeWithCrop% vResizeWithCrop, Crop image(s) to the viewport selection
     Gui, Add, Checkbox, xp+15 y+10 gTglRszCropping Checked%ResizeCropAfterRotation% vResizeCropAfterRotation, Perform image crop after image rotation (as in the viewport)
-    Gui, Add, Checkbox, xs y+10 gTglRszApplyEffects Checked%ResizeApplyEffects% vResizeApplyEffects, Apply color adjustments and image mirroring`nactivated in the main window
+    Gui, Add, Checkbox, xs y+10 gTglRszApplyEffects Checked%ResizeApplyEffects% vResizeApplyEffects, Apply colour adjustments and image mirroring`nactivated in the main window
  
     Gui, Tab, 2
     thisW := (PrefsLargeFonts=1) ? 90 : 50
@@ -94069,7 +94069,7 @@ calcNewImgDimensions(imgW, imgH, desiredW, desiredH, isPercntg, isKeepRatio, ByR
 
 filesListApplyColors() {
     Static prevFXmode := "n"
-    If warnFramesActionPrevented("APPLY COLORS")
+    If warnFramesActionPrevented("APPLY COLOURS")
        Return
 
     o_imgFxMode := imgFxMode
@@ -94086,7 +94086,7 @@ filesListApplyColors() {
    {
       If (filesElected>200)
       {
-         msgResult := msgBoxWrapper(appTitle ": Apply colors", "You have selected " groupDigits(filesElected) " images. The images in supported write formats will be processed according to the colour adjustments of the viewport. The original files will be OVERWRITTEN. Do you want to continue?", 4, 0, "question")
+         msgResult := msgBoxWrapper(appTitle ": Apply colours", "You have selected " groupDigits(filesElected) " images. The images in supported write formats will be processed according to the colour adjustments of the viewport. The original files will be OVERWRITTEN. Do you want to continue?", 4, 0, "question")
          If !InStr(msgResult, "yes")
             Return
       }
@@ -94649,7 +94649,7 @@ TglRszApplyEffects() {
    {
       infoMirroring := defineIMGmirroring()
       If (usrColorDepth>1)
-         infoColorDepth := "`nSimulated color depth: " defineColorDepth()
+         infoColorDepth := "`nSimulated colour depth: " defineColorDepth()
       If (imgFxMode>1)
          infoColors := "`nColor display mode:`n" DefineFXmodes() " [" currIMGdetails.PixelFormat "]"
  
@@ -100484,7 +100484,7 @@ PanelImgAutoCrop() {
     gH := (PrefsLargeFonts=1) ? 145 : 125
     Gui, Add, Text, x15 y15 Section, Please adjust the following parameters for best results.
     ha := (PrefsLargeFonts=1) ? 27 : 18
-    GuiAddSlider("usrAutoCropColorTolerance", 0,254, 10, "Color variation tolerance", "UpdateUIautoCropParams", 1, "xs y+10 w" slide2Wid " h" ha)
+    GuiAddSlider("usrAutoCropColorTolerance", 0,254, 10, "Colour variation tolerance", "UpdateUIautoCropParams", 1, "xs y+10 w" slide2Wid " h" ha)
     Gui, Add, Checkbox, x+10 hp gUpdateUIautoCropParams Checked%AutoCropAdaptiveMode% vAutoCropAdaptiveMode, Adaptive mode
     Gui, Add, Checkbox, x+2 hp gUpdateUIautoCropParams Checked%AutoCropStrongAdaptiveMode% vAutoCropStrongAdaptiveMode, strong
 
@@ -101195,7 +101195,7 @@ batchAutoColorsFiles() {
    filesElected := getSelectedFiles(0, 1)
    If (filesElected>50)
    {
-      msgInfos := "Are you sure you want to auto-adjust colors for " groupDigits(filesElected) " files? This may take some time to finish. If needed, press Escape to abandon it."
+      msgInfos := "Are you sure you want to auto-adjust colours for " groupDigits(filesElected) " files? This may take some time to finish. If needed, press Escape to abandon it."
       msgResult := msgBoxWrapper(appTitle ": Confirmation", msgInfos, 4, 0, "question")
       If (msgResult!="Yes")
          Return
@@ -101229,7 +101229,7 @@ batchAutoColorsFiles() {
          If skippedFiles
             etaTime .= "`nSkipped files: " groupDigits(skippedFiles)
 
-         showTOOLtip("Performing automatic color adjustments on the selected images" etaTime, 0, 0, countTFilez/filesElected)
+         showTOOLtip("Performing automatic colour adjustments on the selected images" etaTime, 0, 0, countTFilez/filesElected)
          prevMSGdisplay := A_TickCount
          someErrors := ""
       }
@@ -101978,7 +101978,7 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="", losslessJpegs:=0) {
       If (nExt!=oExt && StrLen(nExt)>0)
       {
          doConversion := 1
-         msgBoxWrapper(appTitle ": WARNING", "You chose to save the image file in a new format. Please note, this may lead to a color depth conversion.", 0, 0, "exclamation")
+         msgBoxWrapper(appTitle ": WARNING", "You chose to save the image file in a new format. Please note, this may lead to a colour depth conversion.", 0, 0, "exclamation")
       }
       If (nExt="ico")
          doConversion := 1
@@ -102553,7 +102553,7 @@ SaveFIMfile(file2save, pBitmap, userGivenDepth:=32, quality:="") {
   } Else
   {
      SoundBeep 300, 100
-     addJournalEntry("Failed to save image using FreeImage. No matching color depth for chosen format.")
+     addJournalEntry("Failed to save image using FreeImage. No matching colour depth for chosen format.")
   }
 
   If hFIFimgB
@@ -102610,7 +102610,7 @@ FIMpalettizeLikeSaveAs(hImage) {
       If !E
          hImage8 := ConvertIndexedPBITMAPtoFIM(pBitmap)
       Else
-         addJournalEntry(A_ThisFunc "(): GDI+ failed to reduce the image to 256 colors [error " E "]. FreeImage reduces it instead, without transparency.")
+         addJournalEntry(A_ThisFunc "(): GDI+ failed to reduce the image to 256 colours [error " E "]. FreeImage reduces it instead, without transparency.")
       Gdip_DisposeImage(pBitmap)
    }
 
@@ -106693,12 +106693,12 @@ CoreGUItoolbar(scopul:=0, whichList:=0) {
          , BTNblurTool := ["brush-blur", 0, "Blur brush", 0, "BTNblurTool"]
          , BTNclonerTool := ["brush-cloner", 0, "Cloner brush", 0, "BTNclonerTool"]
          , BTNbrushMtool := ["brush-main", 0, "Brush tool", 0, "BTNbrushMtool"]
-         , BTNFXbrush := ["brush-fx", 0, "Color effects soft brush", 0, "BTNFXbrush"]
+         , BTNFXbrush := ["brush-fx", 0, "Colour effects soft brush", 0, "BTNFXbrush"]
          , BTNwetbrush := ["brush-wet", 0, "Soft wet brush", 0, "BTNwetbrush"]
          , BTNdryout := ["brush-dry", 0, "Dry-out brush", 0, "BTNdryout"]
          , BTNpenVector := ["pen-vector", 0, "Draw freeform shape", 0, "BTNpenVector"]
-         , BTNpipette := ["pipette", 0, "Pick color from the viewport", 0, "BTNpipette"]
-         , BTNcolorsSwatch := ["colorz-swatch", 0, "Primary / secondary colors", 0, "BTNcolorsSwatch"]
+         , BTNpipette := ["pipette", 0, "Pick colour from the viewport", 0, "BTNpipette"]
+         , BTNcolorsSwatch := ["colorz-swatch", 0, "Primary / secondary colours", 0, "BTNcolorsSwatch"]
          , BTNalphCapture := ["alpha-mask-capture", 0, "Capture alpha mask", 0, "BTNalphCapture"]
          , BTNalphInvert := ["alpha-mask-invert", 0, "Invert alpha mask", 0, "BTNalphInvert"]
          , BTNalphRaster := ["alpha-mask-pixelize", 0, "Rasterize alpha mask", 0, "BTNalphRaster"]
@@ -106710,7 +106710,7 @@ CoreGUItoolbar(scopul:=0, whichList:=0) {
          , BTNsave := ["save-disk", 0, "Save image or files list", 0, "BTNsave", 0, 0, 1]
          , BTNopen := ["open", 0, "Open image or files list", 0, "BTNopen", 0, 1, 1]
          , BTNcutImg := ["cut", 0, "Cut image selection or file(s)", 0, "BTNcutImg", 0, 0, 1]
-         , BTNadjustColors := ["adjust-colors", 0, "Adjust viewport colors", 0, "BTNadjustColors", 0, 0, 1]
+         , BTNadjustColors := ["adjust-colors", 0, "Adjust viewport colours", 0, "BTNadjustColors", 0, 0, 1]
          , BTNtlbrflipH := ["flip-h", 0, "Flip horizontally", 0, "BTNtlbrflipH", 0, 0, 1]
          , BTNtlbrflipV := ["flip-v", 0, "Flip vertically", 0, "BTNtlbrflipV", 0, 0, 1]
          , BTNtransformArea := ["transform-img", 0, "Import file or transform selected area", 0, "BTNtransformArea", 0, 0, 1]
@@ -106766,7 +106766,7 @@ CoreGUItoolbar(scopul:=0, whichList:=0) {
          , BTNnavLastImgu := ["last", 0, "Jump to the last image in the list", 0, "BTNnavLastImgu", 0, 0, 1]
          , BTNnavNextImgu := ["next", 0, "Next image in the list", 0, "BTNnavNextImgu"]
          , BTNnavPrevImgu := ["previous", 0, "Previous image in the list", 0, "BTNnavPrevImgu"]
-         , BTNalignVPimgu := ["vp-center-img", 0, "Toggle align image to center", 0, "BTNalignVPimgu", 0, 0, 1]
+         , BTNalignVPimgu := ["vp-center-img", 0, "Toggle align image to centre", 0, "BTNalignVPimgu", 0, 0, 1]
          , BTNhudHisto := ["histogram", 0, "Cycle histogram modes", 0, "BTNhudHisto"]
          , BTNannotate := ["annotate", 0, "Define image caption", 0, "BTNannotate", 0, 0, 1]
          , BTNprivatModa := ["private", 0, "Toggle private mode", 0, "BTNprivatModa", 0, 0, 1]
@@ -107939,7 +107939,7 @@ tlbrDecideTooltips(hwnd) {
       msgu := "L: Last image «End»`nR: Next random image «Shift + Backspace»"
    } Else If (btnID="BTNalignVPimgu")
    {
-      msgu := "L: Toggle centered image alignment «A»`nR: Toggle outside viewport image panning"
+      msgu := "L: Toggle centred image alignment «A»`nR: Toggle outside viewport image panning"
    } Else If (btnID="BTNimgSizers")
    {
       msgu := "L: Cycle adapt to window modes «T»`nR: Adapt modes options menu"
@@ -108091,13 +108091,13 @@ tlbrDecideTooltips(hwnd) {
    } Else If InStr(icoFile, "brush-fx")
    {
       keyu := (AnyWindowOpen=64) ? " «Q»" : ""
-      msgu := "Color effects - soft brush" keyu
+      msgu := "Colour effects - soft brush" keyu
    } Else If InStr(icoFile, "brush-wet")
    {
       msgu := (AnyWindowOpen=64 && BrushToolType<3) ? "Soft wet brush: " Round(BrushToolWetness/22 * 100) "%" : "Soft wet brush"
    } Else If InStr(icoFile, "flood-fill")
    {
-      msgu := (AnyWindowOpen=66) ? "Set color similarity tolerance" : "Flood fill / color bucket «K»"
+      msgu := (AnyWindowOpen=66) ? "Set colour similarity tolerance" : "Flood fill / colour bucket «K»"
    } Else If InStr(icoFile, "brush-dry")
    {
       msgu := "Brush drying rate"
@@ -108146,11 +108146,11 @@ tlbrDecideTooltips(hwnd) {
    {
       keyu := (imgEditPanelOpened=1 && AnyWindowOpen) ? " «C»" : ""
       keyu2 := (imgEditPanelOpened=1 && AnyWindowOpen) ? " «X»" : ""
-      msgu := "L: Pick color (click and drag)" keyu "`nR: Switch primary / secondary color" keyu2
+      msgu := "L: Pick colour (click and drag)" keyu "`nR: Switch primary / secondary colour" keyu2
    } Else If InStr(icoFile, "colorz-swatch")
    {
       keyu2 := (imgEditPanelOpened=1 && AnyWindowOpen) ? " «X»" : ""
-      msgu := "L: Choose color`nR: Switch primary / secondary color" keyu2
+      msgu := "L: Choose colour`nR: Switch primary / secondary colour" keyu2
       If (thumbsDisplaying=1)
          msgu := "Toggle private mode"
    } Else If InStr(icoFile, "crop")
@@ -108194,13 +108194,13 @@ tlbrDecideTooltips(hwnd) {
    } Else If InStr(icoFile, "adjust-colors")
    {
       If (isImgEditingNow()=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
-         msgu := "Toggle color adjustments for the image object «U»"
+         msgu := "Toggle colour adjustments for the image object «U»"
       Else If (thumbsDisplaying=1)
-         msgu := "L: Adjust viewport colors and more «U»`nR: Reset viewport adjustments « \ »"
+         msgu := "L: Adjust viewport colours and more «U»`nR: Reset viewport adjustments « \ »"
       Else If isTlbrViewModus()
-         msgu := "L: Adjust viewport colors and more «Shift + U»`nR: Reset viewport adjustments « \ »"
+         msgu := "L: Adjust viewport colours and more «Shift + U»`nR: Reset viewport adjustments « \ »"
       Else
-         msgu := "L: Adjust image colors «U»`nR: Reset viewport adjustments « \ »"
+         msgu := "L: Adjust image colours «U»`nR: Reset viewport adjustments « \ »"
    } Else If InStr(icoFile, "transform-img")
    {
       msgu := (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) ? "L: Import selected image into the currently opened one" : "L: Transform selected image area «Ctrl + T»"
@@ -108357,7 +108357,7 @@ tlbrDecideTooltips(hwnd) {
    {
       msgu := "Cycle through list view modes «L»"
       If (thumbsListViewMode=1)
-         msgu := "L: " msgu "`nR: Toggle centered alignment for thumbnails «A»"
+         msgu := "L: " msgu "`nR: Toggle centred alignment for thumbnails «A»"
    } Else If InStr(icoFile, "view") 
    {
        msgu := "L: Toggle image preview «Z»`nR: Toggle preview area double-size"
