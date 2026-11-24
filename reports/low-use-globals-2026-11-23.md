@@ -19,9 +19,9 @@ Snapshot of `development` at 62e83ad, 2026-11-23. Line numbers are in `quick-pic
 
 Used in 0 to 3 functions: 373 super-globals (0 functions: 1, one: 62, two: 120, three: 190).
 
-**Left out: 238 settings and panel controls** (54 in one function, 65 in two, 119 in three). Each one's name is written in a string (`RegAction(act, "Name")`, `INIaction`, `GuiAddSlider("Name", ...)`, `uiSlidersArray["Name", ...]`, `GuiUpdateSliders("Name")`, `IniSLDBWrite("Name", ...)`, the `ctrlsList` table at `module-interface.ahk:1656`) or bound to a control (`vName`, `HwndName`). The settings loader and the Gui commands need the name, so these stay global, even the ones a single function uses, such as `BrushToolRandomSize` in `ActPaintBrushNow()`.
+**Left out: 238 settings and panel controls** (54 in one function, 65 in two, 119 in three). Each one's name is written in a string (`RegAction(act, "Name")`, `INIaction`, `GuiAddSlider("Name", ...)`, `uiSlidersArray["Name", ...]`, `GuiUpdateSliders("Name")`, `IniSLDBWrite("Name", ...)`, the `ctrlsList` table at `module-interface.ahk:1656`) or bound to a control. The settings loader and the `vName` option need the name as a global, so these stay global, even the ones a single function uses, such as `BrushToolRandomSize` in `ActPaintBrushNow()`. An `HwndName` option would accept a local, but each of the 19 names bound only that way is read outside the function that creates its control (`hPic0` to `hPic11` through `hPic%A_Index%` loops), so they stay as handles.
 
-**Analysed:** the other 134, `CSmid` (used nowhere), and the 184 function-level globals. Of those 184, 169 are panel controls (154 bound with `v` or `Hwnd`, 15 `Picku*` buttons that `GuiAddPickerColor()` creates as `"vPicku" name`), 2 belong to the third-party `Font_Library3.ahk`, and 13 are not controls (sections 2 and 3). A name bound to a control in any panel counted as a control; whether every panel that declares such a name also creates it was not checked.
+**Analysed:** the other 134, `CSmid` (used nowhere), and the 217 function-level globals (continuation lines included). Of those 217, 194 are panel controls (176 bound with `v` or `Hwnd`, 18 `Picku*` buttons that `GuiAddPickerColor()` creates as `"vPicku" name`), 2 belong to the third-party `Font_Library3.ahk`, and 21 are not controls (sections 2 and 3). A name bound to a control in any panel counted as a control; whether every panel that declares such a name also creates it was not checked.
 
 ## Result
 
@@ -32,12 +32,12 @@ Used in 0 to 3 functions: 373 super-globals (0 functions: 1, one: 62, two: 120, 
 | One function → local | 3 | `menusList`, `startPageIndex`, `cmdExifTool` |
 | One function → `Static` | 5 | `hCWPhook`, `hasMemThumbsCached`, `createdQuickMenuSearchWin`, `maxVectorUndoLevels`, `hasOpened` (function-level) |
 | Start-up code only → drop the declaration | 1 | `FirstRun` |
-| Delete | 14 | `dynamicThumbsColumns` (never assigned), `CSmid` (never used), `lastInvoked` in `CopyMovePanelWindow()` (never read), 11 dead function-level declarations |
+| Delete | 22 | `dynamicThumbsColumns` (never assigned), `CSmid` (never used), `lastInvoked` in `CopyMovePanelWindow()` (never read), 19 dead function-level declarations |
 | Stays | 122 | event state and shared constants, in six groups (section 4) |
 
 Couriers are rare. Of the 134, only `forceProtectLoadedImg` is a clean "set, call, clear" hand-off. Nearly every low-use global carries a value from one event to a later one (a click, a timer, the next draw), which a parameter cannot do.
 
-The mark ⁽⁰⁹⁻⁰⁵⁾ flags a global that `global-vars-audit-2026-09-05.md` also lists. The other names in that report are no longer top-level globals at 62e83ad.
+The mark ⁽⁰⁹⁻⁰⁵⁾ flags the 13 globals that `global-vars-audit-2026-09-05.md` proposes changing and that are still top-level globals at 62e83ad. The other globals it proposes changing no longer are (`InternalFilterString` is now a function-level panel control).
 
 ## 1. Couriers, and values the reader can compute
 
@@ -108,7 +108,7 @@ Each is written before its first read on every path through its function, so the
 |---|---|---|---|
 | `menusList` | `module-interface.ahk:9`, `:= ""` | `BuildMenuBar()` (module-interface.ahk) 2391, 2393, 2395, 2397, 2399, 2401 write; 2408 read (`Loop, Parse, menusList, \|`) | The if/else chain at 2390-2401 assigns it on every branch and ends in `Else`. |
 | `startPageIndex` | 108, `:= 0` | `UpdateThumbsScreen()` 5248 write (`thumbsInfoYielder(...)`); 5270, 5287, 5291, 5297 read | The only exit before 5248 is the `Return` at 5243. |
-| `cmdExifTool` | 218, `:= ""` | `batchRemoveMetaData()` 40655 write (`new cli(...)`); 40703, 40730, 40748, 40749 read (`.Close()` last) | Every `Return` of the function before 40655 comes first. |
+| `cmdExifTool` | 218, `:= ""` | `batchRemoveMetaData()` 40655 write (`new cli(...)`); 40703, 40730, 40748, 40749 read (`.Close()` last) | Every `Return` of the function before 40655 comes first, and the only later one (40764) follows `.Close()`. As a local, the `cli` object is released when the function returns, so its `__Delete()` (`cli-interface.ahk:47`) runs then instead of at the next call or at exit; see Seen in passing. |
 
 ### 2.2 → `Static`
 
@@ -129,10 +129,11 @@ Declared at 106 (`:= 1`). Only the auto-exec section uses it: 453 (`IniRead, Fir
 - **`dynamicThumbsColumns`** (286, `:= 0`) is never assigned, and the `INIaction` line that saved it is commented out (11841). The test `thumbsColumns>0 && dynamicThumbsColumns=0` in `recalculateThumbsSizes()` (5004) is always just `thumbsColumns>0`. The two `If (dynamicThumbsColumns=1)` branches in `ChangeThumbsZoom()` never run: the zoom-level step at 11815-11821 and its tooltip at 11842-11843. Change: delete the global, the `&& dynamicThumbsColumns=0` test, both dead branches (keep their `Else` bodies) and the commented `INIaction` line.
 - **`CSmid`** (151, `:= "▒"`): nothing uses it.
 - **`lastInvoked` in `CopyMovePanelWindow()`**: `Global BtnCpyMv, LViewDynas, lastInvoked := 1` (60811) makes it a global for this function alone. It is written at 60837 and read nowhere. Change: remove it from 60811 and delete 60837. The `Static lastInvoked` of other functions are separate variables.
-- **11 function-level declarations with no control and no use.** Each name was searched as `name`, `vName` and `HwndName`, and as a built name (`"vinfo" x`, `"vSlider" x`, `"veditF" x`); `GuiAddSlider()` names its controls `customSliders<var>` and `customLblSliders<var>`, so none comes from it. The names:
+- **19 function-level declarations with no control and no use.** Each name was searched in `quick-picto-viewer.ahk` and `lib/*.ahk` as `name`, `vName` and `HwndName`, and against every `prefix%x%suffix` form and every quoted prefix followed by a concatenation; `GuiAddSlider()` names its controls `customSliders<var>` and `customLblSliders<var>`, so none comes from it. The names:
   - `realTimePreview` (92774; only the commented-out `GuiControlGet` lines 93396 and 93500 mention it)
   - `NewVProt` (55033; its ComboBox is commented out at 55052)
-  - `editF10` (58698)
+  - `editF10` (58698) and `editF12` (58699)
+  - `BtnPosX1p`, `BtnPosY1p`, `BtnPosX2p`, `BtnPosY2p`, `BtnPosXp`, `BtnPosYp`, `BtnPosZp` (55034-55035; only the `BtnPos*m` names get a control, 55055-55061)
   - `infoBlurAmount` (53740, the whole line)
   - `infoDrawLineAreaOpacity` and `infoDrawLineAreaContour` (52731)
   - `infoResultRes` (54462)
@@ -311,6 +312,7 @@ Never assigned after the declaration. Each is read by more than one function, so
 - **A drop can be refused until restart.** `dummyTimerProcessDroppedFiles()` returns without clearing `groppedFiles` when it fires less than 400 ms after its previous run finished (`module-interface.ahk:1958-1959`), and nothing starts the timer again. `PVwinGuiDropFiles()` then refuses every later drop as "busy", because `groppedFiles.Count()>0` (1935). It takes a second drop within about 200 ms of the first one finishing (the timer is started 200 ms after the drop, 1950).
 - **A message box resets `repositionedWindow`.** `MsgBox2()` calls `repositionWindowCenter()` without `winPos` (`msgbox2.ahk:440`), which sets `repositionedWindow := 0` (27938). After a message box shown while a position-remembering panel is open, `CloseWindow()` skips `WinGetPos` for the panel (100357-100358), so the panel may next open where it was before the user moved it.
 - **30 redundant function-level `Global` lines** re-declare 8 super-globals; plain assignments do the same. They are: `lastOtherWinClose` 17 times (3045, 4877, 9764, 26330, 30950, 42800, 43206, 49001, 49005, 49647, 49662, 49680, 49958, 69956, 71854, 72351, 100373), `scriptStartTime` (66228, 66234, 66243), `lastWinDrag` (3044, 71896), `zeitSillyPrevent` (49957, 109002), `lastEditRWChange` (94764, 94782), `lastEditRHChange` (94825, 94843), `findFlippedDupes` (91704), `AllowDarkModeForWindow` (`shell-stuff.ahk:1234`).
+- **The ExifTool pipe handles are closed twice.** `cli.close()` (`cli-interface.ahk:51-56`) does not clear `hStdInWr`/`hStdOutRd`, and `__Delete()` calls it again, so `batchRemoveMetaData()`'s explicit `.Close()` (40749) is followed by a second `CloseHandle` on the same two values when the object is released. If Windows has reused a value by then, the second call closes someone else's handle.
 - `imgDecLX` and `imgDecLY` are also written by `simulateCalcImageCoordsInVP()` (88137-88138), which nothing calls (also listed in `near-identical-functions-2026-11-23.md`).
 
 ## Regenerating the lists
