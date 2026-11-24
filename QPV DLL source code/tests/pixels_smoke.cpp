@@ -326,7 +326,7 @@ static void jobPipeline() {
     check(res.meta.frames==3 && res.meta.dpi==72 && res.meta.wicFmt==15,
           "and so are the frame count, the resolution and the pixel format");
 
-    qpvSetPixelFormatNames(L"a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|24-bpp - BGR", L"MINISWHITE|MINISBLACK|RGB", L"|||32-PARGB||");
+    qpvSetPixelFormatNames(L"a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|24-bpp - BGR", L"MINISWHITE|MINISBLACK|RGB", L"|||32-ARGB||");
     check(qpvPixelFormatName(res.loaderUsed, res.meta)==L"24-bpp - BGR",
           "a WIC format is named the way WicPixelFormats() names it");
 
@@ -402,7 +402,7 @@ static void jobPipeline() {
     check(res3.loaderUsed==3 && res3.meta.frames==1 && res3.meta.dpi==96,
           "one frame at 96 DPI, the way RenderSVGfile() reports it");
     check(res3.width==200 && res3.height==100, "the size the document declares is the recorded one");
-    check(qpvPixelFormatName(res3.loaderUsed, res3.meta)==L"32-PARGB", "and the format is the renderer's constant");
+    check(qpvPixelFormatName(res3.loaderUsed, res3.meta)==L"32-ARGB", "and the format is the renderer's constant");
 
     gShimWicCalls = gShimFimCalls = gShimGdipCalls = gShimPdfCalls = 0;
     DupePixResult res3b;
@@ -564,7 +564,7 @@ static void jobPipeline() {
         const TpSrcMeta &m = res.meta;       // the one WIC decoded
         check(qpvGetPixelFormatName(1, m.wicFmt, 0, -1, 0, buf, 64)==12 && std::wstring(buf)==L"24-bpp - BGR",
               "qpvGetPixelFormatName hands the WIC name to the thumbnails pool");
-        check(qpvGetPixelFormatName(3, -1, 0, -1, 0, buf, 64) > 0 && std::wstring(buf)==L"32-PARGB",
+        check(qpvGetPixelFormatName(3, -1, 0, -1, 0, buf, 64) > 0 && std::wstring(buf)==L"32-ARGB",
               "an SVG is named the way RenderSVGfile() names it");
         check(qpvGetPixelFormatName(4, -1, 0, -1, 0, buf, 64)==0 && buf[0]==0,
               "a PDF is left unnamed, the way the drain leaves it uncollected");
@@ -802,7 +802,7 @@ static void collectionAgainstRealSQLite() {
                                  L"8-bpp - Alpha|16-bpp - BGR555|16-bpp - BGR565|16-bpp - BGRA5551|"
                                  L"16-bpp - Gray|24-bpp - BGR|24-bpp - RGB",
                                  L"MINISWHITE|MINISBLACK|RGB|PALETTIZED|RGBA|CMYK",
-                                 L"|||32-PARGB||")==29,
+                                 L"|||32-ARGB||")==29,
           "the pixel format names arrive from the interpreter");
 
     const wchar_t *sel = L"SELECT imgidu, fullPath FROM images"
@@ -1242,7 +1242,7 @@ static void gdipLoaderAndTheColumnsItCannotFill() {
     FIM.ok = true;
     m_pIWICFactory = (IWICImagingFactory*)1;
     qpvSetPixelFormatNames(L"a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|24-bpp - BGR",
-                           L"MINISWHITE|MINISBLACK|RGB", L"|||32-PARGB||");
+                           L"MINISWHITE|MINISBLACK|RGB", L"|||32-ARGB||");
     check(dupesPixInit(2) >= 1, "the pool starts");
 
     gShimWicCalls = gShimFimCalls = gShimGdipCalls = 0;

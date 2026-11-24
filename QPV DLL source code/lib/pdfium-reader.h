@@ -346,7 +346,8 @@ DLL_API int DLL_CALLCONV RenderPdfPageAsText(const wchar_t *pdfPath, int *givenI
     return errorType;
 }
 
-static Gdiplus::GpBitmap* coreRenderPdfPageAsBitmap(const wchar_t *pdfPath, int pageIndex, float dpi, int* givenW, int* givenH, int fillBehind, int bgrColor, int *varOut, int *errorType, const wchar_t* password, int do24bits) {
+// 32 bits pages: straightAlpha=1 gives a 32bppARGB bitmap, for the viewer; the worker pools take 32bppPARGB
+static Gdiplus::GpBitmap* coreRenderPdfPageAsBitmap(const wchar_t *pdfPath, int pageIndex, float dpi, int* givenW, int* givenH, int fillBehind, int bgrColor, int *varOut, int *errorType, const wchar_t* password, int do24bits, int straightAlpha = 0) {
 // https://github.com/bblanchon/pdfium-binaries
 // the caller holds pdfiumMutex
     int act = *varOut;
@@ -426,7 +427,7 @@ static Gdiplus::GpBitmap* coreRenderPdfPageAsBitmap(const wchar_t *pdfPath, int 
     *givenW = (int)pageWidth;
     *givenH = (int)pageHeight;
     int cbStride = (do24bits==1) ? bitmapWidth * 3 : bitmapWidth * 4;
-    Gdiplus::PixelFormat destinationGdipFormat = (do24bits==1) ? PixelFormat24bppRGB : PixelFormat32bppPARGB;
+    Gdiplus::PixelFormat destinationGdipFormat = (do24bits==1) ? PixelFormat24bppRGB : (straightAlpha==1) ? PixelFormat32bppARGB : PixelFormat32bppPARGB;
     Gdiplus::DllExports::GdipCreateBitmapFromScan0(bitmapWidth, bitmapHeight, cbStride, destinationGdipFormat, NULL, &myBitmap);
     if (myBitmap==NULL)
     {
@@ -484,7 +485,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
         return NULL;
     }
 
-    return coreRenderPdfPageAsBitmap(pdfPath, pageIndex, dpi, givenW, givenH, fillBehind, bgrColor, varOut, errorType, password, do24bits);
+    return coreRenderPdfPageAsBitmap(pdfPath, pageIndex, dpi, givenW, givenH, fillBehind, bgrColor, varOut, errorType, password, do24bits, 1);
 }
 
 #endif // QPV_PDFIUM_READER_H

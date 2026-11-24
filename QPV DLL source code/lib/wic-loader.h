@@ -833,9 +833,7 @@ BYTE* coreWICgetBufferImage(int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize,
   }
 
   GUID destFmt = (bitsDepth==32) ? GUID_WICPixelFormat32bppBGRA : GUID_WICPixelFormat24bppBGR;
-  if (bitsDepth==33)
-     destFmt = GUID_WICPixelFormat32bppPBGRA;
-  else if (bitsDepth==16)
+  if (bitsDepth==16)
      destFmt = GUID_WICPixelFormat16bppBGR555;
   else if (bitsDepth==48)
      destFmt = GUID_WICPixelFormat48bppRGB;
@@ -909,7 +907,7 @@ BYTE* coreWICgetBufferImage(int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize,
   if (myBitmap!=NULL)
   {
       Gdiplus::DllExports::GdipDisposeImage(myBitmap);
-      myBitmap = WICbmpSourceConvertGdip(pFinalBitmapSource, width, height, (UINT)cbStride, (UINT)cbBufferSize, PixelFormat32bppPARGB);
+      myBitmap = WICbmpSourceConvertGdip(pFinalBitmapSource, width, height, (UINT)cbStride, (UINT)cbBufferSize, PixelFormat32bppARGB);
   } else if (cbStride>0 && cbStride<=0xFFFFFFFFull && cbBufferSize>=cbStride)
   {
       // CopyPixels() takes the stride and the buffer size as UINTs, so anything past that
@@ -991,9 +989,30 @@ DLL_API BYTE* DLL_CALLCONV WICgetBufferImage(int bitsDepth, UINT64 cbStride, UIN
     return coreWICgetBufferImage(bitsDepth, cbStride, cbBufferSize, sliceHeight, useICM, 0, 0, 0, 0, 0, 0, 0, 0, myBitmap);
 }
 
+// premultiplied BGRA into straight BGRA, in place, rounded to nearest
+static void WICunpremultiplyBGRA(BYTE *data, UINT width, UINT height, UINT cbStride) {
+     for ( UINT y = 0 ; y < height ; y++)
+     {
+         BYTE *px = data + (UINT64)y * cbStride;
+         for ( UINT x = 0 ; x < width ; x++, px += 4)
+         {
+             const UINT a = px[3];
+             if (a==0 || a==255)
+                continue;
+
+             for ( int c = 0 ; c < 3 ; c++)
+             {
+                 // a resize with overshoot can leave a channel above its alpha
+                 const UINT v = (px[c] * 510u + a) / (2u * a);
+                 px[c] = (BYTE)(v>255u ? 255u : v);
+             }
+         }
+     }
+}
+
 Gdiplus::GpBitmap* BYTEconvertGdip(BYTE* &m_pbBuffer, UINT &width, UINT &height, UINT &cbStride) {
      Gdiplus::GpBitmap *myBitmap = NULL;
-     Gdiplus::DllExports::GdipCreateBitmapFromScan0(width, height, cbStride, PixelFormat32bppPARGB, NULL, &myBitmap);
+     Gdiplus::DllExports::GdipCreateBitmapFromScan0(width, height, cbStride, PixelFormat32bppARGB, NULL, &myBitmap);
      if (myBitmap!=NULL)
      {
          Gdiplus::Rect rectu(0, 0, width, height);
@@ -1002,11 +1021,11 @@ Gdiplus::GpBitmap* BYTEconvertGdip(BYTE* &m_pbBuffer, UINT &width, UINT &height,
          bitmapDatu.Height = height;
          bitmapDatu.Stride = cbStride;
          bitmapDatu.Scan0 = m_pbBuffer;
-         bitmapDatu.PixelFormat = PixelFormat32bppPARGB;
+         bitmapDatu.PixelFormat = PixelFormat32bppARGB;
 
          // ImageLockModeWrite | ImageLockModeUserInputBuf: the unlock copies m_pbBuffer in, so a failed
          // lock or unlock leaves a blank bitmap that must not pass for the image
-         if (Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rectu, 6, PixelFormat32bppPARGB, &bitmapDatu)!=Gdiplus::Ok
+         if (Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rectu, 6, PixelFormat32bppARGB, &bitmapDatu)!=Gdiplus::Ok
           || Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu)!=Gdiplus::Ok)
          {
             // disposed ahead of the message: building one can throw
@@ -1023,9 +1042,9 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV WICgetRectImage(int x, int y, int w, int
   UINT Stride = 0;
   UIntMult(100, sizeof(Gdiplus::ARGB), &Stride);
   Gdiplus::GpBitmap* myBitmap = NULL;
-  Gdiplus::DllExports::GdipCreateBitmapFromScan0(100, 100, Stride, PixelFormat32bppPARGB, NULL, &myBitmap);
+  Gdiplus::DllExports::GdipCreateBitmapFromScan0(100, 100, Stride, PixelFormat32bppARGB, NULL, &myBitmap);
   if (myBitmap!=NULL)
-     BYTE* m_pbBuffer = coreWICgetBufferImage(33, 0, 0, 0, useICM, mustClip, x, y, w, h, newW, newH, givenQuality, myBitmap);
+     BYTE* m_pbBuffer = coreWICgetBufferImage(32, 0, 0, 0, useICM, mustClip, x, y, w, h, newW, newH, givenQuality, myBitmap);
   return myBitmap;
 }
 
@@ -1332,8 +1351,8 @@ struct WICload {
     IWICBitmapDecoder     *pDecoder             = NULL;
     IWICBitmapScaler      *pScaler              = NULL;
     IWICBitmapFrameDecode *pFrame               = NULL;
-    WICPixelFormatGUID    destinationFormat     = GUID_WICPixelFormat32bppPBGRA;
-    Gdiplus::PixelFormat  destinationGdipFormat = PixelFormat32bppPARGB;
+    WICPixelFormatGUID    destinationFormat     = GUID_WICPixelFormat32bppBGRA;
+    Gdiplus::PixelFormat  destinationGdipFormat = PixelFormat32bppARGB;
     UINT owidth = 0, oheight = 0, mustResize = 0;
     DWORD sehCode = 0;
 };
@@ -1398,8 +1417,10 @@ static HRESULT wicLoadPixelFormat(WICload &ld, const WICframeFacts &facts, HRESU
        ld.mustResize = (nSize[0]!=ld.owidth || nSize[1]!=ld.oheight) ? 1 : 0;
        if (ld.mustResize==1)
        {
+          // resized premultiplied, so that transparent pixels add no colour to their neighbours;
+          // wicLoadResized() divides the alpha back out
           ld.destinationFormat = GUID_WICPixelFormat32bppPBGRA;
-          ld.destinationGdipFormat = PixelFormat32bppPARGB;
+          ld.destinationGdipFormat = PixelFormat32bppARGB;
        }
 
        int destinationBPP = decideWICtoFIMpixelFormat(opixelFormat);
@@ -1527,8 +1548,10 @@ static void wicLoadResized(WICload &ld, BYTE *m_pbBuffer, UINT width, UINT heigh
            int k = (ld.givenQuality==7) ? 3 : 0;
            k = openCVresizeBitmap(m_pbBuffer, resized, width, height, cbStride, nSize[0], nSize[1], NcbStride, 32, k, ld.doFlipHV);
            if (k==1)
+           {
+              WICunpremultiplyBGRA(resized, nSize[0], nSize[1], NcbStride);
               ld.myBitmap = BYTEconvertGdip(resized, nSize[0], nSize[1], NcbStride);
-           else
+           } else
               wicLoadLog(ld, "failed to rescale bitmap using OpenCV");
        } else wicLoadLog(ld, "failed to allocate buffer for the resized bitmap");
     } else wicLoadLog(ld, "failed to copy pixels to the allocated buffer");
@@ -1573,16 +1596,12 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
     }
 
     WICload ld = {threadIDu, noBPPconv, givenQuality, givenW, givenH, keepAratio, ScaleAnySize, givenFrame, doFlipHV, useICM, szFileName, resultsArray, isFIMokay};
-    if (noBPPconv==32)
-       ld.destinationFormat = GUID_WICPixelFormat32bppBGRA;
-    else if (noBPPconv==24)
+    if (noBPPconv==24)
        ld.destinationFormat = GUID_WICPixelFormat24bppBGR;
     else if (noBPPconv==16)
        ld.destinationFormat = GUID_WICPixelFormat16bppBGR555;
 
-    if (noBPPconv==32)
-       ld.destinationGdipFormat = PixelFormat32bppARGB;
-    else if (noBPPconv==24)
+    if (noBPPconv==24)
        ld.destinationGdipFormat = PixelFormat24bppRGB;
     else if (noBPPconv==16)
        ld.destinationGdipFormat = PixelFormat16bppRGB555;

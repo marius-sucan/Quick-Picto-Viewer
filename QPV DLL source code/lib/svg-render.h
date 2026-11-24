@@ -11,7 +11,8 @@
 #ifndef QPV_SVG_RENDER_H
 #define QPV_SVG_RENDER_H
 
-Gdiplus::GpBitmap* WICBitmapToGdipBitmap(IWICBitmap* &thisWICbitmap) {
+// straightAlpha=1 gives a 32bppARGB bitmap; otherwise it is 32bppPARGB, as Direct2D drew it
+Gdiplus::GpBitmap* WICBitmapToGdipBitmap(IWICBitmap* &thisWICbitmap, int straightAlpha) {
     Gdiplus::GpBitmap *myBitmap = NULL;
     if (!thisWICbitmap)
     {
@@ -30,9 +31,11 @@ Gdiplus::GpBitmap* WICBitmapToGdipBitmap(IWICBitmap* &thisWICbitmap) {
        return myBitmap;
     }
 
+    const GUID wantedFormat = (straightAlpha==1) ? GUID_WICPixelFormat32bppBGRA : GUID_WICPixelFormat32bppPBGRA;
+    const Gdiplus::PixelFormat gdipFormat = (straightAlpha==1) ? PixelFormat32bppARGB : PixelFormat32bppPARGB;
     IWICBitmapSource* convertedWICbitmap = NULL;
-    if (format!=GUID_WICPixelFormat32bppPBGRA)
-       hr = WICConvertBitmapSource(GUID_WICPixelFormat32bppPBGRA, thisWICbitmap, &convertedWICbitmap);
+    if (format!=wantedFormat)
+       hr = WICConvertBitmapSource(wantedFormat, thisWICbitmap, &convertedWICbitmap);
     else
        hr = thisWICbitmap->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void**>(&convertedWICbitmap));
 
@@ -40,7 +43,7 @@ Gdiplus::GpBitmap* WICBitmapToGdipBitmap(IWICBitmap* &thisWICbitmap) {
     {
        UIntMult(width, sizeof(Gdiplus::ARGB), &cbStride);
        UIntMult(cbStride, height, &cbBufferSize);
-       myBitmap = WICbmpSourceConvertGdip(convertedWICbitmap, width, height, cbStride, cbBufferSize, PixelFormat32bppPARGB);
+       myBitmap = WICbmpSourceConvertGdip(convertedWICbitmap, width, height, cbStride, cbBufferSize, gdipFormat);
        SafeRelease(convertedWICbitmap, "WICBitmapToGdipBitmap: convertedWICbitmap", 0);
     } else
     {
@@ -145,9 +148,10 @@ IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height, 
 
 // the body of LoadSVGimage(), with the two factories left to the caller; not exported.
 // Passing NULL for either one falls back to the process wide factory, so this behaves
-// exactly like LoadSVGimage() unless the caller has its own
+// exactly like LoadSVGimage() unless the caller has its own; the viewer takes straight alpha,
+// the worker pools premultiplied
 Gdiplus::GpBitmap* LoadSVGimageEx(UINT givenW, UINT givenH, float fSx, float fSy, const wchar_t *szFileName,
-                                  ID2D1Factory *d2dFac, IWICImagingFactory *wicFac) {
+                                  ID2D1Factory *d2dFac, IWICImagingFactory *wicFac, int straightAlpha = 0) {
     Gdiplus::GpBitmap* myBitmap = NULL;
     IWICBitmap* thisWICbitmap = NULL;
     if (givenW<2 || givenH<2)
@@ -155,14 +159,14 @@ Gdiplus::GpBitmap* LoadSVGimageEx(UINT givenW, UINT givenH, float fSx, float fSy
 
     thisWICbitmap = WicD2DrenderSVG(szFileName, givenW, givenH, fSx, fSy, d2dFac, wicFac);
     if (thisWICbitmap!=NULL)
-       myBitmap = WICBitmapToGdipBitmap(thisWICbitmap);
+       myBitmap = WICBitmapToGdipBitmap(thisWICbitmap, straightAlpha);
 
     SafeRelease(thisWICbitmap, "LoadSVGimage: thisWICbitmap", 0);
     return myBitmap;
 }
 
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadSVGimage(int threadIDu, UINT givenW, UINT givenH, float fSx, float fSy, const wchar_t *szFileName) {
-    return LoadSVGimageEx(givenW, givenH, fSx, fSy, szFileName, NULL, NULL);
+    return LoadSVGimageEx(givenW, givenH, fSx, fSy, szFileName, NULL, NULL, 1);
 }
 
 #endif // QPV_SVG_RENDER_H

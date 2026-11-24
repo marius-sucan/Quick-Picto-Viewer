@@ -1698,7 +1698,7 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
               // loader 4 for the same reason. Not one of the five columns would say
               // anything about the document: srcW and srcH above are the size of THIS
               // render, which is fitted into the thumbnail box at the 250 DPI this pool
-              // picked, while RenderPDFpage() fits it at userVPpdfDPI and reports 32-PARGB
+              // picked, while RenderPDFpage() fits it at userVPpdfDPI and reports 32-ARGB
               // where this asks PDFium for 24 bits. The same PDF would land in the files
               // list with different numbers depending on whether the workers or the single
               // threaded branch happened to draw it, which is the whole thing this is
