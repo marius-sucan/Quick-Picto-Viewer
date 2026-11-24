@@ -77936,7 +77936,6 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   Critical, on
   Static prevFrame := -1, lastInvoked := 1, BbackupIMGdetails := [], AbackupIMGdetails := []
 
-  GDIbmpFileConnected := 1
   otfi := totalFramesIndex
   hasFullReloaded := CountGIFframes := totalFramesIndex := 0
   MD5name := generateThumbName(imgPath, 1)
@@ -78006,8 +78005,6 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   ; If (RegExMatch(rawFmt, "i)(gif|tiff)$") && totalFramesIndex>0)
   If (currIMGdetails.frames>0)
      totalFramesIndex := currIMGdetails.Frames
-  Else If (rawFmt="MEMORYBMP")
-     GDIbmpFileConnected := 0
 
   isAnimFile := RegExMatch(imgPath, multiPageAnimTypesRegEx) ? 1 : 0
   If ((isAnimFile=1 || RegExMatch(imgPath, "i)(.\.(tif|tiff))$")) && totalFramesIndex>0)
@@ -78047,20 +78044,18 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
         rBitmap := cloneGDItoMem(A_ThisFunc, oBitmap)
 
      If validBMP(rBitmap)
-     {
-        GDIbmpFileConnected := 0
         trGdip_DisposeImage(oBitmap, 1)
-     } Else rBitmap := oBitmap
+     Else
+        rBitmap := oBitmap
   } Else
   {
      If (currIMGdetails.HasAlpha=1 && rawFmt!="MEMORYBMP")
         rBitmap := cloneGDItoMem(A_ThisFunc, oBitmap)
 
      If validBMP(rBitmap)
-     {
-        GDIbmpFileConnected := 0
         trGdip_DisposeImage(oBitmap, 1)
-     } Else rBitmap := oBitmap
+     Else
+        rBitmap := oBitmap
   }
 
   If (vpIMGrotation!=0)
@@ -78102,7 +78097,6 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
 
   If (canCancelImageLoad<3 && bwDithering=1 && imgFxMode=4)
   {
-     GDIbmpFileConnected := 0
      setWindowTitle("Converting image to black and white with dithering")
      If (currIMGdetails.HasAlpha=1)
         E := Gdip_BitmapSetColorDepth(rBitmap, 24, 1)
@@ -78137,6 +78131,8 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   BbackupIMGdetails := AbackupIMGdetails.Clone()
   AbackupIMGdetails := currIMGdetails.Clone()
   p := viewportQPVimage.imgHandle ? 1 : ""     ; this is meant to block caching the dummy GDI+ bitmap when images are loaded through «very-large» mode; see LoadBitmapForScreen()
+  ; a bitmap held in memory keeps no file open
+  GDIbmpFileConnected := (Gdip_GetImageRawFormat(rBitmap)="MEMORYBMP") ? 0 : 1
   AprevImgCall := "a" GDIbmpFileConnected MD5name p imgPath o_bwDithering ColorDepthDithering vpIMGrotation userHQraw userPerformColorManagement cmrRAWtoneMapAlgo allowToneMappingImg cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapAltExpo desiredFrameIndex "|==|" totalFramesIndex currentUndoLevel undoLevelsRecorded fimgW fimgH
   gdiBitmapIDcall := AprevImgCall
   gdiBitmapIDentire := AprevImgCall rBitmap
