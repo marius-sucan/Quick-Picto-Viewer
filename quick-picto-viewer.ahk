@@ -4965,7 +4965,7 @@ defineThumbsAratio() {
   Return friendly
 }
 
-recalculateThumbsSizes(dynColumnsDelta:=0) {
+recalculateThumbsSizes(columnsDelta:=0) {
    Static theString := "WAWAWAWAWAWAWAWAWAWAWAWAWAWAWAWAWAWAWAWAW"
         , prevDimensions, columnsPossible, txtResH, othumbsW := 300, othumbsH := 300
 
@@ -5001,23 +5001,26 @@ recalculateThumbsSizes(dynColumnsDelta:=0) {
          calcIMGdimensions(othumbsW, othumbsH, mainWidth, mainHeight, thumbsW, thumbsH)
 
       columns := Min(Max(Round(mainWidth/thumbsW), minColumns), maxColumns)
-      If dynColumnsDelta
-      {
-         ; the zoom level of the neighbouring column count
-         newColumns := Min(Max(columns + dynColumnsDelta, minColumns), maxColumns)
-         If (newColumns!=columns)
-         {
-            thumbsZoomLevel := clampInRange(mainWidth/(newColumns*othumbsW), 0.35, 3)
-            Return recalculateThumbsSizes()
-         }
-      }
    } Else
       columns := Min(Max(thumbsColumns, minColumns), maxColumns)
+
+   If columnsDelta
+   {
+      ; = / - step from the shown column count to its neighbour
+      newColumns := Min(Max(columns + columnsDelta, minColumns), maxColumns)
+      If (dynamicThumbsColumns!=1)
+         thumbsColumns := newColumns
+      Else If (newColumns!=columns)
+         thumbsZoomLevel := clampInRange(mainWidth/(newColumns*othumbsW), 0.35, 3)
+
+      If (newColumns!=columns)
+         Return recalculateThumbsSizes()
+   }
 
    ; whole columns and rows span the viewport
    thumbsW := mainWidth//columns
    rows := Round(mainHeight/Round(thumbsW*othumbsH/othumbsW))
-   thumbsH := mainHeight//Min(Max(rows, 1, Ceil(mainHeight/2048)), mainHeight//minSize)
+   thumbsH := Min(mainHeight//Min(Max(rows, 1), mainHeight//minSize), 2048)
 
    If isInRange(max(thumbsW, thumbsH), 0, 150)
       thumbsSizeQuality := 125
@@ -11818,15 +11821,9 @@ ChangeThumbsZoom(dir) {
 
    apo := thumbsZoomLevel "|" thumbsColumns
    If (dynamicThumbsColumns=1)
-   {
       recalculateThumbsSizes((dir=1) ? -1 : 1)
-   } Else
-   {
-      If (dir=1)
-         thumbsColumns += 1
-      Else
-         thumbsColumns -= 1
-   }
+   Else
+      recalculateThumbsSizes((dir=1) ? 1 : -1)
 
    thumbsZoomLevel := clampInRange(thumbsZoomLevel, 0.35, 3)
    thumbsColumns := clampInRange(thumbsColumns, 2, 100)
