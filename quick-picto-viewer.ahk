@@ -36002,7 +36002,7 @@ removeFilesListSeenImages(modus:=0) {
 
       If (StrLen(filesFilter)>1 && hasAskedFilter=0)
       {
-         msgResult := msgBoxWrapper(appTitle ": Remove " friendlyLabel " images from index", "The files list is filtered down to " maxFilesIndex " files from " bckpMaxFilesIndex ".`n`nOnly the files matched by the current filter will be scanned.`n`nTo scan all the image files in the index, deactivate the filter by pressing Ctrl + F.", 1, 0, "info")
+         msgResult := msgBoxWrapper(appTitle ": Remove " friendlyLabel " images from index", "The files list is filtered down to " maxFilesIndex " files from " bckpMaxFilesIndex ".`n`nOnly the files matched by the current filter will be scanned.`n`nTo scan all the image files in the index, deactivate the filter by pressing Ctrl + Space.", 1, 0, "info")
          If (msgResult="cancel" || InStr(msgResult, "win_close"))
             Return
          Else 
@@ -37743,7 +37743,7 @@ SortFilesList(SortCriterion, userAct:=0) {
       filesToBeSorted := maxFilesIndex
       If (StrLen(filesFilter)>1 && hasAskedFilter=0)
       {
-         msgResult := msgBoxWrapper(appTitle ": Sort operation", "The files list is filtered down to " maxFilesIndex " files from " bckpMaxFilesIndex ".`n`nOnly the files matched by the current filter will be sorted, not all the files.`n`nTo sort all files, remove the filter by pressing Ctrl + F.", 1, 0, "info")
+         msgResult := msgBoxWrapper(appTitle ": Sort operation", "The files list is filtered down to " maxFilesIndex " files from " bckpMaxFilesIndex ".`n`nOnly the files matched by the current filter will be sorted, not all the files.`n`nTo sort all files, remove the filter by pressing Ctrl + Space.", 1, 0, "info")
          If (msgResult="cancel" || InStr(msgResult, "win_close"))
             Return
          Else
@@ -52220,7 +52220,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     GuiAddColor("x+5 hp w" sml, "FillArea2ndColor")
     GuiAddSlider("FillArea2ndOpacity", 1,255, 255, "Opacity", "updateUIfillPanel", 1, "x+5 w" wml " hp")
     GuiAddSlider("FillAreaGradientAngle", -180,180, "0f", "Angle: $€°", "updateUIfillPanel", 2, "xs y+15 w" slideWid " h" ha)
-    GuiAddDropDownList("xp yp wp AltSubmit gupdateUIfillPanel Choose" FillAreaWelcomePattern " vFillAreaWelcomePattern", "Horizontal lines|Random squares|Random circles|Corner anchored circles|Vertical lines|Random circles|Maurer rose", "Pattern generator type")
+    GuiAddDropDownList("xp yp wp AltSubmit gupdateUIfillPanel Choose" FillAreaWelcomePattern " vFillAreaWelcomePattern", "Horizontal lines|Random squares|Random circles|Corner anchored circles|Vertical lines|Randomly anchored circles|Maurer rose", "Pattern generator type")
     GuiAddSlider("FillAreaGradientScale", 1,300, 100, "Scale: $€%", "updateUIfillPanel", 1, "x+5 wp h" ha)
     GuiAddSlider("FillAreaGradientPosA", 0,200, 0, "Position A", "updateUIfillPanel", 3, "xs y+15 wp hp")
     GuiAddSlider("FillAreaGradientPosB", 0,200, 200, "Position B", "updateUIfillPanel", 3, "x+5 wp hp")
@@ -62569,7 +62569,7 @@ batchConvert2format() {
 
    setImageLoading()
    filesPerCore := calculateCoresRequired(filesElected)
-   showTOOLtip("Converting to ." rDesireWriteFMT " format " groupDigits(filesElected) " files, please wait")
+   showTOOLtip("Converting " groupDigits(filesElected) " files to ." rDesireWriteFMT " format, please wait")
    destroyGDIfileCache()
    backCurrentSLD := CurrentSLD
    mustDoMultiCore := (convertFormatUseMultiThreads=1 && systemCores>1 && filesPerCore>=2) ? 1 : 0
