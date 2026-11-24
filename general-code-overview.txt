@@ -370,7 +370,7 @@ d) How an image is loaded and displayed on screen
    openCVresizeGdipBitmap() found in qpvmain.dll. The DLL function
    locks the GDI+ bitmap in its own pixel format, resizes the given
    rect with OpenCV and returns a new 32-PARGB bitmap, which is
-   is then drawn by GDI+. If no bitmap is returned, Gdip_DrawImage()
+   then drawn by GDI+. If no bitmap is returned, Gdip_DrawImage()
    scales the image for that frame.
 
    High quality frames use the area interpolation when the image is
