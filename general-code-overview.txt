@@ -398,8 +398,9 @@ d) How an image is loaded and displayed on screen
    adaptively choose between the available caches. To draw the
    image on screen, Gdip_DrawImage() or Gdip_DrawImageFX() are used.
 
-   Internally, QPV use the 32-PARGB pixel format, because
-   Gdip_DrawImage() and other functions perform faster.
+   Internally, QPV uses the 32-ARGB pixel format: the DLL functions
+   lock the bitmaps in it, so GDI+ converts nothing on a lock. The
+   thumbnails made by the DLL workers are 32-PARGB; they are only drawn.
 
    There are four EX_LAYERED windows: "hGDIthumbsWin", "hGDIwin"
    "hGDIselectWin", "hGDIinfosWin". There are two global GDI+

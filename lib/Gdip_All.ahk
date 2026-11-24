@@ -3432,7 +3432,7 @@ Gdip_RotateBitmapAtCenter(pBitmap, Angle, pBrush:=0, InterpolationMode:=7, Pixel
     } Else
     {
        If (PixelFormat=-1)
-          PixelFormat := "0xE200B"
+          PixelFormat := "0x26200A" ; PixelFormat32bppARGB
 
        newBitmap := Gdip_CreateBitmap(RWidth, RHeight, PixelFormat)
        If (StrLen(newBitmap)>1)
@@ -3509,11 +3509,11 @@ Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", Kee
     If (KeepPixelFormat=1)
        PixelFormat := Gdip_GetImagePixelFormat(pBitmap, 1)
     Else If (KeepPixelFormat=-1)
-       PixelFormat := "0xE200B"
+       PixelFormat := "0x26200A" ; PixelFormat32bppARGB
     Else If (Strlen(KeepPixelFormat)>3)
        PixelFormat := KeepPixelFormat
 
-    If ((mpx>536.4 && (!PixelFormat || PixelFormat=0x22009 || PixelFormat=0xE200B)) || (mpx>715.3 && PixelFormat=0x21808) || max(ResizedW, ResizedH)>32750 && checkTooLarge=1)
+    If ((mpx>536.4 && (!PixelFormat || PixelFormat=0x22009 || PixelFormat=0x26200A || PixelFormat=0xE200B)) || (mpx>715.3 && PixelFormat=0x21808) || max(ResizedW, ResizedH)>32750 && checkTooLarge=1)
        Return
 
     If (ResizedW=Width && ResizedH=Height)
@@ -9332,7 +9332,7 @@ Gdip_BitmapConvertGray(pBitmap, hue:=0, vibrance:=-40, brightness:=1, contrast:=
     If (StrLen(KeepPixelFormat)>3)
        PixelFormat := KeepPixelFormat
     Else If (KeepPixelFormat=-1)
-       PixelFormat := "0xE200B"
+       PixelFormat := "0x26200A" ; PixelFormat32bppARGB
 
     newBitmap := Gdip_CreateBitmap(Width, Height, PixelFormat)
     G := Gdip_GraphicsFromImage(newBitmap, InterpolationMode)

@@ -2276,7 +2276,7 @@ getFIMfunc(funct) {
    Return funct
 }
 
-ConvertFIMtoPBITMAP(hFIFimgA, pixelFormat:="0xE200B") {
+ConvertFIMtoPBITMAP(hFIFimgA, pixelFormat:="0x26200A") { ; PixelFormat32bppARGB
 ; only the FreeImage Standard Bitmap type is supported
 
   type := FreeImage_GetImageType(hFIFimgA)
