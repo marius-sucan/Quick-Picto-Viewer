@@ -19,10 +19,11 @@ audit also covers what those controls run, and the routes that open the panel. T
 
 Line numbers are `quick-picto-viewer.ahk` on `development` at `468aef9`. The audit changed no code.
 
-Nine findings and a list of small things. Each one says how it was checked: **run** means the real
-application did it under headless Wine, on the stock AutoHotkey 1.1.37.02; **read** means it follows from
-the code and was not run. Nothing was run on Windows. Each run carries a tag such as A1 or E3: the letter
-names its batch (listed under «How this was checked»), and the tag marks its lines in the kit's logs.
+Eight findings, a list of small things (row 9 of the summary) and four things seen in passing. Each one
+says how it was checked: **run** means the real application did it under headless Wine, on the stock
+AutoHotkey 1.1.37.02; **read** means it follows from the code and was not run. Nothing was run on Windows.
+Each run carries a tag such as A1 or E3: the letter names its batch (listed under «How this was checked»),
+and the tag marks its lines in the kit's logs.
 
 Earlier work on this panel is not reported again: the 2026-11-08 menus, Status column and «Check all files»
 (`aa90f56`, with Marius's corrections in `a20625d`); the history and paging fixes (`4714558`); the
@@ -36,7 +37,8 @@ Earlier work on this panel is not reported again: the 2026-11-08 menus, Status c
 
 - **The panel**: panel 8, «Rename multiple files». It opens from `PanelRenameThisFile()` when two or more files
   are selected (:44299-44303). Its routes: F2 (:2016-2018), the File menu's «Rename file(s)» (:68636), the files
-  actions menu's «Rename file(s)» (:70752), the toolbar's «Modify entry» button (:106545), and «Multi-rename»
+  actions menu's «Rename file(s)» (:70752), the toolbar's «Rename file(s)» button (`BTNmodifyEntry`,
+  :106544-106545), and «Multi-rename»
   in the single file rename box (:44327-44329).
 - **The pattern**: the text in the box, as `decideMultiRename()` reads it. A **plain name** is a pattern with no
   `[this]`, no `trim{}`, no `//`, `\\` or `>>`: the files take that name with « (N)» added, counted per folder.
@@ -77,8 +79,9 @@ that can mean a selected file in the Recycle Bin. Findings 6 to 8 leave stale st
 `coreBatchMultiRenameFiles()` :41944-42187, its redisplay `dummyTimerDelayiedImageDisplay(100)` :42179;
 `UIlvMultiRenameResponder()` «DoubleClick» :41768-41771; `BTNdoSoloRename()` :41149-41161
 
-No route of this panel calls `askAboutFileSave()`. The single file rename asks it (:44348), and so do the
-copy/move panels (:61654, :62025) and «Remove filters» (:33238).
+No route of this panel calls `askAboutFileSave()`. The single file rename asks it (:44348), and so do the two
+copy/move panels (`BTNuiProceedStructuredOperation()` :61654, `BtnCopyMoveAction()` :62025) and «Remove filters»
+(:33238).
 
 - **«Rename files»**: the batch renames the files, then redisplays the current entry at its new path (:42179).
   Loading that path ends the editing.
@@ -114,7 +117,7 @@ So «Rename files» loses the edits only when the edited image is among the rena
 A change of letter case alone is recognized by `isSameFileOtherCase()`, and the status by `newPath=srcPath`.
 Both use `=`, which folds the case of ASCII letters only: `été.png` and `ÉTÉ.png` are «different» for them. The
 file system folds both, so `FileExist("…\ÉTÉ.png")` finds `été.png` itself, and the batch treats the file as
-its own collision (:42084-42086). Romanian, French and German names are hit: ă, î, ș, ț, é, ü, ß…
+its own collision (:42084-42086). Romanian, French and German names are hit: ă, î, ș, ț, é, ü…
 
 Runs, `case{U}` on été.png, ăîșț.png and abc.png, under each collision action (C1-C4). The probe line of each
 run shows `FileExist(ÉTÉ.png)=A`, `isSameFileOtherCase()=0` and `"été"="ÉTÉ"` false.
@@ -262,8 +265,10 @@ is gone, so the pattern reads blank, and the blank-pattern branch runs `LV_Delet
 
 Runs:
 
-- **G1**, «Cancel» within 450 ms of a typed change: the timer runs with `AnyWindowOpen=0`, and a hidden
-  SettingsGUIA window exists afterwards. The panel then opens again normally.
+- **G0**, «Cancel» within 450 ms of a typed change: right after «Cancel» there is no SettingsGUIA window; once
+  the timer has run, there is one, hidden.
+- **G1**, the same: the timer runs with `AnyWindowOpen=0`, the hidden window is there afterwards, and the panel
+  then opens again normally.
 - **G2**, «Rename files» within 450 ms of a typed change (Enter right after typing): the same hidden window,
   after the batch.
 - **G3**, the file actions history panel opened within the 450 ms: its list had 3 rows before the timer and
@@ -322,7 +327,8 @@ The hidden window did no visible harm in G1 and G2. G3 needs another panel opene
   parts (:60710), in both modes. I4: `\\server\share\dir\a.jpg` gives the folder `server\share\dir`, a relative
   path, so the batch's target `OutDir "\" newFileName "." ext` (:42053) would point under the working folder
   (run for the split; no network share was available under Wine, so a rename on one was not run). The helper
-  has 189 calls; whatever else rebuilds a path from its folder is likely hit the same way (read).
+  has 186 calls in the script and its lib; whatever else rebuilds a path from its folder is likely hit the
+  same way (read).
 - **B. The single file rename on a database list** offers the lowered name in its box (:44307-44308), and a
   typed name without an extension takes the lowered extension (:44341-44343); finding 3 in another panel (read).
 - **C. The collision action is kept for the session only.** `onConflictMultiRenameAct` is set at start-up to 4
@@ -351,6 +357,8 @@ The hidden window did no visible harm in G1 and G2. G3 needs another panel opene
   on its first call and keeps it current for the rest of the batch (:34050-34072) (read).
 - **The pattern box**, read with `GuiControlGet` into each handler's own `UsrEditNewFileName`, works in every
   handler run (A-J) (run).
+- **A right-click on the list** opens one menu: the list's handler opens the panel menu (:41772-41774), and
+  `SettingsGUIAGuiContextMenu()` returns without one for a right-click on a control (:26029-26032) (read).
 - **The menus**: «Insert» disables its tokens for `$.` patterns (:41451-41457); a `case{…}` token replaces the
   one already in the box (:41494-41499) (read).
 
@@ -417,8 +425,12 @@ The hidden window did no visible harm in G1 and G2. G3 needs another panel opene
   - the late preview timer started as the box's g-label starts it, `SetTimer, uiPopulateLVmultiRename, -450`
     (finding 8).
 - **Batches**: A (collisions against the preview), B (database lists), C (non-ASCII case), D (the «Invalid RegEx»
-  row), E and E4 (an edited image), F (favourites), G (the late timer), H (the defects left open on 2026-11-13),
+  row), E and E4 (an edited image), F (favourites), G and G0 (the late timer), H (the defects left open on
+  2026-11-13),
   I (the font toggle, the page buttons, the history, a network path), J (a swap, an empty file).
+- **Read, not run, at this revision**: «Insert», «Examples», «Erase history», «Help», «<<», «<», «>>», «Preserve
+  original file date and time» and «Dark mode UI». The 2026-11-08 kits ran the menus, «Erase history» and the
+  paging at earlier revisions; no finding about them here means none was found by reading.
 - **Not run on Windows**: how NTFS and the Recycle Bin handle the «Overwrite» case of finding 2; what Alt+M does
   in 9.7; a rename on a network share (A).
 - **Not run at all**: Escape during «Check all files»; private mode; multi-page preview mode; a selection
