@@ -70501,8 +70501,9 @@ createMenuMainView() {
             kMenu("PVview", "Add", "Decrease viewport text size`tCtrl+-", "MenuChangeOSDZoomMinus", "disability handicap eyes eyesight large",,1)
          } Else
          {
-            kMenu("PVview", "Add", "Decrease thumbnail size`t=", "MenuChangeImgZoomPlus")
-            kMenu("PVview", "Add", "Increase thumbnail size`t-", "MenuChangeImgZoomMinus")
+            ; with fixed columns, = adds a column and the thumbnails shrink
+            kMenu("PVview", "Add", ((dynamicThumbsColumns=1) ? "Increase" : "Decrease") " thumbnail size`t=", "MenuChangeImgZoomPlus")
+            kMenu("PVview", "Add", ((dynamicThumbsColumns=1) ? "Decrease" : "Increase") " thumbnail size`t-", "MenuChangeImgZoomMinus")
          }
       } Else
       {
@@ -71739,8 +71740,8 @@ BuildSecondMenu(givenCoords:=0) {
             kMenu("PVmenu", "Add", "Decrease text size`t-", "MenuChangeOSDZoomMinus",,,1)
          } Else
          {
-            kMenu("PVmenu", "Add", "More thumbnail columns`t=", "MenuChangeImgZoomPlus")
-            kMenu("PVmenu", "Add", "Fewer thumbnail columns`t-", "MenuChangeImgZoomMinus")
+            kMenu("PVmenu", "Add", ((dynamicThumbsColumns=1) ? "Increase thumbnail size" : "More thumbnail columns") "`t=", "MenuChangeImgZoomPlus")
+            kMenu("PVmenu", "Add", ((dynamicThumbsColumns=1) ? "Decrease thumbnail size" : "Fewer thumbnail columns") "`t-", "MenuChangeImgZoomMinus")
          }
       } Else
       {
