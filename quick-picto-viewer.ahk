@@ -11601,7 +11601,16 @@ HardResetImageView() {
 
    VPchangeLumos(2, "k")
    If (AnyWindowOpen=40 && thumbsDisplaying=1)
+   {
+      ; the panel submits its controls, so they take the reset values first
+      GuiControl, SettingsGUIA:, FlipImgH, % FlipImgH
+      GuiControl, SettingsGUIA:, FlipImgV, % FlipImgV
+      GuiControl, SettingsGUIA: Choose, UIimgFxMode, % (imgFxMode>3) ? imgFxMode - 1 : imgFxMode
+      GuiControl, SettingsGUIA: Choose, usrColorDepth, % usrColorDepth
+      GuiControl, SettingsGUIA:, thumbsColumns, % thumbsColumns
+      GuiControl, SettingsGUIA:, UIthumbsZoomLevel, % Round(thumbsZoomLevel*100)
       updateUIthumbsView()
+   }
 }
 
 coreResetIMGview(dummy:=0) {
