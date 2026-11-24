@@ -69217,7 +69217,7 @@ InvokeMenuBarList(manuID:=0, justBuild:=0) {
      kMenu("pvMenuBarList", "Add", "&Regenerate the entire list", "RegenerateEntireList")
   Menu, pvMenuBarList, Add
   If (SLDtypeLoaded=2 && currentFilesListModified=1 && CurrentSLD && maxFilesIndex>1)
-     kMenu("pvMenuBarList", "Add", "&Save files list no&w`tCtrl+S", "BTNsaveCurrentSlideshow")
+     kMenu("pvMenuBarList", "Add", "&Save files list now`tCtrl+S", "BTNsaveCurrentSlideshow")
   If (maxFilesIndex>1)
      kMenu("pvMenuBarList", "Add", "Save files list as .S&LD`tCtrl+Shift+S", "PanelSaveSlideShowu")
 
@@ -69280,7 +69280,7 @@ InvokeMenuBarEditorTools(manuID:=0, justBuild:=0) {
   deleteMenus()
   If isVarEqualTo(AnyWindowOpen, 31, 24)
   {
-     kMenu("PVlTools", "Add", "`Options disabled", "dummy")
+     kMenu("PVlTools", "Add", "Options disabled", "dummy")
      kMenu("PVlTools", "Disable", "Options disabled")
      If (justBuild!=1)
         showThisMenu("PVlTools", 0, 1, manuID)
@@ -71204,7 +71204,7 @@ createMenuLiveTools(dummy:=0) {
    Else If (AnyWindowOpen=74)
       kMenu("PVlTools", "Check/Disable", "&Adjust image colours`tU")
    Else If (AnyWindowOpen=81)
-      kMenu("PVlTools", "Check/Disable", "Create image s&ymmetry or patterns")
+      kMenu("PVlTools", "Check/Disable", "S&ymmetry patterns")
 
    If (editingSelectionNow=1 && dummy!="mbr")
    {
