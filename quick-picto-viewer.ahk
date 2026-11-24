@@ -218,7 +218,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , cmdExifTool := "", tabzDarkModus := 0, maxRecentOpenedFolders := 6, UIuserToneMapParamA := 210, UIuserToneMapParamB := 160
    , userImgChannelRlvl, userImgChannelGlvl, userImgChannelBlvl, userImgChannelAlvl, combosDarkModus := ""
    , sillySeparator :=  "▪", menuCustomNames := new hashtable(), clrGradientCoffX := 0, clrGradientCoffY := 0
-   , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*|Clip to alpha*|Replace*|Behind*"
+   , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Subtract|Luminosity|Ghosting|Inverted difference*|Clip to alpha*|Replace*|Behind*"
    , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := []
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
    , PDFpwdsCache := [], multiCoreThumbsInitGood := "n", thumbsPoolState := 0
@@ -2503,7 +2503,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
   mustOpenStartFolder := ""
   zPlitPath(fileNamu, 0, OutFileName, OutDir, extname)
   If !FileExist(fileNamu)
-     Return msgBeepTimer("ERROR: Unable to load the files list.`nThe file is missing or access denied.`n" OutFileName "`n" OutDir "\")
+     Return msgBeepTimer("ERROR: Unable to load the files list.`nThe file is missing or access is denied.`n" OutFileName "`n" OutDir "\")
 
   PopulateIndexFilesStatsInfos("kill")
   If (SLDtypeLoaded=3)
@@ -2693,7 +2693,7 @@ refreshUImainWinElements() {
 }
 
 activateFilesListFilterBasedOnFolder(thisIndex) {
-   If askAboutFileSave(" and the files list will be filtered to the image containing folder")
+   If askAboutFileSave(" and the files list will be filtered to the folder containing the image")
       Return
 
    r := resultedFilesList[thisIndex, 1]
@@ -2841,7 +2841,7 @@ OpenQPVfileFolder(modus:=0, pathu:=0) {
     If !FolderExist(folderu)
        Return msgBeepTimer("ERROR: Folder not found or access denied:`n" folderu "\")
 
-    If askAboutDiscards(" and the containing folder of the selected image will be opened")
+    If askAboutDiscards(" and the folder containing the selected image will be opened")
        Return
 
     If imgPath
@@ -2950,7 +2950,7 @@ OpenWithNewQPVinstance(modus:=0, givenList:=0, givenCount:=0) {
    ; ToolTip, % givenCount "--" modus "--" filesElected "--" givenList , , , 2
    If (filesElected>25 && modus!="single")
    {
-      msgBoxWrapper(appTitle ": WARNING", "You are not allowed to spawn in one go more than 25 instances of " appTitle ".", 0, 0, "error")
+      msgBoxWrapper(appTitle ": WARNING", "In one go, you can spawn at most 25 instances of " appTitle ".", 0, 0, "error")
       Return
    }
 
@@ -3125,7 +3125,7 @@ OpenImgWithUserExternApp(modus:=0) {
    If !FileExist(thisAPPpath)
    {
       zPlitPath(thisAPPpath, 0, fileNamu, folderu, OutNameNoExt)
-      Return msgBeepTimer("ERROR: The file of the external application does not seem to exist anymore`n" fileNamu "`n" folderu "\")
+      Return msgBeepTimer("ERROR: The external application file no longer seems to exist`n" fileNamu "`n" folderu "\")
    }
 
    Try Run, %thisAPPpath% "%imgPath%"
@@ -3298,7 +3298,7 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
       {
          etaTime := ETAinfos(countTFilez, filesElected, startOperation)
          If (failedFiles>0)
-            etaTime .= "`nFailed to perform action on " groupDigits(failedFiles) " files"
+            etaTime .= "`nFailed to perform the action on " groupDigits(failedFiles) " files"
          If (skippedFiles>0)
             etaTime .= "`nSkipped files: " groupDigits(skippedFiles)
 
@@ -3422,7 +3422,7 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
    }
 
    If (failedFiles>0)
-      someErrors .= "`nFailed to perform action on " groupDigits(failedFiles) " files"
+      someErrors .= "`nFailed to perform the action on " groupDigits(failedFiles) " files"
    If (skippedFiles>0)
       someErrors .= "`nSkipped files: " groupDigits(skippedFiles)
    If (failedDBfiles>0)
@@ -3458,7 +3458,7 @@ CalculateSelectedFilesSizes() {
   stopGifORslidesPlayback()
   getSelectedFiles(0, 1)
   If !markedSelectFile
-     Return msgBeepTimer("WARNING: No files currently selected to calculate the total size for", 0)
+     Return msgBeepTimer("WARNING: No files are selected to calculate the total size of", 0)
 
   showTOOLtip("Calculating total size for selected file entries, please wait")
   prevMSGdisplay := A_TickCount
@@ -3487,7 +3487,7 @@ CalculateSelectedFilesSizes() {
         If failedFiles
            etaTime .= "`nFailed to collect data for " groupDigits(failedFiles) " files"
 
-        showTOOLtip("Calculating total files size`nTotal size: " thisSize etaTime, 0, 0, countFiles/markedSelectFile)
+        showTOOLtip("Calculating the total size`nTotal size: " thisSize etaTime, 0, 0, countFiles/markedSelectFile)
         prevMSGdisplay := A_TickCount
      }
 
@@ -3559,7 +3559,7 @@ CopyImagePath(modus:=0) {
       If (userPrivateMode=1)
          thisu := "****************"
 
-      infoText := (wasOkay=0) ? "ERROR: Failed to copy to clipboard as text the active entry" : "The active entry was copied to clipboard as text"
+      infoText := (wasOkay=0) ? "ERROR: Failed to copy the active entry to clipboard as text" : "The active entry was copied to clipboard as text"
       Return msgBeepTimer(infoText "`n" thisu, InStr(infoText, "error: failed") ? 300 : 0)
    }
 
@@ -3622,7 +3622,7 @@ CopyImagePath(modus:=0) {
        friendly := "file names"
 
     If !copyTextToClippy(listu)
-       msgBeepTimer("Failed to copy to clipboard as text the " friendly)
+       msgBeepTimer("Failed to copy the " friendly " to the clipboard as text")
     Else
        msgBeepTimer(groupDigits(counter) " selected " friendly " copied to clipboard as text", 0)
 
@@ -3691,7 +3691,7 @@ CopyMoveFilesExplorer(userOption:="copy", onWhat:=0) {
         dataHandle := ClipboardSetFiles(newFilesList, userOption, modus)
         Sleep, 5
         testClipType := IsClipboardFormatAvailable(15)
-        infoText := (testClipType!=1 || !dataHandle) ? "ERROR: Failed to store the selected " friendly "s into the clipboard" : userOption " was applied on " groupDigits(countTFilez) A_Space friendly "s.`nThese can now be pasted in any file manager or in QPV."
+        infoText := (testClipType!=1 || !dataHandle) ? "ERROR: Failed to store the selected " friendly "s on the clipboard" : userOption " was applied to " groupDigits(countTFilez) A_Space friendly "s.`nThese can now be pasted in any file manager or in QPV."
         Return msgBeepTimer(infoText, InStr(infoText, "error") ? 300 : 900)
      } Else markedSelectFile := 0
   }
@@ -3710,7 +3710,7 @@ CopyMoveFilesExplorer(userOption:="copy", onWhat:=0) {
   dataHandle := ClipboardSetFiles(newFilesList, userOption, modus)
   Sleep, 5
   Try testClipType := IsClipboardFormatAvailable(15)
-  infoText := (testClipType!=1 || !dataHandle) ? "ERROR: Failed to set " friendly " to clipboard" : userOption " [Explorer] was applied on the " friendly " `n"
+  infoText := (testClipType!=1 || !dataHandle) ? "ERROR: Failed to set " friendly " to clipboard" : userOption " [Explorer] was applied to the " friendly " `n"
   msgBeepTimer(infoText fileNamu "`n" folderu "\", InStr(infoText, "error") ? 300 : 900)
 }
 
@@ -4022,7 +4022,7 @@ CopyAlphaMask2clippy(modus:=0, allowAsk:=0) {
      Else If !r
         msgBeepTimer("Failed to rasterize the alpha mask")
      Else
-        msgBeepTimer("Alpha mask rasterized as user painted bitmap`nOriginal mask type: " infoMask, 900)
+        msgBeepTimer("Alpha mask rasterized as a user painted bitmap`nOriginal mask type: " infoMask, 900)
   } Else
   {
      If r
@@ -4045,7 +4045,7 @@ PanelOfferAlphaMaskMerger(oldBitmap, newBitmap) {
    Static blends := {1:0, 2:2, 3:3, 4:6, 5:7, 6:10, 7:16}
 
    widthu := (PrefsLargeFonts=1) ? 900 : 600
-   msgResult := msgBoxWrapper("Merge alpha masks: " appTitle, "It seems you already have a user painted bitmap as alpha mask. Would you like to blend it with the new generated bitmap or just replace it?", "&Proceed|&Cancel", 1, "image", nullCheckBox, 0, "", "" ,, 1, widthu, "Replace bitmap (no blending)`f`fDarken (substractive)`fMultiply (substractive)`fLighten (additive)`fScreen (additive)`fOverlay (mixed)`fExclusion (mixed)", 2)
+   msgResult := msgBoxWrapper("Merge alpha masks: " appTitle, "It seems you already have a user painted bitmap as an alpha mask. Would you like to blend it with the newly generated bitmap or just replace it?", "&Proceed|&Cancel", 1, "image", nullCheckBox, 0, "", "" ,, 1, widthu, "Replace bitmap (no blending)`f`fDarken (subtractive)`fMultiply (subtractive)`fLighten (additive)`fScreen (additive)`fOverlay (mixed)`fExclusion (mixed)", 2)
    If InStr(msgResult.btn, "proceed")
    {
       thisu := blends[msgResult.2ndlist]
@@ -4101,7 +4101,7 @@ SetImageAsAlphaMask(isGiven:=0, externBMP:=0) {
   stopGifORslidesPlayback()
   r := 1
   whichBitmap := (wasGiven=1) ? externBMP : useGdiBitmap()
-  friendly := (editingSelectionNow=1 && wasGiven=0) ? " selected area " : ""
+  friendly := (editingSelectionNow=1 && wasGiven=0) ? " selected area" : ""
   setImageLoading()
   If validBMP(whichBitmap)
   {
@@ -4625,7 +4625,7 @@ initThumbsPool() {
     rz := DllCall("qpvmain.dll\qpvSetPixelFormatNames", "WStr", packWICpixelFormatNames(), "WStr", FIMcolorTypeNames("packed"), "WStr", "|||32-ARGB||", "Int")
     sendPoolFormatLists()
     multiCoreThumbsInitGood := 1
-    addJournalEntry("Succesfully initialized " r " threads.")
+    addJournalEntry("Successfully initialized " r " threads.")
 }
 
 QPV_ThumbsPoolBegin(thumbSize, timePerImg, thisImgQuality, wantBitmap, alwaysSave) {
@@ -4849,7 +4849,7 @@ ToggleThumbsMode() {
       thisFolderDetails := getFolderDetails(StrReplace(CurrentSLD, "|"))
       IF (thisFolderDetails!=watchFolderDetails && !markedSelectFile)
       {
-         msgResult := msgBoxWrapper(appTitle ": Folder changed", "The folder currently opened seems to have been changed. Would you like to reload it?", 4, 0, "question")
+         msgResult := msgBoxWrapper(appTitle ": Folder changed", "The opened folder seems to have changed. Would you like to reload it?", 4, 0, "question")
          If InStr(msgResult, "yes")
             RefreshFilesList()
       }
@@ -7139,11 +7139,11 @@ configVectorShapeSymmetryPoint(modus, silentu, givenIndex, noChecks:=0, allowRei
       If (modus="x" && !errMsgNow)
       {
          If (leftSideXH!=rightSideXH)
-            errMsgNow := "ERROR: The number of points do not correspond.`nLeft side: " leftSideXH "`nRight side: " rightSideXH "`nPlease choose another point."
+            errMsgNow := "ERROR: The numbers of points do not match.`nLeft side: " leftSideXH "`nRight side: " rightSideXH "`nPlease choose another point."
       } Else If !errMsgNow
       {
          If (topSideYV!=bottomSideYV)
-            errMsgNow := "ERROR: The number of points do not correspond.`nTop side: " topSideYV "`nBottom side: " bottomSideYV "`nPlease choose another point."
+            errMsgNow := "ERROR: The numbers of points do not match.`nTop side: " topSideYV "`nBottom side: " bottomSideYV "`nPlease choose another point."
       }
    }
 
@@ -7463,7 +7463,7 @@ MenuRemSelVectorPoints() {
     {
        ; the entire path, or all of it but one point, was selected and is now gone
        If remainedu
-          friendly := groupDigits(removedu) " out of " groupDigits(origCountu) " path points were selected and removed`nOnly one point is left, the vector path is no longer usable"
+          friendly := groupDigits(removedu) " out of " groupDigits(origCountu) " path points were selected and removed`nOnly one point is left; the vector path is no longer usable"
        Else
           friendly := "All " groupDigits(origCountu) " path points were selected and removed`nThe vector path is now empty"
 
@@ -7532,7 +7532,7 @@ MenuCopyVectorPoints(modus:=0, givenIndex:=0) {
     If (nVpoints.Count()>2)
     {
        clipVectorPoints := nVpoints.Clone()
-       msgBeepTimer(groupDigits(thisIndex) " points were copied to private clipboard", 0)
+       msgBeepTimer(groupDigits(thisIndex) " points were copied to the private clipboard", 0)
     } Else
        msgBeepTimer("WARNING: At least 3 points need to be selected to copy to clipboard")
 
@@ -7575,7 +7575,7 @@ MenuConvertShapeToPoly() {
       Return
 
    widthu := (PrefsLargeFonts=1) ? 600 : 300
-   msgResult := msgBoxWrapper("Convert curved shape to polygonal: " appTitle, "Please select the level of detail for the resulted polygonal shape.", "&Convert shape|&Cancel", 1, "image", nullCheckBox, 0, "90`%`f80`%`f`f70`%`f60`%`f50`%`f40`%`f30`%`f20`%`f10`%","",,, widthu)
+   msgResult := msgBoxWrapper("Convert curved shape to polygonal: " appTitle, "Please select the level of detail for the resulting polygonal shape.", "&Convert shape|&Cancel", 1, "image", nullCheckBox, 0, "90`%`f80`%`f`f70`%`f60`%`f50`%`f40`%`f30`%`f20`%`f10`%","",,, widthu)
    If InStr(msgResult.btn, "convert")
    {
       thisLevel := msgResult.list / 10
@@ -7593,7 +7593,7 @@ MenuConvertShapeToPoly() {
       PointsCount := Gdip_GetPathPointsCount(thisPath)
       If (PointsCount>200100)
       {
-         msgResult := msgBoxWrapper(appTitle ": Confirmation", "The initial vector path has " totalCount " points. After converting it to a polygonal path, the path has " PointsCount ". Please note, " appTitle " was not developed to efficiently handle so many points in a vector path. It is likely that you will be noticing significant performance regressions. Please confirm you want to continue with the resulted polygonal path.", 4, 0, "question")
+         msgResult := msgBoxWrapper(appTitle ": Confirmation", "The initial vector path has " totalCount " points. After converting it to a polygonal path, the path has " PointsCount ". Please note that " appTitle " was not designed to handle so many points efficiently in a vector path. You will likely notice significant slowdowns. Please confirm you want to continue with the resulting polygonal path.", 4, 0, "question")
          If (msgResult!="Yes")
          {
             PointsF := ""
@@ -7961,7 +7961,7 @@ MenuExpandVectorPointAnchors() {
 MenuSetStartVectorPoint(given:=0, isGiven:=0) {
   wasGiven := (given>0 && isGiven="yes") ? 1 : 0
   If (isNowSymmetricVectorShape() && wasGiven=0)
-     Return msgBeepTimer("WARNING: The symmetry mode is currently activated. `nIt is not allowed to change the start point of the path.")
+     Return msgBeepTimer("WARNING: The symmetry mode is currently active.`nThe start point of the path cannot be changed.")
 
   totalLoops := customShapePropPoints.Count()
   If (totalLoops<3)
@@ -9538,7 +9538,7 @@ selectGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry,
    If (newArrayu.Count()>2)
    {
       fr := actu ? "" : "de"
-      msgBeepTimer(newArrayu.Count() " points were now " fr "selected", 0, msgDisplayTime//2)
+      msgBeepTimer(newArrayu.Count() " points are now " fr "selected", 0, msgDisplayTime//2)
    }
  
    dummyForcedRefreshImgSelectionWindow()
@@ -9777,7 +9777,7 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
                Else If (nX > scrollXpos - 50)
                   friendly := "`nRegroup selected files at this scrollbar location"
                Else
-                  friendly := "`nNo action associated to this pointer location"
+                  friendly := "`nNo action associated with this pointer location"
             
                nc := nY
                thisFolder := r := dc := ""
@@ -9817,7 +9817,7 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
             } Else 
             {
                func2exec := r := dc := nc := ""
-               friendly := "`nNo action associated to this pointer location"
+               friendly := "`nNo action associated with this pointer location"
             }
 
             If (initialRow!="" && !(InStr(info, "omnibox list") && thisFolder))
@@ -10760,7 +10760,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
              Else If (adjustGradientOffset=2)
                 theMsg := "Color gradient center offset`nX / Y: " Round(clrGradientOffX * 100, 1) "%, " Round(clrGradientOffY * 100, 1) "%`nGradient angle: " Round(FillAreaGradientAngle, 1) "°"
              Else If (adjustSelCavity=1)
-                theMsg := "Selection exclusion area`nX / Y:" Round(innerSelectionCavityX*100, 1) "%, " Round(innerSelectionCavityY*100, 1) "%"
+                theMsg := "Selection exclusion area`nX / Y: " Round(innerSelectionCavityX*100, 1) "%, " Round(innerSelectionCavityY*100, 1) "%"
 
              ; ToolTip, % theMsg, % mainX + 10, % mainY + 10
              drawImgSelectionOnWindow("live", theMsg, ARGBdec, dotActive, mainWidth, mainHeight, 0, 0, 0, 0, snapAxisX, snapAxisY)
@@ -11380,7 +11380,7 @@ defineColorDepth() {
 }
 
 ToggleImgFX(dir:=0) {
-   Static fxBar := "", lastInvoked := 1, moreFX :={1:"None", 2:"Brightness / Contrast", 3:"Hue / Saturation / Lightness", 4:"Levels adjust [High / Mid / Low]", 5:"Color tint [Hue / Amount]", 6:"Colors balance", 7:"Color curve per channel"}
+   Static fxBar := "", lastInvoked := 1, moreFX :={1:"None", 2:"Brightness / Contrast", 3:"Hue / Saturation / Lightness", 4:"Levels adjust [High / Mid / Low]", 5:"Color tint [Hue / Amount]", 6:"Colour balance", 7:"Color curve per channel"}
         , curvesFX := {1:"Brightness (density)", 2:"Contrast", 3:"Highlights", 4:"Shadows", 5:"Midtones", 6:"White saturation", 7:"Black saturation"}
         , curvesChannels := {1:"Red", 2:"Green", 3:"Blue", 4:"All"}
 
@@ -11440,7 +11440,7 @@ ToggleImgFX(dir:=0) {
       friendly .= "`nSimulated color depth: " defineColorDepth()
 
    If (imgFxMode=4 || imgFxMode=3 || imgFxMode=2)
-      friendly .= "`n `nPress " ((thumbsDisplaying=1) ? "U" : "Shift + U") " to adjust colors display options."
+      friendly .= "`n `nPress " ((thumbsDisplaying=1) ? "U" : "Shift + U") " to adjust the colour display options."
 
    showTOOLtip("Image colors: " friendly, A_ThisFunc, 2, (imgFxMode - 0.999 + bonus)/9)
    SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -11702,7 +11702,7 @@ VPchangeLumos(dir, dummy:=0) {
       If (imgFxMode=1 && usrColorDepth>1)
          addMsg .= "`nImage color depth: ALTERED [ " defineColorDepth() " ]"
       If (vpIMGrotation>0)
-         addMsg .= "`nImage rotated: " vpIMGrotation "° degrees."
+         addMsg .= "`nImage rotated: " vpIMGrotation "°."
       If InStr(currIMGdetails.PixelFormat, "TONE-MAPPED")
          addMsg .= "`nImage TONE-MAPPED based on user defined settings."
 
@@ -11894,7 +11894,7 @@ blockBrokenIMGrefresh(allowThumbs:=0) {
 
    If !isImgEditingNow()
    {
-      msgBeepTimer("ERROR: No image currently loaded or it has failed to load")
+      msgBeepTimer("ERROR: No image is loaded, or it failed to load")
       Return 1
    }
    Return 0
@@ -12045,7 +12045,7 @@ dummyDisplayZoomImgInfo() {
       updatePanelColorSliderz()
    }
    If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.svg)$") && zoomLevel>2)
-      friendly := "`nTo render the vector image at a higher resolution,`nrefresh (F5) the image at desired zoom level."
+      friendly := "`nTo render the vector image at a higher resolution,`nrefresh (F5) the image at the desired zoom level."
 
    showTOOLtip("Zoom level: " defineZoomLevel() "%" friendly, 0, 0, zoomLevel/20)
    SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -12331,7 +12331,7 @@ changeImgRotationInVP(dir, stepu:=5, doReset:=0) {
       {
          vpIMGrotation := 0
          If (viewportQPVimage.imgHandle)
-            Return msgBeepTimer("WARNING: The image cannot be rotated in the viewport.`nTo rotate the image itself go to Image > Transform menu`nand select Rotate by 90°.")
+            Return msgBeepTimer("WARNING: The image cannot be rotated in the viewport.`nTo rotate the image itself, go to the Image > Transform menu`nand select Rotate by 90°.")
          Else
             Return msgBeepTimer("ERROR: The image dimensions exceed the maximum limits.`nThe image cannot be rotated in the viewport.")
       }
@@ -14055,7 +14055,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
     If (fattalErr>1)
     {
        FreeImage_UnLoad(hFIFimgA)
-       Return "Errors counter: " fattalErr "."
+       Return "Error count: " fattalErr "."
     }
 
     If (TextInAreaValign=3)
@@ -14478,7 +14478,7 @@ realtimePasteInPlaceBlurrator(previewMode, clipBMP, ByRef newBitmap) {
     {
        If (previewMode!=1)
        {
-          setWindowTitle("Applying blur filter on image")
+          setWindowTitle("Applying blur filter to image")
           QPV_PrepareAlphaChannelBlur(clipBMP, 1, 1)
        }
 
@@ -14646,7 +14646,7 @@ QPV_SetBitmapAsAlphaChannel(pBitmap, pBitmapMask, invertAlphaMask:=0, replaceSou
   isOkay := (w2=w && h2=h) ? 1 : 0 
   If (!w || !h || !w2 || !h2 || !isOkay)
   {
-     addJournalEntry(A_ThisFunc "(): ERROR. Bitmaps dimensions mismatched." w2 "/" h2 " | " w "/" h)
+     addJournalEntry(A_ThisFunc "(): ERROR. Bitmap dimensions mismatched. " w2 "/" h2 " | " w "/" h)
      Return 0
   } ; Else
      ; addJournalEntry(A_ThisFunc "(): Bitmaps dimensions. " w2 "/" h2 " | " w "/" h)
@@ -15102,7 +15102,7 @@ QPV_MergeBitmapsWithMask(initialBitmap, newBitmap, alphaBitmap, invert, maskOpac
 
   If (!w || !h || !w2 || !h2 || !isOkay || !tisOkay)
   {
-     addJournalEntry(A_ThisFunc "(): ERROR. Bitmaps dimensions mismatched. " w3 "/" h3 " | " w2 "/" h2 " | " w "/" h)
+     addJournalEntry(A_ThisFunc "(): ERROR. Bitmap dimensions mismatched. " w3 "/" h3 " | " w2 "/" h2 " | " w "/" h)
      Return 0
   } ; Else
      ; addJournalEntry(A_ThisFunc "(): Bitmaps dimensions. " w3 "/" h3 " | " w2 "/" h2 " | " w "/" h)
@@ -15897,7 +15897,7 @@ realtimePasteInPlaceAlphaMasker(previewMode, clipBMP, givenID, ByRef newBitmap, 
     alphaMaskGray := generateAlphaMaskBitmap(newBitmap, previewMode, offX, offY, offW, offH, 0, 0, transformTool)
     If !validBMP(alphaMaskGray)
     {
-       addJournalEntry(A_ThisFunc "(). ERROR. Alpha mask bitmap was not succesfully created.")
+       addJournalEntry(A_ThisFunc "(). ERROR. Alpha mask bitmap was not successfully created.")
        Return
     }
 
@@ -17436,11 +17436,11 @@ alertReduceColorDepth(alertMode:=1) {
 
    vpFmt := Gdip_GetImagePixelFormat(useGdiBitmap(), 2)
    If (thisImgBPP!=24 && thisImgBPP!=32)
-      msgu := "The image you now begin to edit has an unsupported color depth for editing: " pixFmt "`n`nThe image will be converted to the viewport image color depth: " vpFmt ". Therefore, some color information will likely be lost."
+      msgu := "The image you are about to edit has an unsupported colour depth for editing: " pixFmt "`n`nThe image will be converted to the viewport image color depth: " vpFmt ". Therefore, some color information will likely be lost."
 
-   pff := msgu ? "The image " : "The image you now begin to edit "
+   pff := msgu ? "The image " : "The image you are about to edit "
    If (currIMGdetails.Frames>1)
-      msgu .= "`n`n" pff "has " currIMGdetails.Frames " frames or pages.`n`nOnly the current frame will be preserved, the other frames will be discarded."
+      msgu .= "`n`n" pff "has " currIMGdetails.Frames " frames or pages.`n`nOnly the current frame will be preserved; the other frames will be discarded."
 
    trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
    tooBigA := isImgSizeTooLarge(currIMGdetails.Width, currIMGdetails.Height)
@@ -17451,7 +17451,7 @@ alertReduceColorDepth(alertMode:=1) {
    {
       infoRes := "`nOriginal resolution: " groupDigits(currIMGdetails.Width) " x " groupDigits(currIMGdetails.Height) " px | " ompx " MPx"
       newRes := "`nViewport resolution: " groupDigits(imgW) " x " groupDigits(imgH) " px | " mpx " MPx"
-      msgu .= "`n`nThe image you now begin to edit exceeds the maximum possible dimensions for image editing." infoRes "`n`nYou will edit it now at an automatically downscaled resolution:" newRes
+      msgu .= "`n`nThe image you are about to edit exceeds the maximum possible dimensions for image editing." infoRes "`n`nYou will now edit it at an automatically downscaled resolution:" newRes
    }
 
    If !msgu
@@ -17471,9 +17471,9 @@ alertReduceSaveColorDepth() {
    pixFmt := currIMGdetails.PixelFormat  " | " currIMGdetails.RawFormat
    thisImgBPP := SubStr(pixFmt, 1, InStr(pixFmt, "-") - 1)
    If (thisImgBPP!=24 && thisImgBPP!=32)
-      msgResult := msgBoxWrapper(appTitle ": IMAGE SAVE WARNING", "The image you intend to save is originally at an unsupported image editing color depth: " pixFmt "`n`nThe image will be converted to 24 or 32 bits color depth. Therefore, some color information will probably be lost. ", "&Continue|C&ancel", 1, "exclamation")
+      msgResult := msgBoxWrapper(appTitle ": IMAGE SAVE WARNING", "The image you intend to save originally has a colour depth unsupported for editing: " pixFmt "`n`nThe image will be converted to a 24- or 32-bit colour depth. Therefore, some color information will probably be lost. ", "&Continue|C&ancel", 1, "exclamation")
    Else If (currIMGdetails.Frames>1)
-      msgResult := msgBoxWrapper(appTitle ": IMAGE SAVE WARNING", "The image you intend to save has " currIMGdetails.Frames " frames or pages.`n`nOnly the current frame will be preserved, the other frames will be discarded. ", "&Continue|C&ancel", 1, "exclamation")
+      msgResult := msgBoxWrapper(appTitle ": IMAGE SAVE WARNING", "The image you intend to save has " currIMGdetails.Frames " frames or pages.`n`nOnly the current frame will be preserved; the other frames will be discarded. ", "&Continue|C&ancel", 1, "exclamation")
 
    If !InStr(msgResult, "continue")
       Return 1
@@ -17488,7 +17488,7 @@ alertReduceSaveColorDepth() {
       infoRes := "`nOriginal resolution: " currIMGdetails.Width " x " currIMGdetails.Height " px | " Round((currIMGdetails.Width*currIMGdetails.Height)/1000000,2) " MPx"
       trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
       newRes := "`nViewport resolution: " imgW " x " imgH " px | " Round((imgW*imgH)/1000000,2) " MPx"
-      msgResult := msgBoxWrapper(appTitle ": IMAGE SAVE WARNING", "The image you intend to resave exceeds the maximum possible dimensions for image editing." infoRes "`n`nYou will be saving an automatically downscaled resolution:" newRes, "&Continue|C&ancel", 1, "exclamation")
+      msgResult := msgBoxWrapper(appTitle ": IMAGE SAVE WARNING", "The image you intend to resave exceeds the maximum possible dimensions for image editing." infoRes "`n`nYou will be saving it at an automatically downscaled resolution:" newRes, "&Continue|C&ancel", 1, "exclamation")
    }
    If !InStr(msgResult, "continue")
       Return 1
@@ -17507,7 +17507,7 @@ downscaleHugeImagesForEditing() {
    nmgpx := Round((w * h)/1000000, 1)
    If (mgpx>536.7)
    {
-      msgResult := msgBoxWrapper(appTitle ": WARNING", "The image currently opened has " mgpx " megapixels. The image editing tool you intend to use is not currently implemented for images above 536 MPx. Do you want to down-scale the image?`n`nThe image will be down-scaled to:`n" w " x " h " pixels`n" nmgpx " megapixels.", "&Yes|&No", 1, "exclamation")
+      msgResult := msgBoxWrapper(appTitle ": WARNING", "The open image has " mgpx " megapixels. The image editing tool you intend to use is not currently implemented for images above 536 MPx. Do you want to down-scale the image?`n`nThe image will be down-scaled to:`n" w " x " h " pixels`n" nmgpx " megapixels.", "&Yes|&No", 1, "exclamation")
       If (msgResult!="yes")
          Return -1
    }
@@ -17613,7 +17613,7 @@ mergeViewPortEffectsImgEditing(funcu:=0, recordUndoAfter:=0, allowOutside:=0, al
           disposeCacheIMGs("soft")
        } Else 
        {
-          addJournalEntry(A_ThisFunc "(): Failed to apply viewport color effects on the image.")
+          addJournalEntry(A_ThisFunc "(): Failed to apply viewport colour effects to the image.")
           trGdip_DisposeImage(newBitmap)
        }
 
@@ -17692,7 +17692,7 @@ ApplyVPcolorAdjustSelectedArea(modus:=0) {
 
     If (imgFxMode=1)
     {
-       msgBeepTimer("No viewport color adjustments to be applied on image`n`nPress F to cycle through modes`nor press Shift + U to open the viewport color adjustments panel")
+       msgBeepTimer("No viewport colour adjustments to apply to the image`n`nPress F to cycle through modes`nor press Shift + U to open the viewport color adjustments panel")
        CreateTempGuiButton("Cycle color modes,,quickBarNextColorMode||Adjust colors,,PanelColorsAdjusterVPwindow", 0)
        Return
     }
@@ -17711,7 +17711,7 @@ ApplyVPcolorAdjustSelectedArea(modus:=0) {
     {
        imgFxMode := o_imgFxMode
        trGdip_DisposeImage(newBitmap)
-       msgBeepTimer("Failed to apply the viewport color adjustments to the image selected area")
+       msgBeepTimer("Failed to apply the viewport color adjustments to the selected image area")
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17721,7 +17721,7 @@ ApplyVPcolorAdjustSelectedArea(modus:=0) {
     {
        trGdip_DisposeImage(newBitmap)
        Gdip_DeleteGraphics(G2)
-       msgBeepTimer("Failed to apply the viewport color adjustments to the image selected area`nUnable to create selection path")
+       msgBeepTimer("Failed to apply the viewport color adjustments to the selected image area`nUnable to create selection path")
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17749,7 +17749,7 @@ ApplyVPcolorAdjustSelectedArea(modus:=0) {
        }
     } Else
     {
-       msgBeepTimer("Failed to apply the viewport color adjustments to the image selected area`nError messages feel so desaturated...")
+       msgBeepTimer("Failed to apply the viewport color adjustments to the selected image area`nError messages feel so desaturated...")
        trGdip_DisposeImage(newBitmap)
     }
 
@@ -17767,7 +17767,7 @@ AdjustColorsLegacySelectedArea(prevFXmode:=0) {
        Return 
 
     If (prevFXmode<2 || !isNumber(prevFXmode))
-       Return msgBeepTimer("No color adjustments to be applied on image`n`nPress U to open the color adjustments panel")
+       Return msgBeepTimer("No colour adjustments to apply to the image`n`nPress U to open the color adjustments panel")
 
     mergeViewPortRotationImgEditing()
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
@@ -17785,7 +17785,7 @@ AdjustColorsLegacySelectedArea(prevFXmode:=0) {
     {
        trGdip_DisposeImage(newBitmap)
        imgFxMode := o_imgFxMode
-       msgBeepTimer("Failed to apply the color adjustments to the image selected area")
+       msgBeepTimer("Failed to apply the color adjustments to the selected image area")
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17796,7 +17796,7 @@ AdjustColorsLegacySelectedArea(prevFXmode:=0) {
        trGdip_DisposeImage(newBitmap)
        Gdip_DeleteGraphics(G2)
        imgFxMode := o_imgFxMode
-       msgBeepTimer("Failed to apply the color adjustments to the image selected area`nUnable to create selection path")
+       msgBeepTimer("Failed to apply the color adjustments to the selected image area`nUnable to create selection path")
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17858,7 +17858,7 @@ AdjustColorsLegacySelectedArea(prevFXmode:=0) {
        wrapRecordUndoLevelNow(newBitmap)
     } Else
     {
-       msgBeepTimer("Failed to apply the color adjustments to the image selected area`nIt is all so blue in my coding...")
+       msgBeepTimer("Failed to apply the color adjustments to the selected image area`nIt is all so blue in my coding...")
        trGdip_DisposeImage(newBitmap)
     }
 
@@ -17886,7 +17886,7 @@ AdjustColorsSimpleSelectedArea() {
     G2 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap, 7, 4, compositingQuality)
     If !G2
     {
-       msgBeepTimer("Failed to apply the color adjustments to the image selected area")
+       msgBeepTimer("Failed to apply the color adjustments to the selected image area")
        trGdip_DisposeImage(newBitmap)
        SetTimer, ResetImgLoadStatus, -250
        Return
@@ -17897,7 +17897,7 @@ AdjustColorsSimpleSelectedArea() {
     {
        trGdip_DisposeImage(newBitmap)
        Gdip_DeleteGraphics(G2)
-       msgBeepTimer("Failed to apply the color adjustments to the image selected area`nUnable to create selection path")
+       msgBeepTimer("Failed to apply the color adjustments to the selected image area`nUnable to create selection path")
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17951,7 +17951,7 @@ AdjustColorsSimpleSelectedArea() {
        dummyTimerDelayiedImageDisplay(50)
     } Else
     {
-       msgBeepTimer("Failed to apply the color adjustments to the image selected area`nIt is so vividly painful...")
+       msgBeepTimer("Failed to apply the color adjustments to the selected image area`nIt is so vividly painful...")
        trGdip_DisposeImage(newBitmap)
     }
 
@@ -18312,7 +18312,7 @@ FillSelectedArea() {
     If (!testAllowSelInvert() && FillAreaInverted=1)
     {
        btn := !AnyWindowOpen ? "|&Reopen panel" : ""
-       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected, however you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK" btn, 1, "exclamation")
+       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected; however, you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK" btn, 1, "exclamation")
        If InStr(msgResult, "reopen")
           SetTimer, PanelFillSelectedArea, -500
        SetTimer, ResetImgLoadStatus, -100
@@ -19964,7 +19964,7 @@ EraseOrInvertOrGraySelectedArea(actionu, funcu) {
        Else If (actionu="desaturate")
           fn := "PanelDesatureSelectedArea"
        btn := !AnyWindowOpen ? "|&Reopen panel" : ""
-       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected, however you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK" btn, 1, "exclamation")
+       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected; however, you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK" btn, 1, "exclamation")
        If (InStr(msgResult, "reopen") && !AnyWindowOpen)
           SetTimer, % fn, -500
        SetTimer, ResetImgLoadStatus, -100
@@ -20307,7 +20307,7 @@ SharpenSelectedArea() {
     If (!testAllowSelInvert() && BlurAreaInverted=1)
     {
        btn := !AnyWindowOpen ? "|&Reopen panel" : ""
-       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected, however you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK" btn, 1, "exclamation")
+       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected; however, you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK" btn, 1, "exclamation")
        If InStr(msgResult, "reopen")
           SetTimer, PanelSharpenImage, -500
        SetTimer, ResetImgLoadStatus, -100
@@ -20386,7 +20386,7 @@ SharpenSelectedArea() {
     } Else
     {
        trGdip_DisposeImage(metaBitmap)
-       msgBeepTimer("Failed to apply filter: sharpen.`nI aint so sharp as to know why...")
+       msgBeepTimer("Failed to apply filter: sharpen.`nI ain't so sharp as to know why...")
     }
     SetTimer, ResetImgLoadStatus, -250
 }
@@ -20402,7 +20402,7 @@ SymmetrySelectedArea() {
     If (!testAllowSelInvert() && UserSymmetricaInvertArea=1)
     {
        btn := !AnyWindowOpen ? "|&Reopen panel" : ""
-       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected, however you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK" btn, 1, "exclamation")
+       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected; however, you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK" btn, 1, "exclamation")
        If InStr(msgResult, "reopen")
           SetTimer, PanelSymmetricaImage, -500
        SetTimer, ResetImgLoadStatus, -100
@@ -20614,7 +20614,7 @@ PolarRectSelectedArea(funcu, actionu, extraMod:=0, entireImg:=0) {
        allGood := 1
     } Else
     {
-       msgBeepTimer("Failed to process the image selected area`n" funcu "()")
+       msgBeepTimer("Failed to process the selected image area`n" funcu "()")
        trGdip_DisposeImage(newBitmap)
        allGood := 0
     }
@@ -20792,7 +20792,7 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
 
    If !isVarEqualTo(bpp, 24, 32)
    {
-      addJournalEntry("ERROR. Unable to record undo level. Image is not a 24- or 32-bits bitmap.")
+      addJournalEntry("ERROR. Unable to record undo level. Image is not a 24- or 32-bit bitmap.")
       Return
    }
 
@@ -20865,7 +20865,7 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
 undoRedoHugeImagesAct() {
    If (preventUndoLevels=1)
    {
-      msgBeepTimer("WARNING: Undo levels are not being recorded (user option).`nOne undo level is allowed with images over 536 mgpx.")
+      msgBeepTimer("WARNING: Undo levels are not being recorded (user option).`nOnly one undo level is allowed for images over 536 MPx.")
       Return quickBarLater("Record undo levels,,quickBarRecordUndos")
    }
  
@@ -20898,7 +20898,7 @@ undoRedoHugeImagesAct() {
       If (bpp!=Abpp)
       {
          addJournalEntry("Error: undo level has a different color depth than the viewport bitmap: " Abpp " // " bpp)
-         msgBeepTimer("WARNING: The recorded undo level has a different color depth than the viewport bitmap.`nImpossible to perform undo.")
+         msgBeepTimer("WARNING: The recorded undo level has a different color depth than the viewport bitmap.`nUnable to undo.")
          ResetImgLoadStatus()
          Return
       }
@@ -20912,7 +20912,7 @@ undoRedoHugeImagesAct() {
       {
          addJournalEntry("Error: undo level " X1 "," Y1 " - " X2 "," Y2 " [" mW "x" mH "] does not fit the viewport bitmap: " imgW "x" imgH)
          recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
-         msgBeepTimer("WARNING: The recorded undo level does not fit the image in the viewport.`nImpossible to perform undo.")
+         msgBeepTimer("WARNING: The recorded undo level does not fit the image in the viewport.`nUnable to undo.")
          ResetImgLoadStatus()
          Return
       }
@@ -21122,12 +21122,12 @@ memoryUsageWarning(givenW:=0, givenH:=0, bitsDepth:=0, opener:=0, bonusBuffer:=0
 
       If (opener=1)
       {
-         msgResult := msgBoxWrapper(appTitle ": WARNING", "You are currently opening a very large image. QPV already uses " thisMemoryLoad "% from the available system memory. It is projected to peak at around " projectedMemoryLoad "% or more. This may lead to a substantial decrease in system performance and potential system crashes. Current system memory load is at " prcSys " %.`n`nDo you want to load the image entirely into the memory? If you choose to load it partially, the viewport zoom and pan functionalities will be very slow. All image editing functions will be disabled as well.", "&Load it entirely into memory|&Load it partially", 1, "exclamation")
+         msgResult := msgBoxWrapper(appTitle ": WARNING", "You are currently opening a very large image. QPV already uses " thisMemoryLoad "% of the available system memory. It is projected to peak at around " projectedMemoryLoad "% or more. This may lead to a substantial decrease in system performance and potential system crashes. Current system memory load is at " prcSys " %.`n`nDo you want to load the image entirely into memory? If you choose to load it partially, the viewport zoom and pan will be very slow. All image editing functions will be disabled as well.", "&Load it entirely into memory|&Load it partially", 1, "exclamation")
          If !InStr(msgResult, "entirely")
             Return 1
       } Else
       {
-         msgResult := msgBoxWrapper(appTitle ": WARNING", "You are about to perform an action on the image that will cause a substantial increase in memory usage. QPV already uses " thisMemoryLoad "% from the available system memory. It is projected to peak at around " projectedMemoryLoad "% or more. This may lead to a substantial decrease in system performance and potential system crashes. No undo levels will be recorded. Current system memory load is at " prcSys " %.`n`nDo you want to continue?", "&Continue|C&ancel", 1, "exclamation")
+         msgResult := msgBoxWrapper(appTitle ": WARNING", "You are about to perform an action on the image that will cause a substantial increase in memory usage. QPV already uses " thisMemoryLoad "% of the available system memory. It is projected to peak at around " projectedMemoryLoad "% or more. This may lead to a substantial decrease in system performance and potential system crashes. No undo levels will be recorded. Current system memory load is at " prcSys " %.`n`nDo you want to continue?", "&Continue|C&ancel", 1, "exclamation")
          If !InStr(msgResult, "Continue")
             Return 1
       }
@@ -21139,12 +21139,12 @@ memoryUsageWarning(givenW:=0, givenH:=0, bitsDepth:=0, opener:=0, bonusBuffer:=0
 warnHugeImageNotFIM() {
    If (viewportQPVimage.LoadedWith!="FIM" || !viewportQPVimage.imgHandle)
    {
-      msgBeepTimer("ERROR: The image seems to not be loaded through the FreeImage library.`nThe image cannot be processed.")
+      msgBeepTimer("ERROR: The image does not seem to be loaded through the FreeImage library.`nThe image cannot be processed.")
       Return 1
    } Else
    {
       If (currIMGdetails.Frames>1)
-         msgu := "The image you currently have opened has " currIMGdetails.Frames " frames or pages.`n`nOnly the current frame will be preserved, the other frames will be discarded."
+         msgu := "The image you currently have opened has " currIMGdetails.Frames " frames or pages.`n`nOnly the current frame will be preserved; the other frames will be discarded."
 
       If msgu
       {
@@ -21243,7 +21243,7 @@ HugeImagesConvertClrDepth(modus) {
    bufferSize := Stride * kH
    If (oimgBPP=lzp && !isVarEqualTo(modus, "gray", "bw", 8))
    {
-      msgBeepTimer("The image already has the selected color depth: " modus "-bits.", 0)
+      msgBeepTimer("The image already has the selected color depth: " modus "-bit.", 0)
       ResetImgLoadStatus()
       Return
    }
@@ -21290,7 +21290,7 @@ HugeImagesConvertClrDepth(modus) {
 
    If hFIFimgA
    {
-      showTOOLtip("Succesfully converted the image color depth to " modus "-bit")
+      showTOOLtip("Successfully converted the image color depth to " modus "-bit")
       oimgBPP := FreeImage_GetBPP(hFIFimgA)
       imgPath := viewportQPVimage.ImgFile
       ColorsType := FreeImage_GetColorType(hFIFimgA)
@@ -21316,7 +21316,7 @@ HugeImagesConvertClrDepth(modus) {
       recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
       dummyTimerDelayiedImageDisplay(500)
    } Else
-      msgBeepTimer("Failed to convert the color depth at " modus "-bit")
+      msgBeepTimer("Failed to convert the colour depth to " modus "-bit")
    SetTimer, ResetImgLoadStatus, -200
 }
 
@@ -21332,7 +21332,7 @@ warnIncorrectColorDepthHugeImage(bpp, qpvMode){
       If (bpp!=24 && bpp!=32)
       {
          bp := (bpp=128 || bpp=64) ? 32 : 24
-         msgResult := msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", "The image editing tool you are attempting to use, can be applied only on 24- or 32-bits images. The image data in the viewport has a depth of " bpp " bits.`n`nWould you like to convert it now to " bp " bits?", "&Convert|C&ancel", 1, "exclamation")
+         msgResult := msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", "The image editing tool you are attempting to use can be applied only to 24- or 32-bit images. The image data in the viewport has a depth of " bpp " bits.`n`nWould you like to convert it now to " bp " bits?", "&Convert|C&ancel", 1, "exclamation")
          If (msgResult="Convert")
             HugeImagesConvertClrDepth(bp)
          Return 2
@@ -21360,7 +21360,7 @@ warnIncorrectColorDepthHugeImage(bpp, qpvMode){
    {
       If (bpp>64)
       {
-         msgBeepTimer("WARNING: This tool can be applied only on images with`na color depths equal to or lower than 64-bits.")
+         msgBeepTimer("WARNING: This tool can be applied only to images with`na colour depth equal to or lower than 64 bits.")
          Return 1
       }
    }
@@ -21500,7 +21500,7 @@ HugeImagesApplyInsertText() {
                }
             }
          } Else If (TextInAreaVerticalia=1)
-            addJournalEntry(A_ThisFunc "(): ERROR. Failed to rotate text bitmap to 90 degrees.")
+            addJournalEntry(A_ThisFunc "(): ERROR. Failed to rotate text bitmap by 90 degrees.")
 
          ; fnOutputDebug("0: " imgSelX1 "|" imgSelY1 "|" imgSelX2 "|" imgSelY2 "||" imgSelW "|" imgSelH)
          ; fnOutputDebug("A: " minedX "|" minedY "|" mw "|" mH)
@@ -21587,7 +21587,7 @@ HugeImagesApplyInsertText() {
       If failure
       {
          If (failure=2)
-            msgBeepTimer("ERROR: Unable to render texts. " tobju)
+            msgBeepTimer("ERROR: Unable to render the text. " tobju)
          ResetImgLoadStatus()
          Return
       }
@@ -21996,7 +21996,7 @@ HugeImagesDrawParametricLines() {
          setHugeImageActionsCount(viewportQPVimage.actions + 1)
          dummyTimerDelayiedImageDisplay(500)
          If (abandonAll=1)
-            showTOOLtip("WARNING: User aborted draw parametric lines.")
+            showTOOLtip("WARNING: User aborted drawing parametric lines.")
          SoundBeep, 900, 100
          RemoveTooltip()
       } Else
@@ -22568,7 +22568,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
       } Else
       {
          recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
-         msgBeepTimer("ERROR: Failed to apply the " modus " on the image")
+         msgBeepTimer("ERROR: Failed to apply the " modus " to the image")
       }
 
       ResetImgLoadStatus()
@@ -22608,7 +22608,7 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
    } Else If (modus="new-image")
    {
       nmgpx := Round((w * h)/1000000, 1)
-      showTOOLtip("Creating a new " givenQuality "-bits image:`n" w " x " h " pixels`n" nmgpx " megapixels`nPlease wait...")
+      showTOOLtip("Creating a new " givenQuality "-bit image:`n" w " x " h " pixels`n" nmgpx " megapixels`nPlease wait...")
       hFIFimgA := FreeImage_Allocate(w, h, givenQuality)
       If (hFIFimgA && allowUndo)
          FreeImage_FillBackground(hFIFimgA, allowUndo, 8) ; FI_COLOR_SET_ALPHA
@@ -24021,7 +24021,7 @@ applyBlurColorsFX(zBitmap) {
 BlurSelectedArea(modus:="") {
     If (!testAllowSelInvert() && BlurAreaInverted=1)
     {
-       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected, however you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK|&Reopen panel", 1, "exclamation")
+       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected; however, you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK|&Reopen panel", 1, "exclamation")
        If (InStr(msgResult, "reopen") && modus="pixelate")
           SetTimer, PanelPixelizeSelectedArea, -300
        Else If InStr(msgResult, "reopen")
@@ -24071,7 +24071,7 @@ BlurSelectedArea(modus:="") {
        Return
     } Else If (blurAreaPixelizeAmount<2 && modus="pixelate")
     {
-       msgResult := msgBoxWrapper(appTitle ": WARNING", "You have set pixelation amount to zero. Operation abandoned.", "&OK|&Reopen panel", 1, "exclamation")
+       msgResult := msgBoxWrapper(appTitle ": WARNING", "You have set the pixelation amount to zero. Operation abandoned.", "&OK|&Reopen panel", 1, "exclamation")
        If InStr(msgResult, "reopen")
           SetTimer, PanelPixelizeSelectedArea, -300
        SetTimer, ResetImgLoadStatus, -100
@@ -24293,7 +24293,7 @@ BlurSelectedArea(modus:="") {
 ZoomBlurSelectedArea() {
     If (!testAllowSelInvert() && BlurAreaInverted=1)
     {
-       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected, however you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK|&Reopen panel", 1, "exclamation")
+       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected; however, you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK|&Reopen panel", 1, "exclamation")
        If InStr(msgResult, "reopen")
           SetTimer, PanelZoomBlurSelectedArea, -500
        SetTimer, ResetImgLoadStatus, -100
@@ -24356,7 +24356,7 @@ ZoomBlurSelectedArea() {
        Return
     }
 
-    setWindowTitle("APPLYING BLUR ON IMAGE, please wait", 1)
+    setWindowTitle("APPLYING BLUR TO IMAGE, please wait", 1)
     modus := (BlurAreaInverted=1) ? 4 : 0
     Gdip_SetClipPath(G2, pPath, modus)
     r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
@@ -24426,7 +24426,7 @@ detectEdgesSelectedArea() {
     If (!testAllowSelInvert() && BlurAreaInverted=1)
     {
        btn := !AnyWindowOpen ? "|&Reopen panel" : ""
-       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected, however you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK" btn, 1, "exclamation")
+       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected; however, you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK" btn, 1, "exclamation")
        If InStr(msgResult, "reopen")
           SetTimer, PanelDetectEdgesImage, -500
        SetTimer, ResetImgLoadStatus, -100
@@ -25455,7 +25455,7 @@ corePasteClipboardImg(modus, imgW, imgH, allowFilesPaste) {
           clipBMP := drawTextInBox(toPaste, OSDFontName, PasteFntSize, imgW, imgH, OSDtextColor, OSDbgrColor, 0, 0, usrTextAlign, "0xFF")
           setGdipBMPinfos(clipBMP, A_ThisFunc "|recordUndoLevelNow")
           If (modus=1)
-             showTOOLtip("Text clipboard content rendered as image.`nOSD font and colors were used.")
+             showTOOLtip("Text clipboard content rendered as an image.`nOSD font and colors were used.")
           SetTimer, RemoveTooltip, % -msgDisplayTime
        } Else
        {
@@ -25721,7 +25721,7 @@ jumpSelectRangeGiven(pA, pB) {
    getSelectedFiles(0, 1)
    If (markedSelectFile>2)
    {
-      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Some files are already selected in the list. You can choose to add, substract the files selection. The given range is: " mA " - " mB, "&Replace|&Add|&Substract|&Cancel", 0, "question")
+      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Some files are already selected in the list. You can choose to replace, add to or subtract from the files selection. The given range is: " mA " - " mB, "&Replace|&Add|&Subtract|&Cancel", 0, "question")
       If (msgResult="cancel" || InStr(msgResult, "win_close"))
       {
          SetTimer, RemoveTooltip, -250
@@ -27030,7 +27030,7 @@ removeDeadFavedFolders() {
    If ErrorLevel
       msgBeepTimer("ERROR: Failed to update the folder favorites list file. Access denied?")
    Else
-      msgBeepTimer("Operation succesfully completed.`n" failed " inexistent folders or files were found.", 0)
+      msgBeepTimer("Operation successfully completed.`n" failed " inexistent folders or files were found.", 0)
 }
 
 clearAllFavedFolders() {
@@ -27041,10 +27041,10 @@ clearAllFavedFolders() {
      Return
 
   If (A_TickCount - lastInvoked<950)
-     Return msgBeepTimer("ERROR: User answered the message box too quickly.`nPlease read the message before confirming action.")
+     Return msgBeepTimer("ERROR: User answered the message box too quickly.`nPlease read the message before confirming the action.")
 
   FileDelete, % folderFavesFile
-  msgBeepTimer("All the entries pointing to folders and/or files lists from favourites were removed.", 0, msgDisplayTime//2)
+  msgBeepTimer("All entries pointing to folders and/or files lists were removed from favourites.", 0, msgDisplayTime//2)
   SetTimer, ResetImgLoadStatus, -150
 }
 
@@ -27363,15 +27363,15 @@ createOmniBoxFoldersContextMenu(folderPath) {
 }
 
 btnHelpKbdContexts() {
-   msgBoxWrapper(appTitle ": HELP", "Users can customize keyboard shortcuts based on contexts in the application, such as, but not limited to: image view, files list modes, image editor live tools, et cetera.`n`nThe same keyboard shortcut can do different things based on the context. Or, the same function, if available in multiple contexts, can have a different shortcut for each context.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "Users can customize keyboard shortcuts per context in the application, such as image view, files list modes and image editor live tools.`n`nThe same keyboard shortcut can do different things based on the context. Or, the same function, if available in multiple contexts, can have a different shortcut for each context.", -1, 0, 0)
 }
 
 btnHelpSettingsPanel() {
-   msgBoxWrapper(appTitle ": HELP", "The text style options apply to the On-Screen Display in the viewport. The same text style is used to render as images texts pasted from the clipboard.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "The text style options apply to the On-Screen Display in the viewport. The same text style is used to render text pasted from the clipboard as an image.", -1, 0, 0)
 }
 
 BtnHelpEdgeDetection() {
-   msgBoxWrapper(appTitle ": HELP", "Sobel and Scharr convolution kernels can detect edges by emphasizing the gradients. Rhe 1st, 2nd, 3rd or mixed image derivatives are calculated based on the user defined order(s) through the dX and dY values. Scharr uses a kernel size (kS) of 3x3.`n`nWhen the Canny algorithm is selected, the smallest value between threshold1 (T1) and threshold2 (T2) is used for edge linking. The largest value is used to find initial segments of strong edges. T1 and T2 are the thresholds of the hysteresis procedure.`n`nDiff-blending mode detects edges by relying on the difference blending mode. The input image is duplicated on top and then by user-defined X/Y values, moved along the X/Y axis. The output image is rendered grayscale.`n`nUsers are provided with parameters to adjust the blur, brightness and contrast of the input and output images, in order to enable fine-tuned control of the resulted image.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "Sobel and Scharr convolution kernels can detect edges by emphasizing the gradients. The 1st, 2nd, 3rd or mixed image derivatives are calculated based on the user defined order(s) through the dX and dY values. Scharr uses a kernel size (kS) of 3x3.`n`nWhen the Canny algorithm is selected, the smallest value between threshold1 (T1) and threshold2 (T2) is used for edge linking. The largest value is used to find initial segments of strong edges. T1 and T2 are the thresholds of the hysteresis procedure.`n`nDiff-blending mode detects edges by relying on the difference blending mode. The input image is duplicated on top and then moved along the X/Y axes by user-defined X/Y values. The output image is rendered in greyscale.`n`nUsers are provided with parameters to adjust the blur, brightness and contrast of the input and output images, in order to enable fine-tuned control of the resulting image.", -1, 0, 0)
 }
 
 invokePrefsPanelsContextMenu(modus:=0, addBonus:=0) {
@@ -27428,7 +27428,7 @@ invokePrefsPanelsContextMenu(modus:=0, addBonus:=0) {
 }
 
 btnHelpQuickSearchMenus() {
-   msgBoxWrapper(appTitle ": HELP", "This panel allows users to search the available menu options based on the current context. It also allows users to:`n`n- customize keyboard shortcuts; right-click on any menu item and choose «Customize keyboard shortcut»;`n`n- navigate through folders; just type or paste a folder path;`n`n- open folders or add the containing image files to the current files index;`n`n- manage folders; common actions available, such as copy, paste, delete, rename, et cetera;`n`n- jump to a given index in the list; begin with the symbol @ and type a number then press Enter;`n`n- execute internal code functions or display global variable values, if the query begins with >. Users can also set variables by using >set_variableName=NewValue.`n`nDrag and drop is supported between listed folders, and between this panel and the main window or the folders tree panel.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "This panel allows users to search the available menu options based on the current context. It also allows users to:`n`n- customize keyboard shortcuts; right-click on any menu item and choose «Customize keyboard shortcut»;`n`n- navigate through folders; just type or paste a folder path;`n`n- open folders or add the image files they contain to the current files index;`n`n- manage folders; common actions are available, such as copy, paste, delete and rename;`n`n- jump to a given index in the list; begin with the symbol @ and type a number, then press Enter;`n`n- execute internal code functions or display global variable values, if the query begins with >. Users can also set variables by using >set_variableName=NewValue.`n`nDrag and drop is supported between listed folders, and between this panel and the main window or the folders tree panel.", -1, 0, 0)
    WinActivate, ahk_id %hQuickMenuSearchWin%
 }
 
@@ -28065,7 +28065,7 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
     If (IDwin=AnyWindowOpen && imgEditPanelOpened=1)
     {
        openingPanelNow := 0
-       addJournalEntry(A_ThisFunc "(): ERROR: You cannot reopen the same window while it is opened. Close and reopen it :-).")
+       addJournalEntry(A_ThisFunc "(): ERROR: You cannot reopen the same window while it is open. Close and reopen it :-).")
        Return
     }
 
@@ -28214,7 +28214,7 @@ PanelSeenStats() {
     Gui, Tab, 2 ; Monthly
     GuiAddListView("x+15 y+15 w" lstWid " +LV0x10000 r" uLVr " Grid vLViewMetaM AltSubmit -multi gSeenStatsLVaction", "#|Date|Images|%", "Seen images per month")
     Gui, Tab, 3 ; Hourly
-    GuiAddListView("x+15 y+15 w" lstWid " +LV0x10000 r" uLVr " Grid -multi vLViewMetaH", "#|Hour|Images|%", "Seen images per year")
+    GuiAddListView("x+15 y+15 w" lstWid " +LV0x10000 r" uLVr " Grid -multi vLViewMetaH", "#|Hour|Images|%", "Seen images per hour")
     Gui, Tab, 4 ; Options
     Gui, Add, Button, x+15 y+15 Section h%thisBtnHeight% gCleanDeadFilesSeenImagesDB, &Purge records of inexistent files
     Gui, Add, Button, y+5 hp geraseSeenIMGsDB, &Erase the entire list
@@ -28355,11 +28355,11 @@ PanelIndexedFilesStats() {
     showTOOLtip("Generating statistics, please wait")
     Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate AltSubmit vCurrentPanelTab Choose%thisPanelTab% hwndhCurrTab, Days|Months|Years|Sizes|Types
     Gui, Tab, 1 ; Daily
-    GuiAddListView("x+15 y+15 w" lstWid " +LV0x10000 r" uLVr " Grid vLViewMetaD -multi AltSubmit gIndexStatsLVaction", "#|Date|Images|%", "Files per days")
+    GuiAddListView("x+15 y+15 w" lstWid " +LV0x10000 r" uLVr " Grid vLViewMetaD -multi AltSubmit gIndexStatsLVaction", "#|Date|Images|%", "Files per day")
     Gui, Tab, 2 ; Monthly
-    GuiAddListView("x+15 y+15 w" lstWid " +LV0x10000 r" uLVr " Grid vLViewMetaM -multi AltSubmit gIndexStatsLVaction", "#|Date|Images|%", "Files per months")
+    GuiAddListView("x+15 y+15 w" lstWid " +LV0x10000 r" uLVr " Grid vLViewMetaM -multi AltSubmit gIndexStatsLVaction", "#|Date|Images|%", "Files per month")
     Gui, Tab, 3 ; Yearly
-    GuiAddListView("x+15 y+15 w" lstWid " +LV0x10000 r" uLVr " Grid vLViewMetaY -multi AltSubmit gIndexStatsLVaction", "#|Year|Images|%", "Files per years")
+    GuiAddListView("x+15 y+15 w" lstWid " +LV0x10000 r" uLVr " Grid vLViewMetaY -multi AltSubmit gIndexStatsLVaction", "#|Year|Images|%", "Files per year")
     Gui, Tab, 4 ; Sizes
     GuiAddListView("x+15 y+15 w" lstWid " +LV0x10000 r" uLVr " Grid vLViewMetaS -multi AltSubmit gIndexStatsLVaction", "#|File size ranges|Total size [MB]|Images|%", "Statistics grouped by file sizes")
     Gui, Tab, 5 ; Types
@@ -28410,7 +28410,7 @@ PanelWrapperFilesStats() {
 
     RegAction(0, "uiPreferedFileStats",, 1)
     ; Gui, Tab, 1
-    Gui, Add, Text, x15 y15 w%txtWid%, Every statistics panel allows users to filter the indexed files to various criteria by double-clicking on list view entries. Users can easily identify files by size, date, type, resolution, pixel format, or based on histogram data: low or high key, or washed out images in the image collection.
+    Gui, Add, Text, x15 y15 w%txtWid%, Every statistics panel allows users to filter the indexed files by various criteria by double-clicking on list view entries. Users can easily identify files by size, date, type, resolution, pixel format, or based on histogram data: low or high key, or washed out images in the image collection.
     Gui, Add, Text, y+15 Section, File details: size, date modified, type and more.
     Gui, Add, Button, xp+15 y+5 h%thisBtnHeight% gPanelIndexedFilesStats, &File statistics panel
     Gui, Add, Button, x+5 hp gBtnCollectFileInfos, &Collect data
@@ -28508,7 +28508,7 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
       If AnyWindowOpen
          BtnCloseWindow()
 
-      If askAboutFileSave(" and the files list will be filtered to given criteria")
+      If askAboutFileSave(" and the files list will be filtered by the given criteria")
          Return -1
    }
 
@@ -29152,7 +29152,7 @@ BtnCopyImageFileStats() {
    GuiControlGet, infoLine
    textu := "`n" infoLine "`n"
 
-   textu .="This text file contains data about these images detailing the prevalence of megapixels, aspect ratios, DPI, frames, pixel formats and histograms main data points.`n"
+   textu .="This text file contains data about these images detailing the prevalence of megapixels, aspect ratios, DPI, frames, pixel formats and the main histogram data points.`n"
 
    textu .= "`nIMAGES: MEGAPIXELS`n"
    textu .= getListViewData("SettingsGUIA", "LViewMetaD", 4)
@@ -29686,7 +29686,7 @@ PopulateIndexFilesStatsInfos(dummy:=0) {
   ; msgBox, % entriesCount "=" thisMaxCount
   If (entriesCount<Round(thisMaxCount - 1)) && (abandonAll!=1)
   {
-     msgResult := msgBoxWrapper(appTitle ": Statistics", appTitle " has not yet indexed the files' details. These are required to populate this panel with statistics. Would you like to collect the data now? This may take awhile...", 4, 0, "question")
+     msgResult := msgBoxWrapper(appTitle ": Statistics", appTitle " has not yet indexed the files' details. These are required to populate this panel with statistics. Would you like to collect the data now? This may take a while...", 4, 0, "question")
      If (msgResult="Yes")
      {
         prevState := ""
@@ -29888,7 +29888,7 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
   isFilter := StrLen(filesFilter)>2 ? 1 : 0
   If (dummy!="kill")
   {
-     showTOOLtip("Generating statistics on images details, please wait`n" groupDigits(thisMaxCount) " files")
+     showTOOLtip("Generating statistics on image details, please wait`n" groupDigits(thisMaxCount) " files")
      doStartLongOpDance()
      setImageLoading()
      thisState := "z" CurrentSLD DynamicFoldersList SLDtypeLoaded thisMaxCount
@@ -29922,7 +29922,7 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
         If !prevMaxu
         {
            prevState := ""
-           showTOOLtip("AN error occurred User abandoned operation...")
+           showTOOLtip("An error occurred, or the user abandoned the operation...")
            GuiControl, SettingsGUIA:, infoLine, Indexed images: ERROR.
            SetTimer, ResetImgLoadStatus, -100
            Return 0
@@ -30996,14 +30996,14 @@ FolderTreeResponder(a, b, c) {
             r := GetKeyState("Shift", "P") ? "[_MOVE_]" : "[_COPY_]"
             friendly .= A_Space r
             If !thisFolder
-               friendly := "`nDrop folder here to begin navigate it using the omnibox."
+               friendly := "`nDrop folder here to begin navigating it using the omnibox."
 
             ; r := GetKeyState("Shift", "P") ? "[MOVE]" : "[COPY]"
          } Else 
          {
             r := nc := ""
             TV_Modify(c)
-            friendly := "No action associated to this pointer location."
+            friendly := "No action associated with this pointer location."
          }
 
          If (A_TickCount - prevMSGdisplay>100)
@@ -31102,7 +31102,7 @@ defineWindowUnderMouse() {
 }
 
 btnHelpFolderTree() {
-   msgBoxWrapper(appTitle ": HELP", "The folder tree panel facilitates management of files and folders. Common file and folders actions are available: create, cut, copy, paste, delete, rename. Drag and drop is supported between folders, and between this panel and the main window or the omnibox / quick menu search panel.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "The folder tree panel facilitates management of files and folders. Common file and folder actions are available: create, cut, copy, paste, delete, rename. Drag and drop is supported between folders, and between this panel and the main window or the omnibox / quick menu search panel.", -1, 0, 0)
 }
 
 getFolderInfos(givenDir, ByRef filez:=0, ByRef folderz:=0, ByRef fileSizu:=0, doRecursive:="DF") {
@@ -32454,7 +32454,7 @@ PasteFilesIntoGivenFolder(folderPath) {
       {
          etaTime := ETAinfos(countTFilez, foundFiles, startOperation)
          If (failedFiles>0)
-            etaTime .= "`nFailed to perform action on " groupDigits(failedFiles) " files"
+            etaTime .= "`nFailed to perform the action on " groupDigits(failedFiles) " files"
          If (skippedFiles>0)
             etaTime .= "`nSkipped files: " groupDigits(skippedFiles)
 
@@ -32532,7 +32532,7 @@ PasteFilesIntoGivenFolder(folderPath) {
    If (skippedFiles>0)
       someErrors .= "`nSkipped files: " groupDigits(skippedFiles)
    If (failedFiles>0)
-      someErrors .= "`nFailed to perform action on " groupDigits(failedFiles) " files"
+      someErrors .= "`nFailed to perform the action on " groupDigits(failedFiles) " files"
 
    If (filesActu=2)
    {
@@ -32580,7 +32580,7 @@ copyIMGinfos2clip() {
    If (StrLen(textu)>10)
    {
       If !copyTextToClippy(textu)
-         msgBeepTimer("ERROR: Unable to copy to clipboard the file details")
+         msgBeepTimer("ERROR: Unable to copy the file details to the clipboard")
       Else
          msgBeepTimer("File details copied to the clipboard", 0)
    }
@@ -32658,7 +32658,7 @@ uiPopulateImgInfos() {
        LV_Add(A_Index, lineArru[1], lineArru[2])
    }
 
-   LV_Add(A_Index, "Colors display mode", DefineFXmodes())
+   LV_Add(A_Index, "Colour display mode", DefineFXmodes())
    If (thumbsDisplaying!=1 && validBMP(useGdiBitmap()))
    {
       Gdip_GetHistogram(useGdiBitmap(), 2, ArrChR, ArrChG, ArrChB)
@@ -33185,7 +33185,7 @@ PanelEnableFilesFilter(modus:="") {
     Gui, Add, Checkbox, xs y+7 gupdateUIFiltersPanel Checked%userFilterStringIsNot% vuserFilterStringIsNot, &Must not contain the given string
     Gui, Add, Text, xs y+15 vbtnFldr2, You can use | for OR and the *, ? wildcards in the filter`nto match more files.
     Gui, Tab, 2
-    Gui, Add, Text, x+15 y+15 Section, Please choose the type of criteria and`nset minimum and maximum range.
+    Gui, Add, Text, x+15 y+15 Section, Please choose the type of criteria and`nset the minimum and maximum range.
     GuiAddDropDownList("xs y+7 w" btnWid " gupdateUIFiltersPanel AltSubmit Choose" userFilterProperty " vuserFilterProperty", "No criteria defined`nFile size`nModified date`nCreated date`nMegapixels`nWidth`nHeight`nAspect ratio`nFrames`nDPI`nAverage`nMedian`nPeak range`nMinimum range`nTotal range`nMode`nMinimum`nStandard deviation`nSelected files`nAlready seen", "Filter criteria")
     Gui, Add, Text, % "x+5 w" (EditWid - btnWid - 5) " hp +0x200 vFilterTypeu", -
     GuiAddEdit("xs y+5 w" btnWid " number limit5 gupdateUIFiltersPanel vFilteruMinRange", FilteruMinRange, "Minimum")
@@ -33203,7 +33203,7 @@ PanelEnableFilesFilter(modus:="") {
     Gui, Add, DateTime, x+5 wp gupdateUIFiltersPanel vFilteruDateMaxRange%dMax%, yyyy/MM/dd
     Gui, Add, Checkbox, xs y+7 gupdateUIFiltersPanel Checked%userFilterInvertThis% vuserFilterInvertThis, &Invert filter
     Gui, Tab
-    GuiAddEdit("xs y+10 w" EditWid " r2 +0x0800 vInternalFilterString", filesFilter, "Resulted files list filter query.")
+    GuiAddEdit("xs y+10 w" EditWid " r2 +0x0800 vInternalFilterString", filesFilter, "Resulting files list filter query.")
     ; Gui, Add, Text, y+7 w%txtWid%, Tip: you can begin the string with \> to use RegEx.
 
     btnWid := (PrefsLargeFonts=1) ? btnWid - 15 : btnWid - 5
@@ -33733,7 +33733,7 @@ coreSetFilesFilteru(stringu, noStringProcessing:=0) {
   backCurrentSLD := CurrentSLD
   userSearchString := CurrentSLD := ""
   fsu := (StrLen(stringu)>50) ? SubStr(stringu, 1, 48) " [...]" : stringu
-  friendly := (StrLen(stringu)>1) ? "Applying filter on the list of files, please wait`n" fsu : "Deactivating the files list filter, please wait..."
+  friendly := (StrLen(stringu)>1) ? "Applying the filter to the list of files, please wait`n" fsu : "Deactivating the files list filter, please wait..."
   showTOOLtip(friendly)
   setImageLoading()
   If (StrLen(filesFilter)<2)
@@ -34246,7 +34246,7 @@ InListMultiEntriesRemover(dummy:=0, dontAsk:=0) {
    zeitOperation := A_TickCount - startOperation
    etaTime := "Elapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3))
    If (abandonAll=1)
-      showTOOLtip("Operation aborted. " countTFilez " index entries were removed until now`n" etaTime)
+      showTOOLtip("Operation aborted. " countTFilez " index entries were removed so far`n" etaTime)
    Else
       showTOOLtip(countTFilez " index entries removed`n" etaTime)
 
@@ -34798,7 +34798,7 @@ LoadPrefsFromSLD() {
    Critical, on
    stopSlideshow()
    If !((SLDtypeLoaded=2 || SLDtypeLoaded=3) && maxFilesIndex>1 && RegExMatch(CurrentSLD, sldsPattern) && FileExist(CurrentSLD))
-      Return msgBeepTimer("ERROR: No valid files list currently opened")
+      Return msgBeepTimer("ERROR: No valid files list is currently open")
 
    If (SLDtypeLoaded=2)
    {
@@ -34823,7 +34823,7 @@ WritePrefsIntoSLD() {
    Critical, on
    stopSlideshow()
    If !((SLDtypeLoaded=2 || SLDtypeLoaded=3) && maxFilesIndex>1 && RegExMatch(CurrentSLD, sldsPattern) && FileExist(CurrentSLD))
-      Return msgBeepTimer("ERROR: No valid files list currently opened")
+      Return msgBeepTimer("ERROR: No valid files list is currently open")
 
    If (SLDtypeLoaded=2)
    {
@@ -35563,7 +35563,7 @@ LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders, allowAsk:=0) {
     If (!countStaticFolders && (allowAsk=1 || allowAsk="f"))
     {
        If (allowAsk!="f")
-          msgResult := msgBoxWrapper(appTitle ": Confirmation", "This folders list was not yet generated. Would you like to generate it now?", 4, 0, "question")
+          msgResult := msgBoxWrapper(appTitle ": Confirmation", "This folders list has not been generated yet. Would you like to generate it now?", 4, 0, "question")
 
        If (msgResult="yes" || allowAsk="f")
        {
@@ -35708,7 +35708,7 @@ BTNcountFilesDiskDynaFolder() {
        }
     } Else
     {
-       showTOOLtip("ERROR: The folder no longer exists or access denied`n" folderu "\")
+       showTOOLtip("ERROR: The folder no longer exists or access is denied`n" folderu "\")
     }
 
     CurrentSLD := backCurrentSLD
@@ -35918,7 +35918,7 @@ cleanDeadFilesList(dummy:=0) {
 
       etaTime := "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
       If (abandonAll=1)
-         showTOOLtip("Operation aborted. " groupDigits(deadFiles) " index entries were removed until now" etaTime)
+         showTOOLtip("Operation aborted. " groupDigits(deadFiles) " index entries were removed so far" etaTime)
       Else
          showTOOLtip(groupDigits(deadFiles) " index entries removed" etaTime)
 
@@ -35959,7 +35959,7 @@ handleEmptyFilesList(thisSLD, extraInfo:="", modus:=0){
    If showButtons
       info := "`n`nCurrent files list:`n" thisSLD
 
-   msgResult := msgBoxWrapper(appTitle ": WARNING", "No files left in the index of " appTitle ", please load a files list or folder." info extraInfo, showButtons, 0, "info")
+   msgResult := msgBoxWrapper(appTitle ": WARNING", "No files left in the index of " appTitle ". Please load a files list or folder." info extraInfo, showButtons, 0, "info")
    If InStr(msgResult, "reload")
    {
       CurrentSLD := thisSLD
@@ -36002,7 +36002,7 @@ removeFilesListSeenImages(modus:=0) {
 
       If (StrLen(filesFilter)>1 && hasAskedFilter=0)
       {
-         msgResult := msgBoxWrapper(appTitle ": Remove " friendlyLabel " images from index", "The files list is filtered down to " maxFilesIndex " files from " bckpMaxFilesIndex ".`n`nOnly the files matched by current filter will be scanned.`n`nTo scan all the image files from the index, deactivcate the filter by pressing Ctrl + F.", 1, 0, "info")
+         msgResult := msgBoxWrapper(appTitle ": Remove " friendlyLabel " images from index", "The files list is filtered down to " maxFilesIndex " files from " bckpMaxFilesIndex ".`n`nOnly the files matched by the current filter will be scanned.`n`nTo scan all the image files in the index, deactivate the filter by pressing Ctrl + F.", 1, 0, "info")
          If (msgResult="cancel" || InStr(msgResult, "win_close"))
             Return
          Else 
@@ -36103,7 +36103,7 @@ removeFilesListSeenImages(modus:=0) {
       If (abandonAll=1)
       {
          If (SLDtypeLoaded=3)
-            msgBeepTimer("Operation aborted. " groupDigits(countSeen) " already removed until now from the database.")
+            msgBeepTimer("Operation aborted. " groupDigits(countSeen) " removed from the database so far.")
          Else
             msgBeepTimer("Operation aborted. Files list left unchanged, no index entries removed.")
 
@@ -36226,7 +36226,7 @@ findFavesInList(modus:=0, doSel:=0) {
       seenEntries := ""
       If (abandonAll=1)
       {
-         msgBeepTimer("Operation aborted. " groupDigits(countSeen) " already marked until now")
+         msgBeepTimer("Operation aborted. " groupDigits(countSeen) " marked so far")
          CurrentSLD := backCurrentSLD
          SetTimer, ResetImgLoadStatus, -150
          ForceRefreshNowThumbsList()
@@ -36282,7 +36282,7 @@ retrieveAlreadySeenImageFromCurrentList(keepFilter:=0) {
    If (maxFilesIndex>1)
    {
       friendly2 := (userFilterInvertThis=1) ? "never seen" : "already seen"
-      If askAboutFileSave(" and the " friendly2 " images list, from the current list, will be retrieved")
+      If askAboutFileSave(" and the " friendly2 " images from the current list will be retrieved")
          Return
 
       prevMSGdisplay := A_TickCount
@@ -36404,7 +36404,7 @@ retrieveAlreadySeenImageFromCurrentList(keepFilter:=0) {
       etaTime := "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
       CurrentSLD := backCurrentSLD
       RandomPicture()
-      showDelayedTooltip("Finished the identification process of " friendly2 " images`n" groupDigits(countSeen) " images were found in the initial files list" etaTime)
+      showDelayedTooltip("Finished identifying " friendly2 " images`n" groupDigits(countSeen) " images were found in the initial files list" etaTime)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
       quickBarLater("Remove filter,,MenuRemNowFilesListFilter")
       Return 1
@@ -36507,8 +36507,8 @@ uiPopulateCachesOverview(modus:=0) {
        rowsDef[2] := ["File details", "WHERE ifnull(fsize, '')='' ", 1, "file details", 1]
        rowsDef[3] := ["Image details", "WHERE ifnull(imgwidth, '')='' AND ifnull(imgheight, '')='' ", 1, "image details", 1]
        rowsDef[4] := ["Image histogram details", "WHERE ifnull(imgmedian, '')='' ", 1, "image histograms", 1]
-       rowsDef[5] := ["Pixels data (9x8, 32x32)", SQLpixelsJoinClause() " WHERE " SQLpixelsPresentClause("small"), 0, "pixel data", 1]
-       rowsDef[6] := ["Flipped pixels data (9x8, 32x32)", SQLpixelsJoinClause() " WHERE " SQLpixelsPresentClause("smallH"), 0, "pixel data (flipped)", 1]
+       rowsDef[5] := ["Pixel data (9x8, 32x32)", SQLpixelsJoinClause() " WHERE " SQLpixelsPresentClause("small"), 0, "pixel data", 1]
+       rowsDef[6] := ["Flipped pixel data (9x8, 32x32)", SQLpixelsJoinClause() " WHERE " SQLpixelsPresentClause("smallH"), 0, "pixel data (flipped)", 1]
        rowsDef[7] := ["dHash (8x8)", "WHERE ifnull(dHash, '')='' ", 1, "image hashes", 1]
        rowsDef[8] := ["pHash (32x32)", "WHERE ifnull(pHash, '')='' ", 1, "image hashes", 1]
        rowsDef[9] := ["lHash (8x8)", "WHERE ifnull(lHash, '')='' ", 1, "image hashes", 1]
@@ -36647,11 +36647,11 @@ uiCachesOverviewSizeEstimate(totalz, rowsDef) {
       If (growthHashes>0)
          msgu .= "`n   - image hashes: " fileSizeFriendly(growthHashes)
       If (growthTpixelz>0)
-         msgu .= "`n   - pixels data: " fileSizeFriendly(growthTpixelz)
+         msgu .= "`n   - pixel data: " fileSizeFriendly(growthTpixelz)
       If (ignoredu>0)
          msgu .= "`n`nThe figures above include the " groupDigits(ignoredu) " ignored or dead file entries."
    } Else
-      msgu .= "`nThe data seems to be already collected for all the indexed files."
+      msgu .= "`nThe data seems to have already been collected for all the indexed files."
 
    msgBoxWrapper(appTitle ": Database size estimation", msgu, -1, 0, 0)
 }
@@ -36809,8 +36809,8 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
       ; MsgBox, % strPosu "=" whatu "`n" SQLstr
       If (asku=1 && noQuestion=0 && filesToBeSorted>10)
       {
-         thisFriendly := (SLDtypeLoaded=3) ? "`n`nThe data will be automatically cached in the database and you can stop and resume this process at anytime." : ""
-         msgResult := msgBoxWrapper(appTitle ": Confirmation", "You have selected to perform an operation that relies on collected file and image details. " appTitle " needs to scan " groupDigits(filesToBeSorted) " out of " groupDigits(filesInScope) " files. By refusing to the collect data, the operation you chose (sort, filter, generate statistics or find duplicates) will likely give incomplete or erroneous results." thisFriendly, "Collect &data now|&Continue with incomplete data|&Abort", 0, "question", "&Do not collect file data and never ask again in this session", 0)
+         thisFriendly := (SLDtypeLoaded=3) ? "`n`nThe data will be automatically cached in the database and you can stop and resume this process at any time." : ""
+         msgResult := msgBoxWrapper(appTitle ": Confirmation", "You have selected to perform an operation that relies on collected file and image details. " appTitle " needs to scan " groupDigits(filesToBeSorted) " out of " groupDigits(filesInScope) " files. If you refuse to collect the data, the operation you chose (sort, filter, generate statistics or find duplicates) will likely give incomplete or erroneous results." thisFriendly, "Collect &data now|&Continue with incomplete data|&Abort", 0, "question", "&Do not collect file data and never ask again in this session", 0)
          If (InStr(msgResult.btn, "incomplete") || InStr(msgResult.btn, "collect")) 
            noQuestion := msgResult.Check
 
@@ -37497,7 +37497,7 @@ dbSortingCached(SortCriterion, userAct:=0) {
    If (maxFilesIndex>0)
    {
       If (testIsDupesList() && InStr(resultedFilesList[currentFileIndex, 23], "_"))
-         Return msgBeepTimer("WARNING: Files list sorting not allowed.`nThe files list is comprised of duplicate image pairs filtered by Hamming distance.")
+         Return msgBeepTimer("WARNING: Files list sorting not allowed.`nThe files list comprises duplicate image pairs filtered by Hamming distance.")
 
       If warnFramesActionPrevented("SORT LIST")
          Return
@@ -37656,7 +37656,7 @@ ActSortDupeGroups() {
    If testIsDupesList()
       retrieveDupesByProperties(0, 1)
 
-   etaTime := "Elapsed time to sort files list by duplicates image group IDs: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: " maxFilesIndex
+   etaTime := "Elapsed time to sort files list by duplicate image group IDs: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: " maxFilesIndex
    addJournalEntry(etaTime)
 }
 
@@ -37743,7 +37743,7 @@ SortFilesList(SortCriterion, userAct:=0) {
       filesToBeSorted := maxFilesIndex
       If (StrLen(filesFilter)>1 && hasAskedFilter=0)
       {
-         msgResult := msgBoxWrapper(appTitle ": Sort operation", "The files list is filtered down to " maxFilesIndex " files from " bckpMaxFilesIndex ".`n`nOnly the files matched by current filter will be sorted, not all the files.`n`nTo sort all files, remove the filter by pressing Ctrl + F.", 1, 0, "info")
+         msgResult := msgBoxWrapper(appTitle ": Sort operation", "The files list is filtered down to " maxFilesIndex " files from " bckpMaxFilesIndex ".`n`nOnly the files matched by the current filter will be sorted, not all the files.`n`nTo sort all files, remove the filter by pressing Ctrl + F.", 1, 0, "info")
          If (msgResult="cancel" || InStr(msgResult, "win_close"))
             Return
          Else
@@ -38379,7 +38379,7 @@ initWorkLoadMultiCoresJpegLL(maxList) {
   job.progressMsg := "Performing JPEG lossless operations, please wait"
   job.abandonMsg := "Abandoning image files processing, please wait"
   job.fatalMsg := "JPEG lossless processing aborted."
-  job.abortTail := "selected files were processed until now"
+  job.abortTail := "selected files were processed so far"
   job.doneTail := "selected JPEG files were processed"
   Return WorkLoadMultiCoreHandler(job)
 }
@@ -38419,7 +38419,7 @@ initWorkLoadMultiCoresConvertFormat(maxList) {
   job.progressMsg := "Converting to ." rDesireWriteFMT " format, please wait"
   job.abandonMsg := "Abandoning image file formats conversion, please wait"
   job.fatalMsg := "Image file formats conversion aborted."
-  job.abortTail := "selected files were converted to ." rDesireWriteFMT " until now"
+  job.abortTail := "selected files were converted to ." rDesireWriteFMT " so far"
   job.doneTail := "selected files were converted to ." rDesireWriteFMT
   Return WorkLoadMultiCoreHandler(job)
 }
@@ -38468,7 +38468,7 @@ initWorkLoadMultiCoresSimpleImgProcessing(maxList, losslessJpegs:=0) {
   job.progressMsg := "Processing image files, please wait"
   job.abandonMsg := "Abandoning image files processing, please wait"
   job.fatalMsg := "Image processing aborted."
-  job.abortTail := "selected files were processed until now"
+  job.abortTail := "selected files were processed so far"
   job.doneTail := "selected files were processed"
   Return WorkLoadMultiCoreHandler(job)
 }
@@ -38583,7 +38583,7 @@ WorkLoadMultiCoreHandler(job) {
   If (fatalError=1)
   {
      SoundBeep, 300, 100
-     msgBoxWrapper(appTitle ": ERROR", "Most execution threads have crashed. " job.fatalMsg "`n`nPlease try again with multi-threading disabled.`n`n" groupDigits(processedFiles) " out of " groupDigits(countTFilez) " selected files were processed until now." someErrors, 0, 0, "error")
+     msgBoxWrapper(appTitle ": ERROR", "Most execution threads have crashed. " job.fatalMsg "`n`nPlease try again with multi-threading disabled.`n`n" groupDigits(processedFiles) " out of " groupDigits(countTFilez) " selected files were processed so far." someErrors, 0, 0, "error")
      r := "error"
   }
 
@@ -39584,7 +39584,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
 
      If (userAddedFavesCount>maxFavesEntries - 1)
      {
-        msgBeepTimer("WARNING: You have reached the maximum allowed favourite images: " maxFavesEntries " entries.", 300, msgDisplayTime//2)
+        msgBeepTimer("WARNING: You have reached the maximum number of favourite images: " maxFavesEntries " entries.", 300, msgDisplayTime//2)
         If (directCall=1)
            CreateTempGuiButton("Manage favourites,,retrieveFavesAsList", 0)
         Return
@@ -39719,7 +39719,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
      IniAction(1, "userAddedFavesCount", "General")
      Tooltip
      If ErrorLevel
-        Return msgBeepTimer("Failed to update the favourites list file`nThe image was not succesfully removed from favourites")
+        Return msgBeepTimer("Failed to update the favourites list file`nThe image was not successfully removed from favourites")
 
      If (doDeduplication=1)
         prevRemSpeed := A_TickCount - startZeit
@@ -39844,7 +39844,7 @@ retrieveFavesAsList(dummy:=0) {
     whileLoopExec := 0
    hash := ""
    If (thisIndexu> maxFavesEntries - 1)
-      msgBoxWrapper(appTitle ": WARNING", "Please take note, you have exceeded the limit of favourite image entries: " maxFavesEntries ".", 0, 0, "exclamation")
+      msgBoxWrapper(appTitle ": WARNING", "Please note that you have exceeded the limit of favourite image entries: " maxFavesEntries ".", 0, 0, "exclamation")
 
    userAddedFavesCount := thisIndexu
    IniAction(1, "userAddedFavesCount", "General")
@@ -39895,7 +39895,7 @@ saveFavesListBasedOnIndexList() {
    If (StrLen(filesFilter)>1)
    {
       lastInvoked := A_TickCount
-      msgResult := msgBoxWrapper(appTitle ": Confirmation", "The current files list has " groupDigits(maxFilesIndex) " images indexed. It is the result of a filter applied on the favourite images list.`n`nPlease confirm you want to save the favourites list as is, filtered. The total of " groupdigits(bckpMaxFilesIndex) " favourited images will no longer be retrievable.", "&Deactivate filter|&Save list|&Cancel", 0, "question")
+      msgResult := msgBoxWrapper(appTitle ": Confirmation", "The current files list has " groupDigits(maxFilesIndex) " images indexed. It is the result of a filter applied to the favourite images list.`n`nPlease confirm you want to save the favourites list as is, filtered. The complete list of " groupdigits(bckpMaxFilesIndex) " favourited images will no longer be retrievable.", "&Deactivate filter|&Save list|&Cancel", 0, "question")
       If InStr(msgResult, "deactivate")
       {
          MenuRemNowFilesListFilter()
@@ -39905,7 +39905,7 @@ saveFavesListBasedOnIndexList() {
       } Else If InStr(msgResult, "save")
       {
          If (A_TickCount - lastInvoked<950)
-            Return msgBeepTimer("WARNING: The destructive option was chosen too fast.`nPlease elaborate allow yourself at least one second to read the message box.")
+            Return msgBeepTimer("WARNING: The destructive option was chosen too fast.`nPlease allow yourself at least one second to read the message box.")
          Sleep, 100
       } Else
       {
@@ -39965,7 +39965,7 @@ eraseAllFavedIMGs() {
      Return
 
   If (A_TickCount - lastInvoked<950)
-     Return msgBeepTimer("ERROR: User answered the message box too quickly.`nPlease read the message before confirming action.")
+     Return msgBeepTimer("ERROR: User answered the message box too quickly.`nPlease read the message before confirming the action.")
 
   FileDelete, % mainFavesFile
   FileDelete, % miniFavesFile
@@ -40431,7 +40431,7 @@ setContaintFolderAsProtected(givenPath:=0,modus:=0) {
      }
 
      If ((modus="given" || InStr(givenPath, ":\")=2) && !FolderExist(givenPath))
-        Return msgBeepTimer("WARNING: The folder selected no longer exists. Action refused.`n" givenPath "\")
+        Return msgBeepTimer("WARNING: The selected folder no longer exists. Action refused.`n" givenPath "\")
 
      imgPath := FolderExist(givenPath) ? givenPath : getIDimage(currentFileIndex)
      zPlitPath(imgPath, 0, OutFileName, OutDir)
@@ -40492,7 +40492,7 @@ PanelMultiFileDelete() {
     thisInfo := protectedFolderPath ? protectedFolderPath "\" : "NONE"
     Gui, Add, Text, x15 y15 Section w%txtWid% +hwndhTemp, Please choose what to remove:
     GuiAddDropDownList("xs+15 y+10 wp gTglMultiDelChoice AltSubmit Choose" userMultiDelChoice " vuserMultiDelChoice", "Delete selected files|Remove file entries from the list|Do both: remove files and the index entries", [hTemp])
-    Gui, Add, Checkbox, xs y+10 gTglOptionMove2recycler Checked%move2recycler% vmove2recycler, Move to Recycle Bin the deleted files (undo possible)
+    Gui, Add, Checkbox, xs y+10 gTglOptionMove2recycler Checked%move2recycler% vmove2recycler, Move the deleted files to the Recycle Bin (undo possible)
     Gui, Add, Checkbox, y+10 Checked%preventDBentryRemoval% vpreventDBentryRemoval, Do not remove the entries from the database 
     Gui, Add, Checkbox, y+10 Checked%preventDeleteMatchingSearch% vpreventDeleteMatchingSearch, Skip the files that match the files list search criteria
     Gui, Add, Checkbox, y+10 gUItoggleMultiDelProtectFolder Checked%preventDeleteFromProtectedPath% vpreventDeleteFromProtectedPath, Skip the files found in the protected folder:
@@ -40628,7 +40628,7 @@ batchRemoveMetaData() {
    filesElected := markedSelectFile
    If (markedSelectFile>3 && doNotAskAgain=0)
    {
-      msgResult := msgBoxWrapper(appTitle ": Remove metadata", "You have selected to remove the metadata from " groupDigits(markedSelectFile) " image files. Please confirm this IRREVERSIBLE action.`n`nPlease note, You should NOT do this to Camera RAW images (except DNG) since proprietary RAW formats often contain information in the makernotes that is necessary for converting the image.", "&Remove metadata|&Cancel", 2, "question", "Do not ask again in this session")
+      msgResult := msgBoxWrapper(appTitle ": Remove metadata", "You have selected to remove the metadata from " groupDigits(markedSelectFile) " image files. Please confirm this IRREVERSIBLE action.`n`nPlease note: you should NOT do this to Camera RAW images (except DNG) since proprietary RAW formats often contain information in the makernotes that is necessary for converting the image.", "&Remove metadata|&Cancel", 2, "question", "Do not ask again in this session")
       If !InStr(msgResult.btn, "remove")
          Return
       Else
@@ -40677,7 +40677,7 @@ batchRemoveMetaData() {
       {
          etaTime := ETAinfos(countTFilez, filesElected, startOperation)
          If failedFiles
-            etaTime .= "`nFailed to remove metadata for " groupDigits(failedFiles) " files"
+            etaTime .= "`nFailed to remove metadata from " groupDigits(failedFiles) " files"
          If skippedFiles
             etaTime .= "`nSkipped files: " groupDigits(skippedFiles)
 
@@ -40741,9 +40741,9 @@ batchRemoveMetaData() {
          someErrors .= "Skipped files: " groupDigits(skippedFiles) "`n"
 
       If (abandonAll=1)
-         msgBeepTimer(someErrors "Operation aborted. Metadata removed succesfully for " groupDigits(yayFiles) " out of " groupDigits(filesElected) " selected files until now")
+         msgBeepTimer(someErrors "Operation aborted. Metadata successfully removed from " groupDigits(yayFiles) " out of " groupDigits(filesElected) " selected files so far")
       Else
-         msgBeepTimer(someErrors "Metadata removed succesfully for " groupDigits(yayFiles) " out of " groupDigits(filesElected) " selected files", 900)
+         msgBeepTimer(someErrors "Metadata successfully removed from " groupDigits(yayFiles) " out of " groupDigits(filesElected) " selected files", 900)
    } Else RemoveTooltip()
 
    Return abandonAll
@@ -40886,7 +40886,7 @@ batchFileDelete(dontAlterIndex:=0) {
    dummyTimerDelayiedImageDisplay(100)
    SetTimer, ResetImgLoadStatus, -50
    If (abandonAll=1)
-      msgBeepTimer(someErrors "Operation aborted. " groupDigits(filesRemoved) " out of " groupDigits(countTFilez) " selected files deleted until now")
+      msgBeepTimer(someErrors "Operation aborted. " groupDigits(filesRemoved) " out of " groupDigits(countTFilez) " selected files deleted so far")
    Else
       msgBeepTimer(someErrors groupDigits(filesRemoved) " out of " groupDigits(countTFilez) " selected files deleted", 900)
 
@@ -41103,7 +41103,7 @@ PanelMultiRenameFiles() {
     ; Gui, Add, Text,, Selected files: %thisu%.
     Gui, Add, Text, x15 y15 Section w1 h1, Files rename pattern.
     Gui, Add, ComboBox, yp w%EditWid% gUIgenericComboAction vUsrEditNewFileName +hwndhTemp, % listu
-    EM_SETCUEBANNER(GetComboBoxInfo(hTemp)[1], "Type here a pattern to rename the selected files")
+    EM_SETCUEBANNER(GetComboBoxInfo(hTemp)[1], "Type a pattern here to rename the selected files")
     Gui, Add, Button, x+5 hp w%insWid% gBtnMultiRenameMenus, &Insert
     Gui, Add, Button, x+5 hp w%exWid% gBtnMultiRenameMenus, E&xamples
     Gui, Add, Button, x+5 hp w%btnWid% gEraseMultiRenameHisto, Erase &history
@@ -41204,7 +41204,7 @@ UImultiRenameChangeLVoffset(a:=0, b:=0, c:=0) {
 BtnHelpMultiRename() {
     GuiControlGet, PreserveDateTimeOnSave
     RegAction(1, "PreserveDateTimeOnSave")
-    msgBoxWrapper(appTitle ": HELP", "Patterns available to rename the files:`n`na) Type the new name. You can use any of the following tokens for dynamic names:`n[this] - original file name`n[pfdname] - original parent folder name`n[fDateM] or [fDateC] - file modified/created date`n[counter] - count all files, regardless of their location`ntrim{X,Y} - X and Y designate how many letters to trim from the beginning and end of the original file name`ncase{U} - change letters to {U}pper, {L}ower or {T}itle case`n`nIf no tokens are used, the files are counted per containing folder.`n`nb) string_to_replace//replaced_with_this`nUse // to perform search and replace in file names. IMG//Photo replaces IMG with Photo.`nBegin with \> to use RegEx for the string to be matched.`nThe trim function and the tokens mentioned earlier can be used only after //.`n`nc) abcdefgh01234>>any string`nEvery enumerated character before >> will be replaced with a single character or a string specified after >>. The tokens from a) can be used after >>.`n`nd) $.NewFileExtension`nTo set a new file extension begin with $. (dollar, dot). It cannot be used in combination with the other patterns or tokens.", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "Patterns available to rename the files:`n`na) Type the new name. You can use any of the following tokens for dynamic names:`n[this] - original file name`n[pfdname] - original parent folder name`n[fDateM] or [fDateC] - file modified/created date`n[counter] - count all files, regardless of their location`ntrim{X,Y} - X and Y designate how many letters to trim from the beginning and end of the original file name`ncase{U} - change letters to {U}pper, {L}ower or {T}itle case`n`nIf no tokens are used, the files are counted per containing folder.`n`nb) string_to_replace//replaced_with_this`nUse // to perform search and replace in file names. IMG//Photo replaces IMG with Photo.`nBegin with \> to use RegEx for the string to be matched.`nThe trim function and the tokens mentioned earlier can be used only after //.`n`nc) abcdefgh01234>>any string`nEvery enumerated character before >> will be replaced with a single character or a string specified after >>. The tokens from a) can be used after >>.`n`nd) $.NewFileExtension`nTo set a new file extension, begin with $. (dollar, dot). It cannot be used in combination with the other patterns or tokens.", -1, 0, 0)
 }
 
 UImultiRenameCollisionAction() {
@@ -42247,7 +42247,7 @@ PanelSetFrameDelay() {
       msgBeepTimer("Frame delay set to " value " ms." infou, 0)
    } Else If InStr(msgResult.btn, "help")
    {
-      msgBoxWrapper(appTitle ": HELP", "QPV can create animated GIFs, WebP, APNG, and other animated image formats through the tool «Join images». In this panel, you can set the delay per frame in milliseconds. If the value is zero or never set, the user defined frames delay in the «Join images» panel will be used.`n`nYou can select multiple files to set their delay in one go.", -1, 0, 0)
+      msgBoxWrapper(appTitle ": HELP", "QPV can create animated GIFs, WebP, APNG, and other animated image formats through the tool «Join images». In this panel, you can set the delay per frame in milliseconds. If the value is zero or never set, the user defined frame delay in the «Join images» panel will be used.`n`nYou can select multiple files to set their delay in one go.", -1, 0, 0)
       SetTimer, PanelSetFrameDelay, -250
    }
 }
@@ -42257,7 +42257,7 @@ PanelEraseCachedThumbnails() {
       Return
 
    fakeWinCreator(11, A_ThisFunc, 1)
-   msgResult := msgBoxWrapper("panelu|Clear cached thumbnails: " appTitle, "Erase thumbnails cached older than... (in days)", "&Clean old cache|&Empty entire cache|C&ancel", 3, "trash", "&Always cache generated thumbnails", enableThumbsCaching, 0, "limit3 number -multi", 0)
+   msgResult := msgBoxWrapper("panelu|Clear cached thumbnails: " appTitle, "Erase cached thumbnails older than... (in days)", "&Clean old cache|&Empty entire cache|C&ancel", 3, "trash", "&Always cache generated thumbnails", enableThumbsCaching, 0, "limit3 number -multi", 0)
    remCacheOldDays := Trimmer(msgResult.edit)
    If InStr(msgResult.btn, "old")
    {
@@ -42683,7 +42683,7 @@ PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
     GuiAddButton("x+1 yp w45 hp -TabStop gBtnClearQuickSearchEdit vUIclearBtn", "X", "Clear edit field",, "QuickMenuSearchGUIA")
     hLVquickSearchMenus := GuiAddListView("xs y+20 w" lstWid " +LV0x10000 +LV0x400 r" uLVr " -multi gLVquickSearchMenusResponder vLVsearchMenus AltSubmit", "Action|X|Shortcut|Menu|Keywords|Function|#|Score", "Search results", "QuickMenuSearchGUIA")
     GuiAddButton("x+1 yp w45 h45 gBTNinvokeQuickSearchMenu vUImenuQSbtn", ">", "Options",, "QuickMenuSearchGUIA")
-    Gui, Add, Text, xs y+2 wp vStatusLineQuickSearch +0x200 -wrap, Status bard
+    Gui, Add, Text, xs y+2 wp vStatusLineQuickSearch +0x200 -wrap, Status bar
     ; Gui, Add, Button, x+5 wp hp gBtnCloseWindow, C&lose
     LV_EX_SetColumnOrder(hLVquickSearchMenus, [2,1,3,4,5,6,7,8])
     VisibleQuickMenuSearchWin := 1
@@ -42806,7 +42806,7 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
                TV_Modify(nc)
             }
 
-            friendly .= nc ? "`nDestination: " folderTreeLabelForMsg(thisFolder) "\" : "No destination folder."
+            friendly .= nc ? "`nDestination: " folderTreeLabelForMsg(thisFolder) "\" : "`nNo destination folder."
             r := GetKeyState("Shift", "P") ? "[_MOVE_]" : "[_COPY_]"
             If nc
                friendly .= A_Space r
@@ -42844,7 +42844,7 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
          } Else 
          {
             r := dc := nc := ""
-            friendly := "`nNo action associated to this pointer location."
+            friendly := "`nNo action associated with this pointer location."
          }
 
          If (A_TickCount - prevMSGdisplay>100)
@@ -42989,7 +42989,7 @@ updateUistatusLineQuickSearch() {
    If !RowNumber
    {
       If (SubStr(userQuickMenusEdit, 2, 2)=":\")
-         GuiControl, QuickMenuSearchGUIA:, StatusLineQuickSearch, % AnyWindowOpen ? "You cannot navigate through folders while a panel is opened." : "The provided folder path does not exist."
+         GuiControl, QuickMenuSearchGUIA:, StatusLineQuickSearch, % AnyWindowOpen ? "You cannot navigate through folders while a panel is open." : "The provided folder path does not exist."
       Else
          GuiControl, QuickMenuSearchGUIA:, StatusLineQuickSearch, No results found matching the provided query.
       Return
@@ -43117,7 +43117,7 @@ GoQuickSearchAction(dummy:="", isGiven:=0, ef:=0) {
          OpenSLD(userQuickMenusEdit)
       } Else If (funcu="!OmniImportSLD")
       {
-         If askAboutFileSave(" and the selected files list will be imported to the list")
+         If askAboutFileSave(" and the selected files list will be imported into the current list")
             Return
 
          zPlitPath(userQuickMenusEdit, 1, fileu, SelectedDir)
@@ -43329,7 +43329,7 @@ PanelDisplayFileHeaderRaw() {
 
    endu := StrReplace(endu, "   ", A_Space)
    OutputVar := ""
-   msgResult := msgBoxWrapper("panelu|File header: " appTitle, "File name: " OutFileName "`n`nHeader ( first readable 256 chars):`n" header "`n`nEnding (last readable 256 chars):`n" endu, 0, 0, 0, 0, 0, 0)
+   msgResult := msgBoxWrapper("panelu|File header: " appTitle, "File name: " OutFileName "`n`nHeader (first 256 readable chars):`n" header "`n`nEnding (last 256 readable chars):`n" endu, 0, 0, 0, 0, 0, 0)
 }
 
 toggleNoEditingWarnings() {
@@ -43461,7 +43461,7 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
       omniBoxMode := 1
       hasAddedItems++
       filesFound := 0
-      LV_Add(A_Index, "...\", xu, "-", "Folder: up-one level", "", "!OmniNavigateUpFolder", 0, 0)
+      LV_Add(A_Index, "...\", xu, "-", "Folder: up one level", "", "!OmniNavigateUpFolder", 0, 0)
       Loop, Files, % Trimmer(userQuickMenusEdit, "\") "\*", DF
       {
          If (determineTerminateOperation()=1)
@@ -43851,7 +43851,7 @@ PanelSetSlidesMusic() {
    } Else If InStr(msgResult.btn, "browse")
    {
       patternObj := {}
-      patternObj["Supported audio file formarts"] := "*.wav;*.mp3;*.wma"
+      patternObj["Supported audio file formats"] := "*.wav;*.mp3;*.wma"
       startPath := StrLen(SlidesMusicSong)>3 ? SlidesMusicSong : CurrentSLD
       AudioFileu := openFileDialogWrapper("O", "FileMustExist", startPath, "Browse music file", patternObj, chosenOption, 2)
       AudioFileu := Trimmer(AudioFileu)
@@ -44029,7 +44029,7 @@ coreDialogConflictsMsgBox(title, sMsg, dMsg, filez, btnList, checkBoxCaption, ch
   thumbu := (PrefsLargeFonts=1) ? 250 : 200
   msgW := (PrefsLargeFonts=1) ? 850 : 480
   msgH := (PrefsLargeFonts=1) ? 180 : 100
-  Gui, Add, Text, %xPos% %yPos% Section, %extraMsg%File names conflict. Please choose what action to perform.
+  Gui, Add, Text, %xPos% %yPos% Section, %extraMsg%File name conflict. Please choose what action to perform.
 
   Gui, Add, Text, xs %yPos% w1 h1 hide -wrap, Source file thumbnail
   Gui, Add, Text, xp yp w%thumbu% h%thumbu% +Border +0x1000 +0xE +hwndhConflictThumbSrc  gdummy, Preview source file
@@ -44064,7 +44064,7 @@ coreDialogConflictsMsgBox(title, sMsg, dMsg, filez, btnList, checkBoxCaption, ch
       {
          Gui, Add, Button, gMsgBoxConflictEvent x+5 w%thisBW% hp %def% -wrap +hwndhTempus, %btnText%
          If InStr(btnText, "auto")
-            ToolTip2ctrl(hTempus, "Into the destination folder, the source file will have an added suffix.`nExample: Image_File_Name (2).jpg")
+            ToolTip2ctrl(hTempus, "In the destination folder, the source file will have an added suffix.`nExample: Image_File_Name (2).jpg")
       }
   }
 
@@ -44209,7 +44209,7 @@ askAboutFileCollision(srcFile, destFile, allowSkip, doLastOption, forceOption, B
       useLastOption := 0
 
    skipBtn := (allowSkip=1) ? "&Skip file|" : ""
-   checkBtn := (allowSkip=1) ? "&Do not prompt again, apply the same option for all the subsequent conflicts" : ""
+   checkBtn := (allowSkip=1) ? "&Do not prompt again; apply the same option to all subsequent conflicts" : ""
    If (useLastOption=1 && lastOption)
    {
       msgResult := lastOption
@@ -44310,7 +44310,7 @@ PanelRenameThisFile(dummy:=0) {
    multiBtn := (markedSelectFile>1) ? "&Multi-rename|" : ""
    fileMsg := (userPrivateMode=1) ? "" : "File location:`n" OutDir "\`n `n"
    typeu := (userPrivateMode=1) ? " Password " : ""
-   msgResult := msgBoxWrapper("panelu|Rename file: " appTitle, fileMsg "Please type the new file name.`n ", "&Rename file|" undoBtn multiBtn "&Modify index entry|C&ancel", 1, "modify-file", "On file name collision, use previously given answer", doLastOption, 0, "limit9050" typeu, OutFileName)
+   msgResult := msgBoxWrapper("panelu|Rename file: " appTitle, fileMsg "Please type the new file name.`n ", "&Rename file|" undoBtn multiBtn "&Modify index entry|C&ancel", 1, "modify-file", "On file name collision, use the previous answer", doLastOption, 0, "limit9050" typeu, OutFileName)
    If InStr(msgResult.btn, "multi")
    {
       SetTimer, PanelMultiRenameFiles, -100
@@ -44400,7 +44400,7 @@ PanelSetThumbColumnOptions() {
     UIvpImgAlignCenter := (imageAlignVPtopLeft=0) ? 1 : 0
     UIthumbsAratio := thumbsAratio
     thisW := (PrefsLargeFonts=1) ? 90 : 65
-    Gui, Add, Text, x15 y15 Section w%txtWid2%, Please note, most of the options listed here are shared with the full image view.
+    Gui, Add, Text, x15 y15 Section w%txtWid2%, Please note: most of the options listed here are shared with the full image view.
     Gui, Add, Text, xs y+15 w%slideWid2%, Flip thumbnails:
     Gui, Add, Checkbox, x+10 wp-15 gupdateUIthumbsView Checked%FlipImgH% vFlipImgH, &horizontally
     Gui, Add, Checkbox, x+10 gupdateUIthumbsView Checked%FlipImgV% vFlipImgV, &vertically
@@ -44414,8 +44414,8 @@ PanelSetThumbColumnOptions() {
     GuiAddDropDownList("xs y+5 w" slideWid2 " AltSubmit gupdateUIthumbsView Choose" UIthumbsAratio " vUIthumbsAratio", "Wide (1.81)|Tall (0.48)|Square (1.00)", "Thumbnails aspect ratio")
     Gui, Add, Checkbox, x+10 hp gupdateUIthumbsView Checked%UIvpImgAlignCenter% vUIvpImgAlignCenter, &Centered alignment
     Gui, Add, Checkbox, xs y+10 gupdateUIthumbsView Checked%fadeOtherDupeGroups% vfadeOtherDupeGroups, Fade the other groups of image duplicates
-    Gui, Add, Checkbox, xs y+10 gupdateUIthumbsView Checked%multilineStatusBar% vmultilineStatusBar, Two lines status bar
-    Gui, Add, Checkbox, xs y+10 gupdateUIthumbsView Checked%thumbsModeItemHighlight% vthumbsModeItemHighlight, Solid active item hilighting
+    Gui, Add, Checkbox, xs y+10 gupdateUIthumbsView Checked%multilineStatusBar% vmultilineStatusBar, Two-line status bar
+    Gui, Add, Checkbox, xs y+10 gupdateUIthumbsView Checked%thumbsModeItemHighlight% vthumbsModeItemHighlight, Solid active item highlighting
     Gui, Add, Text, xs y+15 hp +0x200 w%slideWid2%, Thumbnail columns:
     GuiAddEdit("x+10 w70 gupdateUIthumbsView number -multi limit3 veditF5", thumbsColumns)
     Gui, Add, UpDown, gupdateUIthumbsView vthumbsColumns Range2-99, % thumbsColumns
@@ -44507,7 +44507,7 @@ PanelSaveSlideShowu() {
        SLDcacheFilesList := 1
 
     dlWid := editWid - btnWid2
-    Gui, Add, Text, x15 y15 Section +0x200 +hwndhTemp, Slideshow format for save as:
+    Gui, Add, Text, x15 y15 Section +0x200 +hwndhTemp, Slideshow format for «Save as»:
     GuiAddDropDownList("xs y+5 w" dlWid " gUItoggleSLDformat AltSubmit Choose" userDesiredSlideFMT " vuserDesiredSlideFMT", ".SLD - Plain-text format|.SLDB - SQLite Database format (file details cached)", [hTemp])
     If (showSave=1)
        Gui, Add, Button, x+1 hp w%btnWid2% gBTNsaveSlideshowPanel, Save &as
@@ -44519,13 +44519,13 @@ PanelSaveSlideShowu() {
     ; Gui, Add, Checkbox, xs y+10 Checked%ForceRegenStaticFolders% vForceRegenStaticFolders, Regenerate static folders list`nThe static folders list enables partial files list later updates
     Gui, Add, Text, xs y+10 w%EditWid%, Regardless of the chosen format, the current %appTitle% settings will be stored.
     If InStr(CurrentSLD, "\QPV\favourite-images-list.SLD")
-       infoThisSLD := "Currently opened: «Favourite images list» (plain-text)."
+       infoThisSLD := "Currently open: «Favourite images list» (plain-text)."
     Else If (SLDtypeLoaded=2)
-       infoThisSLD := "Currently opened: plain-text files list`n" CurrentSLD
+       infoThisSLD := "Currently open: plain-text files list`n" CurrentSLD
     Else If (SLDtypeLoaded=3)
-       infoThisSLD := "Currently opened: SQLite database files list`nMost actions applied on the files index are automatically saved. Under rare circumstances resaving is required.`n" CurrentSLD
+       infoThisSLD := "Currently open: SQLite database files list`nMost actions applied to the files index are automatically saved. In rare circumstances, resaving is required.`n" CurrentSLD
     Else
-       infoThisSLD := "No saved files list currently opened."
+       infoThisSLD := "No saved files list is currently open."
 
     If (SLDtypeLoaded=2 && currentFilesListModified=1)
        infoThisSLD .= "`nFiles list has been modified. The changes are unsaved."
@@ -44585,8 +44585,8 @@ BTNhelpSlideshows() {
     msgu .= "this is the source of the files list and can be [re]scanned at any time.`n- the actual files list. If it is not cached / present when the SLD is opened, the main folders "
     msgu .= "list will be scanned for images to populate the files list index.`n- a «static» folders list; this list is automatically generated when the SLD is saved based on the indexed "
     msgu .= "files' paths - only if the user chooses to cache the files list. In later sessions, one can rescan any of these folders, allowing users to selectively update the files list "
-    msgu .= "whenever needed.`n`nIn addition to all of the above, the SQL-Lite database SLDB format can store:`n- image captions [no need for external text files] and also allows users "
-    msgu .= "to attach audio files to image files without the constraint of having them located in the same folder(s) with the image(s).`n- file and image details cache: file size, file "
+    msgu .= "whenever needed.`n`nIn addition to all of the above, the SQLite database SLDB format can store:`n- image captions [no need for external text files] and also allows users "
+    msgu .= "to attach audio files to image files without the constraint of having them located in the same folder(s) as the image(s).`n- file and image details cache: file size, file "
     msgu .= "date created, modified, image information (resolution, pixel format, histogram details and so on)`n`nThe caching of data facilitates management of large image collections, "
     msgu .= "because files list sorting, image and file statistics are performed MUCH faster once the data is cached. The cached data is stored and reused between sessions and can be "
     msgu .= "generated gradually in multiple QPV sessions."
@@ -44728,20 +44728,20 @@ PanelExtractFrames() {
     Gui, Add, Text, xp+15 y+7 w%ml% hp+6 +0x200, Render PDF pages (DPI):
     hTemp := GuiAddEdit("x+10 w" thisWid " number -multi limit4 veditF6", userPDFdpi)
     Gui, Add, UpDown, vuserPDFdpi Range72-3500, % userPDFdpi
-    AddTooltip2Ctrl(hTemp, "When PDF pages are render as bitmaps,`nthe DPI designates the quality of the output.`nRecommended: 450 dpi.")
+    AddTooltip2Ctrl(hTemp, "When PDF pages are rendered as bitmaps,`nthe DPI designates the quality of the output.`nRecommended: 450 dpi.")
     Gui, Add, Text, xs+15 y+7 w%ml% hp +0x200, Image quality `%:
     GuiAddEdit("x+10 w" thisWid " number -multi limit3 veditF5", userJpegQuality)
     Gui, Add, UpDown, vuserJpegQuality Range1-100, % userJpegQuality
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
     Gui, Add, Text, xs+15 y+7 w%ml% hp +0x200 +hwndhTemp, Fallback color depth:
     hTemp := GuiAddDropDownList("x+10 w" thisWid " AltSubmit Choose" depthChoice " vuserSaveBitsDepth", "32 bits RGBA|24 bits RGB|16 bits RGB [32768 colors]|8 bits RGB [256 colors]", [hTemp])
-    ToolTip2ctrl(hTemp, "PDF pages are saved at selected color depth.`nOther frames and pages keep their own depth when the file format can store it,`nthe selected color depth applies when it cannot.")
+    ToolTip2ctrl(hTemp, "PDF pages are saved at the selected colour depth.`nOther frames and pages keep their own depth when the file format can store it;`nthe selected colour depth applies when it cannot.")
     sml := (PrefsLargeFonts=1) ? 40 : 30
     GuiAddButton("x+5 w" sml " hp gbtnHelpSaveImgPanel", " ?", "Help")
     Gui, Add, Text, xs+15 y+7 w%ml% +0x200 +hwndhTemp -wrap, File format on save:
     thisWid := (PrefsLargeFonts=1) ? 110 : 80
     GuiAddDropDownList("x+10 w" thisWid " AltSubmit Choose" userExtractFramesFmt " vuserExtractFramesFmt", userPossibleWriteFMTs, [hTemp])
-    Gui, Add, Text, xs y+10 hp w%ml% +0x200, Folder destination:
+    Gui, Add, Text, xs y+10 hp w%ml% +0x200, Destination folder:
     thisWid := (PrefsLargeFonts=1) ? 105 : 65
     ml := (PrefsLargeFonts=1) ? 250 : 205
     GuiAddEdit("xp+15 y+5 w" ml " r1 -border -wrap vResizeDestFolder", ResizeDestFolder)
@@ -44861,7 +44861,7 @@ PanelCombineImagesMultipage() {
     Gui, Add, Text, xs y+10 w%ml% hp +0x200 vtxtLine1 +hwndhTemp, Maximum color depth:
     GuiAddDropDownList("x+1 w" thisWid " AltSubmit Choose" userSaveBitsDepth " vuserSaveBitsDepth gBtnChangeMultiPageFmt", "32 bits RGBA|24 bits RGB|16 bits RGB [32768 colors]|8 bits RGB [256 colors]", [hTemp])
     Gui, Add, Checkbox, x+5 hp Checked%userCombineDepthDithering% vuserCombineDepthDithering, Dithering
-    Gui, Add, Text, xs y+10 w%ml% hp +0x200 vtxtLine2, Frames delay (in milisec.)
+    Gui, Add, Text, xs y+10 w%ml% hp +0x200 vtxtLine2, Frame delay (in ms)
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
     GuiAddEdit("x+1 w" thisWid " number -multi limit4 veditF5", userCombineGIFframeDelay)
     Gui, Add, UpDown, vuserCombineGIFframeDelay Range1-9500, % userCombineGIFframeDelay
@@ -44920,11 +44920,11 @@ PanelCombineImagesMultipage() {
 }
 
 BtnHelpCombineImgs() {
-   msgBoxWrapper(appTitle ": HELP", "This tool allows users to combine multiple images into one image. TIFF and PDF are multi-page file formats, the other destination formats are for animations.`n`nIf the selected files have multiple frames or pages, and you want them included in the new file, activate the option «Join contained frames from selected files».`n`nThe resulted order of the pages/frames will reflect the order of originally selected files.`n`nFor proper animations, please select files having the same resolution or activate «Set dimensions».`n`nIn PDF files, every image is stored at the chosen resolution [DPI], or at its own when it has fewer pixels than that asks for. JPEG files are kept as they are, with no loss of quality, unless viewport effects apply to them or they are more than 1.5 times as detailed as the chosen resolution. The other images are stored as JPEGs of the chosen quality. The new PDF replaces the destination file only once it is complete.`n`nThe TIFFs created use the LZW compression method.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "This tool allows users to combine multiple images into one image. TIFF and PDF are multi-page file formats; the other destination formats are for animations.`n`nIf the selected files have multiple frames or pages, and you want them included in the new file, activate the option «Join contained frames from selected files».`n`nThe resulting order of the pages/frames will reflect the order of the originally selected files.`n`nFor proper animations, please select files having the same resolution or activate «Set dimensions».`n`nIn PDF files, every image is stored at the chosen resolution [DPI], or at its own when it has fewer pixels than that asks for. JPEG files are kept as they are, with no loss of quality, unless viewport effects apply to them or they are more than 1.5 times as detailed as the chosen resolution. The other images are stored as JPEGs of the chosen quality. The new PDF replaces the destination file only once it is complete.`n`nThe TIFFs created use the LZW compression method.", -1, 0, 0)
 }
 
 BtnHelpJoinIMGsframeDelay() {
-   msgBoxWrapper(appTitle ": HELP", "To set custom delays for specific frames:`n `n1. Close this panel.`n2. Open the «Quick search options» panel (S button below menus).`n3. In the search box type «join» and select «Set frame delay».`n `nTIP: To quickly reopen the panel press `; or F8.`n `nThe delay option from the currently opened panel will be ignored for the images you have set a custom delay.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "To set custom delays for specific frames:`n `n1. Close this panel.`n2. Open the «Quick search options» panel (S button below menus).`n3. In the search box type «join» and select «Set frame delay».`n `nTIP: To quickly reopen the panel press `; or F8.`n `nThe delay option from the currently open panel will be ignored for the images that have a custom delay.", -1, 0, 0)
 }
 
 BTNperformCombineIMGs() {
@@ -45375,15 +45375,15 @@ BTNperformExtractFrames(a) {
       extractedFrames := failedFrames := 0
       r := coreExtractFramesFromImage(currentFileIndex, 0, 0, 0, failedFrames, extractedFrames, extractFramesOptions())
       If (r=-5)
-         msgBeepTimer("WARNING: User abandoned operation.`n" extractedFrames " frames or pages were already extracted in:`n" PathCompact(ResizeDestFolder "\", 51), 0)
+         msgBeepTimer("WARNING: User abandoned operation.`n" extractedFrames " frames or pages were already extracted to:`n" PathCompact(ResizeDestFolder "\", 51), 0)
       Else If (r=-4)
          msgBeepTimer("ERROR: Failed to load the image. No frames or pages were extracted", 0)
       Else If (r=-3)
-         msgBeepTimer("WARNING: The image format does not have support for multiple frames.`nNo frames or pages were extracted.", 0)
+         msgBeepTimer("WARNING: The image format does not support multiple frames.`nNo frames or pages were extracted.", 0)
       Else If (r=-2)
          msgBeepTimer("The image has no frames or pages to extract", 0)
       Else If (r>=1)
-         msgBeepTimer("Succesfully extracted " groupDigits(extractedFrames) " frames out of " r, 0)
+         msgBeepTimer("Successfully extracted " groupDigits(extractedFrames) " frames out of " r, 0)
       Else
          msgBeepTimer("ERROR: An undefined error has occurred.`nNo frames or pages were extracted.", 0)
 
@@ -45465,7 +45465,7 @@ generateThumbsSheet() {
          If (Round((width * height)/1000000, 1) > 715.3)
             msgResult := msgBoxWrapper(appTitle ": WARNING", "The thumbnails sheet image cannot exceed 715 megapixels. Please reduce the size of the thumbnails and the spacing amongst them.", "&OK", 1, "exclamation")
          Else
-            msgResult := msgBoxWrapper(appTitle ": WARNING", "The thumbnails sheet image will have a dimension of " groupDigits(width) " x " groupDigits(height) " pixels. The image file format you chose cannot handle such large dimensions through QPV.`n`nPlease choose a different image file format, eg., TIFF.", "&OK", 1, "exclamation")
+            msgResult := msgBoxWrapper(appTitle ": WARNING", "The thumbnails sheet image will have dimensions of " groupDigits(width) " x " groupDigits(height) " pixels. The image file format you chose cannot handle such large dimensions through QPV.`n`nPlease choose a different image file format, e.g., TIFF.", "&OK", 1, "exclamation")
          Return
       }
 
@@ -45641,7 +45641,7 @@ generateThumbsSheet() {
       If !r
          msgBeepTimer("Finished generating the thumbnails sheet for " groupDigits(imgzSelected) " images." someErrors "`nFile saved: " OutFileName "`n" PathCompact(OutDir, 35) "\", 900)
       Else
-         msgBeepTimer("Failed to save the generated thumbnails sheet comprised of " groupDigits(imgzSelected) " images." someErrors)
+         msgBeepTimer("Failed to save the generated thumbnails sheet of " groupDigits(imgzSelected) " images." someErrors)
    }
 
    trGdip_DisposeImage(pBitmap)
@@ -45911,7 +45911,7 @@ PanelSaveImg() {
     imgPath := getIDimage(currentFileIndex)
     If (InStr(imgPath, "Q:\temporary memory object\") || !imgPath)
     {
-       fileStatus := imgPath "`n`nImage bitmap unsaved to disk."
+       fileStatus := imgPath "`n`nImage bitmap not saved to disk."
     } Else
     {
        fileStatus := PathCompact(imgPath, 47)
@@ -46023,12 +46023,12 @@ GuiAddSaveLossless(pos) {
 
 GuiAddSaveGifPaletteDithering(pos) {
     Gui, Add, Checkbox, % pos " gUIsaveFormatOptionsChanged Checked" userGifPaletteDithering " vuserGifPaletteDithering +hwndhTemp", Dithering
-    ToolTip2ctrl(hTemp, "GIF files and the 8 bits color depth use a palette of 256 colors.`nDithering mixes them in patterns to imitate the missing colors.`nTurn it off for screenshots, text and flat graphics.")
+    ToolTip2ctrl(hTemp, "GIF files and the 8-bit colour depth use a palette of 256 colours.`nDithering mixes them in patterns to imitate the missing colors.`nTurn it off for screenshots, text and flat graphics.")
 }
 
 GuiAddSavePaletteTransparency(pos) {
     Gui, Add, Checkbox, % pos " gUIsaveFormatOptionsChanged Checked" userGifPaletteTransparency " vuserGifPaletteTransparency +hwndhTemp", Keep transparency
-    ToolTip2ctrl(hTemp, "For the 256 colors palette: the pixels more than half transparent become fully transparent,`nthe others opaque. GIF, PNG, TIFF and ICO files keep the transparency.")
+    ToolTip2ctrl(hTemp, "For the 256-colour palette: the pixels more than half transparent become fully transparent,`nthe others opaque. GIF, PNG, TIFF and ICO files keep the transparency.")
 }
 
 updateConverterFormatOptions(fmt) {
@@ -46112,11 +46112,11 @@ saveQualityTip(inSavePanel:=0) {
 btnHelpSaveImgPanel() {
    If (AnyWindowOpen=84)
       f := "`n `nExtracted frames and pages keep the color depth of the file they come from, when the destination file format allows it and nothing is lost; otherwise the «Fallback depth» applies. PDF pages are always saved at the «Fallback depth»."
-   p := (AnyWindowOpen!=15) ? "`n`nThe color depth option is not applicable to all of the supported image file formats. GIF files and the 8 bits color depth use" : "`n`nGIF files use"
+   p := (AnyWindowOpen!=15) ? "`n`nThe color depth option is not applicable to all of the supported image file formats. GIF files and the 8-bit colour depth use" : "`n`nGIF files use"
    p .= " a palette of 256 colors: «Dithering» mixes them in patterns to imitate the missing colors, and «Keep transparency» makes the pixels more than half transparent fully transparent."
    pj := (AnyWindowOpen=15) ? "Progressive JPEG files («P»)" : "Progressive JPEG files"
 
-   msgBoxWrapper(appTitle ": HELP", "The quality applies to JPG, JNG, WEBP, JXL, JXR and JP2 files; 100 gives the best lossy quality. WEBP, JXL, JXR and JP2 files can also be saved without any loss, with the «Lossless» option; it is one option for these four formats.`n`n" pj " show a coarse version of the image first, while they load.`n`nJPEG XL compression effort: 1 is the fastest; 9 gives the smallest files and is the slowest.`n`nPNG and TIFF files are always losslessly storing the image data. The compression option for both only trades the saving speed for the file size. TIFF files use LZW at the fast and normal levels, and ZIP at the best one. PNG relies on Zlib for compression. `n`nThe file format options are set in the «Save image» panel and in the file format converter. They apply to every image file " appTitle " saves." p f, -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "The quality applies to JPG, JNG, WEBP, JXL, JXR and JP2 files; 100 gives the best lossy quality. WEBP, JXL, JXR and JP2 files can also be saved without any loss, with the «Lossless» option; it is one option for these four formats.`n`n" pj " show a coarse version of the image first, while they load.`n`nJPEG XL compression effort: 1 is the fastest; 9 gives the smallest files and is the slowest.`n`nPNG and TIFF files always store the image data losslessly. The compression option for both only trades the saving speed for the file size. TIFF files use LZW at the fast and normal levels, and ZIP at the best one. PNG relies on Zlib for compression. `n`nThe file format options are set in the «Save image» panel and in the file format converter. They apply to every image file " appTitle " saves." p f, -1, 0, 0)
 }
 
 PanelBrushTool(dummy:=0, modus:=0) {
@@ -46237,12 +46237,12 @@ PanelBrushTool(dummy:=0, modus:=0) {
     Gui, Add, Text, xp yp w%gW% h%gH% -border +0xE +hwndhCropCornersPic2 gUIresponderPanelsLivePreview +TabStop, Brush preview
 
     sml := (PrefsLargeFonts=1) ? 55 : 35
-    Gui, Add, Text, x+10 h%hasa% +0x200 vinfoSymmetryLabel, Apply symmetry on: 
+    Gui, Add, Text, x+10 h%hasa% +0x200 vinfoSymmetryLabel, Apply symmetry to: 
     Gui, Add, Checkbox, y+5 w%sml% hp gupdateUIbrushTool Checked%BrushToolSymmetryX% vBrushToolSymmetryX, X
     Gui, Add, Checkbox, x+5 wp hp gupdateUIbrushTool Checked%BrushToolSymmetryY% vBrushToolSymmetryY, Y
     Gui, Add, Button, x+5 hp gBtnSetBrushSymmetryCoords vBTNuiSetLabelSymmetry +hwndhTemp, S&et center
     ToolTip2ctrl(hTemp, "Shortcut in viewport: Shift + Y`nCycle modes: Y")
-    Gui, Add, Checkbox, xs y+9 gupdateUIbrushTool Checked%autoApplyVPcolors% vautoApplyVPcolors, Auto-apply viewport color effects on image
+    Gui, Add, Checkbox, xs y+9 gupdateUIbrushTool Checked%autoApplyVPcolors% vautoApplyVPcolors, Auto-apply viewport color effects to image
 
     Gui, Tab, 3 ; randomize
     GuiAddSlider("BrushToolRandomSize", 0,200, 0, "Brush size", "updateUIbrushTool", 1, "xs y+15 w" slideWid " h" hasa)
@@ -46259,7 +46259,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
 
     Gui, Tab, 4 ; pen pressure
     Gui, Add, Checkbox, xs y+15 w%slideWid% h%hasa% +0x1000 gupdateUIbrushTool Checked%BrushToolPenPressure% vBrushToolPenPressure +hwndhTemp, Enable &pen pressure
-    ToolTip2ctrl(hTemp, "This requires a pressure sensitive pen and Windows 8 or newer.`nWhen no pen is in use, the brush behaves exactly as it does with a mouse.")
+    ToolTip2ctrl(hTemp, "This requires a pressure-sensitive pen and Windows 8 or newer.`nWhen no pen is in use, the brush behaves exactly as it does with a mouse.")
     sml := (PrefsLargeFonts=1) ? 35 : 25
     GuiAddButton("x+1 w" sml " hp gBtnHelpPenPressureBrushes", " ?", "Help")
     Gui, Add, Checkbox, x+5 hp gupdateUIbrushTool Checked%BrushToolPenData% vBrushToolPenData, Display pen data
@@ -46283,15 +46283,15 @@ PanelBrushTool(dummy:=0, modus:=0) {
 }
 
 BtnHelpPenPressureBrushes() {
-   msgBoxWrapper(appTitle ": HELP", "When a pressure sensitive pen is used, the «Pen pressure» tab lets the pressure drive the brush opacity and the brush size. Windows 8 or newer is required.`n `nThe «Opacity influence» and «Size influence» sliders decide how much of each parameter the pressure may claim: at 0% the parameter stays exactly where the other tabs set it, at 100% it follows the pressure entirely.`n `n«Softest press» and «Firmest press» tell QPV which part of the pen range you actually use, both expressed as a percentage of everything the pen can report. The brush spreads its whole response over the band between them: pressing softer than «Softest press» always gives the weakest stroke, pressing firmer than «Firmest press» always gives the strongest one. Lower «Firmest press» when you cannot press hard enough to reach the maximum, and raise «Softest press» when the brush already paints at the slightest touch.`n `nTo find your own values, tick «Display pen data» and paint a stroke: the tool tip reports the raw pressure your hand produces, so you can read off your comfortable softest and firmest presses and set the two sliders accordingly.`n `n«Sensitivity» shapes the ramp between the minimum and maximum bounds. At zero the ramp is perfectly even and the pressure response is the gentlest. Positive values make a light touch already reach the full value.`n `nOpacity and size compound: a stroke at half pressure with both influences at full is not half as visible but far fainter, since the dab is both more transparent and smaller.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "When a pressure-sensitive pen is used, the «Pen pressure» tab lets the pressure drive the brush opacity and the brush size. Windows 8 or newer is required.`n `nThe «Opacity influence» and «Size influence» sliders decide how much of each parameter the pressure may claim: at 0% the parameter stays exactly where the other tabs set it, at 100% it follows the pressure entirely.`n `n«Softest press» and «Firmest press» tell QPV which part of the pen range you actually use, both expressed as a percentage of everything the pen can report. The brush spreads its whole response over the band between them: pressing softer than «Softest press» always gives the weakest stroke, pressing firmer than «Firmest press» always gives the strongest one. Lower «Firmest press» when you cannot press hard enough to reach the maximum, and raise «Softest press» when the brush already paints at the slightest touch.`n `nTo find your own values, tick «Display pen data» and paint a stroke: the tool tip reports the raw pressure your hand produces, so you can read off your comfortable softest and firmest presses and set the two sliders accordingly.`n `n«Sensitivity» shapes the ramp between the minimum and maximum bounds. At zero the ramp is perfectly even and the pressure response is the gentlest. Positive values make a light touch already reach the full value.`n `nOpacity and size compound: a stroke at half pressure with both influences at full is not half as visible but far fainter, since the dab is both more transparent and smaller.", -1, 0, 0)
 }
 
 BtnHelpBrushes() {
-   msgBoxWrapper(appTitle ": HELP", "Eight distinct brush types are available, each customizable in various ways. You can switch between brush types or adjust their settings using keyboard shortcuts when the main window is active. Please see the keyboard shortcuts help panel for more details.`n`nA low value for the «Stepping» option may cause QPV to freeze, as it applies brush strokes at every interval.`n`nSome of the brush randomize options apply only to some types of brushes. They might apply at the beginning of a brush stroke or continously during painting, based on brush settings.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "Eight distinct brush types are available, each customizable in various ways. You can switch between brush types or adjust their settings using keyboard shortcuts when the main window is active. Please see the keyboard shortcuts help panel for more details.`n`nA low value for the «Stepping» option may cause QPV to freeze, as it applies brush strokes at every interval.`n`nSome brush randomization options apply only to certain brush types. They might apply at the beginning of a brush stroke or continuously during painting, based on brush settings.", -1, 0, 0)
 }
 
 BtnHelpToolbar() {
-   msgBoxWrapper(appTitle ": HELP", "The QPV toolbar contains multi-functional buttons that help users perform actions with ease. The associated actions may change depending on the currently active context or tool, even if the icons do not change. However, the tool tips will always reflect this. Nonetheless, the associated actions will always have a similar underlying meaning.`n`nSilder icons`nThe icons can act as sliders. You have to click and drag up or down to decrease the associated value; e.g., brush related parameters or image zoom level.`n`nTwo actions.`nThe tool tips may indicate L or R actions. These are actions associated with the Left and Right click buttons.`n`nPress «Shift+Tab» to gain keyboard focus and to be able to navigate it. Use «Enter» to invoke the L-click action and «Shift+Enter» for to the R-click one.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "The QPV toolbar contains multi-functional buttons that help users perform actions with ease. The associated actions may change depending on the currently active context or tool, even if the icons do not change. However, the tool tips will always reflect this. Nonetheless, the associated actions will always have a similar underlying meaning.`n`nSlider icons`nThe icons can act as sliders. You have to click and drag up or down to increase or decrease the associated value; e.g., brush related parameters or image zoom level.`n`nTwo actions`nThe tool tips may indicate L or R actions. These are actions associated with the left and right mouse buttons.`n`nPress «Shift+Tab» to gain keyboard focus and to be able to navigate it. Use «Enter» to invoke the L-click action and «Shift+Enter» for the R-click one.", -1, 0, 0)
 }
 
 ToggleBrushColors() {
@@ -46824,7 +46824,7 @@ updateLabelSlidesSpeed() {
       p := Round(slideShowDelay/1000, 1) " s"
    Else
       p := slideShowDelay " ms"
-   Return "Slides interval: " p
+   Return "Slide interval: " p
 }
 
 updateLabelGIFdelay() {
@@ -46832,11 +46832,11 @@ updateLabelGIFdelay() {
       p := Round(UserGIFsDelayu/1000, 1) " s"
    Else
       p := UserGIFsDelayu " ms"
-   Return "GIF frames delay: " p
+   Return "GIF frame delay: " p
 }
 
 updateLabelMaskCurvePath() {
-   contrLvl := "Points tension: " Round(alphaMaskClrBintensity/255, 2)
+   contrLvl := "Point tension: " Round(alphaMaskClrBintensity/255, 2)
    If (alphaMaskClrBintensity<15)
       contrLvl := "Path mode: polygonal"
    Else If (alphaMaskClrBintensity>250)
@@ -47216,7 +47216,7 @@ PanelChangeHamDistThreshold() {
        hamUppLim := maxHamLvl
 
     UserHamDistCacheFilterMonoGroups := 1
-    Gui, Add, Text, x15 y15 w%txtWid% Section, Please set the range for the Hamming distance threshold. Lower ranges equate to a stricter criteria - more closely looking images. Cached threshold range: 0 - %maxHamLvl%.
+    Gui, Add, Text, x15 y15 w%txtWid% Section, Please set the range for the Hamming distance threshold. Lower ranges equate to stricter criteria: more similar images. Cached threshold range: 0 - %maxHamLvl%.
     Gui, Add, Text, y+15 w%btnWid%, Lower limit:
     Gui, Add, Text, x+15 wp, Upper limit:
     GuiAddEdit("xs y+5 wp number -multi limit2 veditF5", hamLowLim, "Lower limit")
@@ -47256,7 +47256,7 @@ PanelChangeHamDistThreshold() {
     Gui, Add, Button, xs y+25 w%btnWid% h%thisBtnHeight% Default gBtnChangeHamDistThreshold, &Update
     Gui, Add, Button, x+5 hp wp+10 gPanelFindDupes, &Main panel
     Gui, Add, Button, x+5 hp w85 gBtnCloseWindow, C&ancel
-    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Change hashes threshold: " appTitle)
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Change hash threshold: " appTitle)
 }
 
 BtnChangeHamDistThreshold() {
@@ -47316,17 +47316,17 @@ PanelSearchAndReplaceIndex() {
     imgPath := resultedFilesList[currentFileIndex, 1]
     doPwd := (userPrivateMode=1) ? " password " : ""
     zPlitPath(imgPath, 0, OutFileName, OutDir)
-    Gui, Add, Text, x15 y15 w%txtWid% Section, This panel is meant to help you fix broken files lists. e.g., files moved to a different folder. RegEx, tokens or wildcards are not supported.
+    Gui, Add, Text, x15 y15 w%txtWid% Section, This panel is meant to help you fix broken files lists (e.g., files moved to a different folder). RegEx, tokens or wildcards are not supported.
     Gui, Add, Text, y+15 wp, Search for:
     GuiAddEdit("y+5 wp " doPwd " veditF5 r1 gUIeditsGenericAllowCtrlBksp", OutDir)
     Gui, Add, Text, y+15 wp, Replace with:
     GuiAddEdit("y+5 wp " doPwd " veditF6 r1 gUIeditsGenericAllowCtrlBksp", "")
-    Gui, Add, Text, y+15 hp wp, Apply action on:
+    Gui, Add, Text, y+15 hp wp, Apply action to:
     GuiAddDropDownList("y+1 wp AltSubmit Choose" performSRindexMode " vperformSRindexMode", "Current files list|Selected files only|Entire seen images database|Main seed folders list")
     Gui, Add, Checkbox, y+15 Checked%userSrcRplcIndexFolder% vuserSrcRplcIndexFolder, Modify folder paths only (do not modify file names)
     Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid% Default gBTNperformIndexSearchReplace, &Perform
     Gui, Add, Button, x+5 hp w90 gBtnCloseWindow, C&ancel
-    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Search and replace through the files index: " appTitle)
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Search and replace in the files index: " appTitle)
 }
 
 BTNperformIndexSearchReplace() {
@@ -47339,7 +47339,7 @@ BTNperformIndexSearchReplace() {
       Return msgBeepTimer("WARNING: No search criteria given")
 
    If (editF5==editF6)
-      Return msgBeepTimer("WARNING: Both fields are equal: what to search for and replace with")
+      Return msgBeepTimer("WARNING: The search and replacement strings are identical")
 
    If (performSRindexMode=1 || performSRindexMode=2)
    {
@@ -47386,7 +47386,7 @@ toggleQuickMoveActionKeys() {
 toggleMultiCoresUse() {
    allowMultiCoreMode := !allowMultiCoreMode
    friendly := (allowMultiCoreMode=1) ? "ACTIVATED`nThreads to use: " userMultiCoresLimit : "DEACTIVATED"
-   showTOOLtip("Multi-threaded thumbnails generation: " friendly, A_ThisFunc, 1)
+   showTOOLtip("Multi-threaded thumbnail generation: " friendly, A_ThisFunc, 1)
    IniAction(1, "allowMultiCoreMode", "General")
    If (thumbsDisplaying=1 && thumbsListViewMode=1 && multiCoreThumbsInitGood="n")
       initThumbsPool()
@@ -47441,43 +47441,43 @@ PanelQuickMoveConfigure() {
     thisW := (PrefsLargeFonts=1) ? 190 : 120
 
     ReadSettingsQuickKeysActsPanel()
-    Gui, Add, Checkbox, x15 y15 Section w%txtWid% Checked%allowUserQuickFileActions% vallowUserQuickFileActions gupdateUIquickFileActs, Associate the keyboard keys from 1 to 6 to quick actions: move or copy images to user-defined destination folders.
+    Gui, Add, Checkbox, x15 y15 Section w%txtWid% Checked%allowUserQuickFileActions% vallowUserQuickFileActions gupdateUIquickFileActs, Associate the keyboard keys 1 to 6 with quick actions: move or copy images to user-defined destination folders.
     Gui, Add, Text, xs y+15 Center +0x200 w%tiny% vtxtLine1, [ 1 ]
-    GuiAddEdit("x+5 w" EditWid " r1 -wrap gUIeditsGenericAllowCtrlBksp vQuickFileActFolder1", QuickFileActFolder1, "Folder destination #1.")
+    GuiAddEdit("x+5 w" EditWid " r1 -wrap gUIeditsGenericAllowCtrlBksp vQuickFileActFolder1", QuickFileActFolder1, "Destination folder #1")
     Gui, Add, Button, x+5 hp w%tiny2% gBTNchooseQuickActDestFolder vbtnFldr1, Browse
-    GuiAddDropDownList("x+5 w" thisW " AltSubmit Choose" QuickFileActAfter1 " vQuickFileActAfter1", afterActionsList, "Once file action #1 executed")
+    GuiAddDropDownList("x+5 w" thisW " AltSubmit Choose" QuickFileActAfter1 " vQuickFileActAfter1", afterActionsList, "Once file action #1 is executed")
 
     Gui, Add, Text, xs y+15 Center +0x200 w%tiny% vtxtLine2, [ 2 ]
-    GuiAddEdit("x+5 w" EditWid " r1 -wrap gUIeditsGenericAllowCtrlBksp vQuickFileActFolder2", QuickFileActFolder2, "Folder destination #2.")
+    GuiAddEdit("x+5 w" EditWid " r1 -wrap gUIeditsGenericAllowCtrlBksp vQuickFileActFolder2", QuickFileActFolder2, "Destination folder #2")
     Gui, Add, Button, x+5 hp w%tiny2% gBTNchooseQuickActDestFolder vbtnFldr2, Browse
-    GuiAddDropDownList("x+5 w" thisW " AltSubmit Choose" QuickFileActAfter2 " vQuickFileActAfter2", afterActionsList, "Once file action #2 executed")
+    GuiAddDropDownList("x+5 w" thisW " AltSubmit Choose" QuickFileActAfter2 " vQuickFileActAfter2", afterActionsList, "Once file action #2 is executed")
 
     Gui, Add, Text, xs y+15 Center +0x200 w%tiny% vtxtLine3, [ 3 ]
-    GuiAddEdit("x+5 w" EditWid " r1 -wrap gUIeditsGenericAllowCtrlBksp vQuickFileActFolder3", QuickFileActFolder3, "Folder destination #3.")
+    GuiAddEdit("x+5 w" EditWid " r1 -wrap gUIeditsGenericAllowCtrlBksp vQuickFileActFolder3", QuickFileActFolder3, "Destination folder #3")
     Gui, Add, Button, x+5 hp w%tiny2% gBTNchooseQuickActDestFolder vbtnFldr3, Browse
-    GuiAddDropDownList("x+5 w" thisW " AltSubmit Choose" QuickFileActAfter3 " vQuickFileActAfter3", afterActionsList, "Once file action #3 executed")
+    GuiAddDropDownList("x+5 w" thisW " AltSubmit Choose" QuickFileActAfter3 " vQuickFileActAfter3", afterActionsList, "Once file action #3 is executed")
 
     Gui, Add, Text, xs y+15 Center +0x200 w%tiny% vtxtLine4, [ 4 ]
-    GuiAddEdit("x+5 w" EditWid " r1 -wrap gUIeditsGenericAllowCtrlBksp vQuickFileActFolder4", QuickFileActFolder4, "Folder destination #4.")
+    GuiAddEdit("x+5 w" EditWid " r1 -wrap gUIeditsGenericAllowCtrlBksp vQuickFileActFolder4", QuickFileActFolder4, "Destination folder #4")
     Gui, Add, Button, x+5 hp w%tiny2% gBTNchooseQuickActDestFolder vbtnFldr4, Browse
-    GuiAddDropDownList("x+5 w" thisW " AltSubmit Choose" QuickFileActAfter4 " vQuickFileActAfter4", afterActionsList, "Once file action #4 executed")
+    GuiAddDropDownList("x+5 w" thisW " AltSubmit Choose" QuickFileActAfter4 " vQuickFileActAfter4", afterActionsList, "Once file action #4 is executed")
 
     Gui, Add, Text, xs y+15 Center +0x200 w%tiny% vtxtLine5, [ 5 ]
-    GuiAddEdit("x+5 w" EditWid " r1 -wrap gUIeditsGenericAllowCtrlBksp vQuickFileActFolder5", QuickFileActFolder5, "Folder destination #5.")
+    GuiAddEdit("x+5 w" EditWid " r1 -wrap gUIeditsGenericAllowCtrlBksp vQuickFileActFolder5", QuickFileActFolder5, "Destination folder #5")
     Gui, Add, Button, x+5 hp w%tiny2% gBTNchooseQuickActDestFolder vbtnFldr5, Browse
-    GuiAddDropDownList("x+5 w" thisW " AltSubmit Choose" QuickFileActAfter5 " vQuickFileActAfter5", afterActionsList, "Once file action #5 executed")
+    GuiAddDropDownList("x+5 w" thisW " AltSubmit Choose" QuickFileActAfter5 " vQuickFileActAfter5", afterActionsList, "Once file action #5 is executed")
 
     Gui, Add, Text, xs y+15 Center +0x200 w%tiny% vtxtLine6, [ 6 ]
-    GuiAddEdit("x+5 w" EditWid " r1 -wrap gUIeditsGenericAllowCtrlBksp vQuickFileActFolder6", QuickFileActFolder6, "Folder destination #6.")
+    GuiAddEdit("x+5 w" EditWid " r1 -wrap gUIeditsGenericAllowCtrlBksp vQuickFileActFolder6", QuickFileActFolder6, "Destination folder #6")
     Gui, Add, Button, x+5 hp w%tiny2% gBTNchooseQuickActDestFolder vbtnFldr6, Browse
-    GuiAddDropDownList("x+5 w" thisW " AltSubmit Choose" QuickFileActAfter6 " vQuickFileActAfter6", afterActionsList, "Once file action #6 executed")
+    GuiAddDropDownList("x+5 w" thisW " AltSubmit Choose" QuickFileActAfter6 " vQuickFileActAfter6", afterActionsList, "Once file action #6 is executed")
 
     Gui, Add, Text, xs y+15 Center +0x200 w%tiny%, [ Del ]
     Gui, Add, Checkbox, x+5 w%EditWid% Checked%askDeleteFiles% vaskDeleteFiles, &Prompt before delete
-    GuiAddDropDownList("x+5 w" thisW " AltSubmit Choose" deleteFileActAfter " vdeleteFileActAfter", afterActionsList, "After a file was deleted")
+    GuiAddDropDownList("x+5 w" thisW " AltSubmit Choose" deleteFileActAfter " vdeleteFileActAfter", afterActionsList, "After a file is deleted")
     Gui, Add, Text, xs y+10 hp +0x200 +hwndhTemp, Action on file name conflicts:
     GuiAddDropDownList("x+5 w" thisW - 20 " AltSubmit Choose" QuickFileActConflict " vQuickFileActConflict", "Skip files|Auto-rename|Overwrite|Ask user", [hTemp])
-    Gui, Add, Text, xs y+15, Use Shift to move to given destination folder. Use Alt to open it in Explorer.
+    Gui, Add, Text, xs y+15, Use Shift to move to the given destination folder. Use Alt to open it in Explorer.
 
     Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid% Default gBtnApplyQuickActionsPanel, &Apply
     Gui, Add, Button, x+5 hp wp gBtnHelpCopyMovePanel, Hel&p
@@ -47697,7 +47697,7 @@ PanelAutoSelectDupes() {
    Static SearchdStringz
    If (maxFilesIndex<2)
    {
-      msgBeepTimer("WARNING: Insufficient indexed files to search for")
+      msgBeepTimer("WARNING: Insufficient indexed files to search")
       If filesFilter
          SetTimer, PanelEnableFilesFilter, -200
       Return
@@ -47715,7 +47715,7 @@ PanelAutoSelectDupes() {
    SearchdStringz := Trimmer(SearchdStringz)
    comboList := SearchdStringz ? SearchdStringz : "`f"
    widthu := (PrefsLargeFonts=1) ? 1060 : 560
-   msgResult := msgBoxWrapper("panelu|Auto-select duplicate images " appTitle, "When Automatic mode is selected, the smallest image (in MPx) will be selected. If all dupes in the group have the same resolution, then the smallest file will be selected. If both size and resolution are equal, the images' folder paths that match the string below will NOT be selected.`n`nYou can use | as the OR operator for multiple keywords. Wildcards ? and * are supported as well.`n`nBegin with one of the following symbols to...`n   / match folder paths that begin with given string`n   > match folder paths that end with given string.`n   \> to use Regular Expressions", "&Select files|&Find duplicates|C&ancel", 1, "search", "", 0, comboList, nullEdit,nullEdit, 1, widthu, "Automatic`f`fSmallest files`fSmallest resolution (MPx)", 2)
+   msgResult := msgBoxWrapper("panelu|Auto-select duplicate images: " appTitle, "When Automatic mode is selected, the smallest image (in MPx) will be selected. If all dupes in the group have the same resolution, then the smallest file will be selected. If both size and resolution are equal, the images whose folder paths match the string below will NOT be selected.`n`nYou can use | as the OR operator for multiple keywords. Wildcards ? and * are supported as well.`n`nBegin with one of the following symbols to...`n   / match folder paths that begin with the given string`n   > match folder paths that end with the given string`n   \> use regular expressions", "&Select files|&Find duplicates|C&ancel", 1, "search", "", 0, comboList, nullEdit,nullEdit, 1, widthu, "Automatic`f`fSmallest files`fSmallest resolution (MPx)", 2)
    If InStr(msgResult.btn, "select")
    {
       thisString := Trimmer(msgResult.list)
@@ -47748,11 +47748,11 @@ SearchIndexSelectAll(modus:="") {
       Return
    }
 
-   showTOOLtip("Searching index for matching files:`n" userSearchString)
+   showTOOLtip("Searching the index for matching files:`n" userSearchString)
    getSelectedFiles(0, 1)
    If (markedSelectFile>2)
    {
-      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Some files are already selected in the list. You can choose to add, substract the files selection based on the search criteria.", "&Replace|&Add|&Substract|&Cancel", 0, "question")
+      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Some files are already selected in the list. You can replace the selection, add to it or subtract from it, based on the search criteria.", "&Replace|&Add|&Subtract|&Cancel", 0, "question")
       If (msgResult="cancel" || InStr(msgResult, "win_close"))
       {
          SetTimer, RemoveTooltip, -250
@@ -47815,7 +47815,7 @@ SelectFilesDead() {
    getSelectedFiles(0, 1)
    If (markedSelectFile>2)
    {
-      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Some files are already selected in the list. You can choose to add, substract the files selection when the file is inexistent.", "&Replace|&Add|&Substract|&Cancel", 0, "question")
+      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Some files are already selected in the list. You can replace the selection with the inexistent files, add them to it or subtract them from it.", "&Replace|&Add|&Subtract|&Cancel", 0, "question")
       If (msgResult="cancel" || InStr(msgResult, "win_close"))
       {
          SetTimer, RemoveTooltip, -250
@@ -47945,7 +47945,7 @@ PanelSearchIndex(dummy:="") {
        currentFileIndex := doOpenStartFolder()
 
     If (maxFilesIndex<2)
-       Return msgBeepTimer("WARNING: Insufficient indexed files to search for")
+       Return msgBeepTimer("WARNING: Insufficient indexed files to search")
  
     If (AnyWindowOpen=6)
        BtnCloseWindow()
@@ -47994,7 +47994,7 @@ PanelSearchIndex(dummy:="") {
     w := (PrefsLargeFonts=1) ? 85 : 55
     Gui, Add, Button, x+5 hp wp-40 gOpenFilterPanelBTNaction, &Filter list
     Gui, Add, Button, x+5 hp w%w% gBtnCloseWindow, C&ancel
-    infou := (dummy="select") ? "Select files by given string" : "Search indexed files"
+    infou := (dummy="select") ? "Select files by a given string" : "Search indexed files"
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, infou ": " appTitle)
 }
 
@@ -48061,7 +48061,7 @@ BtnPerformSearchNow(a, b, c) {
          SearchIndexSelectAll()
       }
    } Else
-      msgBeepTimer(invalidRegEx ? "WARNING: The regular expression you provided is invalid.`nPlease correct the pattern before searching." : "WARNING: no valid search criteria was given.")
+      msgBeepTimer(invalidRegEx ? "WARNING: The regular expression you provided is invalid.`nPlease correct the pattern before searching." : "WARNING: no valid search criteria were given.")
 }
 
 OpenFilterPanelBTNaction() {
@@ -48100,7 +48100,7 @@ PanelEditImgCaption() {
 
     Gui, Add, Text, x15 y15 w%txtWid%, Please type the caption or annotation you want associated with this image file.
     GuiAddEdit("y+7 w" EditWid " r15 gUIeditsGenericAllowCtrlBksp limit2048 -wantTab vnewFileName", textFileContent, "Image caption")
-    Gui, Add, Checkbox, y+7 Checked%UsrStoreCaptionDB% vUsrStoreCaptionDB, &Store image caption into the SQL database
+    Gui, Add, Checkbox, y+7 Checked%UsrStoreCaptionDB% vUsrStoreCaptionDB, &Store image caption in the SQL database
     Gui, Add, Checkbox, y+7 Checked%showImgAnnotations% vshowImgAnnotations, &Display image captions on the viewport
     If (currentUndoLevel>2 && thumbsDisplaying!=1)
        Gui, Add, Text, y+7 , WARNING: Image captions are not displayed when an image is being edited.
@@ -48146,7 +48146,7 @@ updateUIcaptionsPanel() {
 }
 
 BTNhelpCaptions() {
-    msgBoxWrapper(appTitle ": HELP", "Image file captions [annotations] are stored in .TXT files [as plain text], where the image file is located, under the same file name.`n`nFor example:`nC:\example-folder\image-file.jpg`nC:\example-folder\image-file.txt`n`nIf you are using SQLite slideshow databases, you have the option to store the captions in the database, not as individual files for each image. However, please keep in mind, when the files list is renewed or regenerated, the captions or audio annotations might get lost.", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "Image file captions [annotations] are stored in .TXT files [as plain text], where the image file is located, under the same file name.`n`nFor example:`nC:\example-folder\image-file.jpg`nC:\example-folder\image-file.txt`n`nIf you are using SQLite slideshow databases, you have the option to store the captions in the database, not as individual files for each image. However, please keep in mind that when the files list is renewed or regenerated, the captions or audio annotations might get lost.", -1, 0, 0)
 }
 
 BTNdeleteCaptionAction() {
@@ -48278,7 +48278,7 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
      ; FileMove would move the file into that folder
      If FolderExist(file2save)
      {
-        msgBeepTimer("WARNING: Rename operation abandoned.`nA folder has the provided name.`n" newFileName)
+        msgBeepTimer("WARNING: Rename operation abandoned.`nA folder with the provided name already exists.`n" newFileName)
         Return 0
      }
 
@@ -48358,7 +48358,7 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
         } Else OutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
 
         zPlitPath(file2save, 0, OutFileName, OutDir, fileNamuNoEXT, oldEXT)
-        msgBeepTimer("File renamed succesfully to:`n" OutFileName "`n" OutDir "\", 0)
+        msgBeepTimer("File renamed successfully to:`n" OutFileName "`n" OutDir "\", 0)
         Return 1
      }
   } Else Return 0
@@ -48958,13 +48958,13 @@ PanelPasteInPlace(dummy:="") {
 throwWarningHugeImagesFeatureNotAvailable() {
    If (viewportQPVimage.imgHandle)
    {
-      msgBeepTimer("WARNING: A very large image is currently opened.`nThis option is not available at the moment.")
+      msgBeepTimer("WARNING: A very large image is currently open.`nThis option is not available at the moment.")
       Return 1
    }
 
    If (markedSelectFile && AnyWindowOpen=89)
    {
-      msgBeepTimer("WARNING: Multiple files are selected for batch processing. Alpha masking not supported.")
+      msgBeepTimer("WARNING: Multiple files are selected for batch processing. Alpha masking is not supported.")
       Return 1
    }
 }
@@ -49001,7 +49001,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
     imgPath := getIDimage(currentFileIndex)
     wasGiven := (FileRexists(dummy) && modalia="extern-file" && toolu="paste") ? 1 : 0
     If (wasGiven=0 && modalia="extern-file" && toolu="paste")
-       Return msgBeepTimer("ERROR: Failed to import given file")
+       Return msgBeepTimer("ERROR: Failed to import the given file")
 
     If (thumbsDisplaying=1 || editingSelectionNow!=1 || openingPanelNow=1)
        Return
@@ -49049,7 +49049,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
 
        zW := imgSelX2 - imgSelX1
        zH := imgSelY2 - imgSelY1
-       showTOOLtip("Retrieving image selected area, please wait")
+       showTOOLtip("Retrieving the selected image area, please wait")
        calcIMGdimensions(zW, zH, mainWidth - 1, mainHeight - 1, newW, newH)
        userClipBMPpaste := getSelectedImageArea(useGdiBitmap(), 0, 1, 1, newW, newH)
        If validBMP(userClipBMPpaste)
@@ -49126,7 +49126,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
        oldSelectionArea := []
        viewportStampBMP := trGdip_DisposeImage(viewportStampBMP, 1)
        userClipBMPpaste := trGdip_DisposeImage(userClipBMPpaste, 1)
-       msgBeepTimer("ERROR: Failed to retrieve and prepare image to perform transformations")
+       msgBeepTimer("ERROR: Failed to retrieve and prepare the image for transformations")
        SetTimer, resetOpeningPanel, -100
        ResetImgLoadStatus()
        Return
@@ -49251,13 +49251,13 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
 
     sml := (PrefsLargeFonts=1) ? 70 : 55
     widu := (PrefsLargeFonts=1) ? 30 : 25
-    GuiAddDropDownList("xs y+7 wp gupdateUIpastePanel AltSubmit Choose" PasteInPlaceAdaptMode " vPasteInPlaceAdaptMode", "Adjust image to selection|Fill selection area entirely (ignore aspect ratio)|Original image size", "Image adapt mode to selection")
+    GuiAddDropDownList("xs y+7 wp gupdateUIpastePanel AltSubmit Choose" PasteInPlaceAdaptMode " vPasteInPlaceAdaptMode", "Adjust image to selection|Fill selection area entirely (ignore aspect ratio)|Original image size", "Image fitting to selection")
     GuiAddDropDownList("xs y+7 gupdateUIpastePanel w" txtWid2 " AltSubmit Choose" PasteInPlaceAlignment " vPasteInPlaceAlignment", "Top, left corner|Top, right corner|Center point|Bottom, left corner|Bottom, right corner", "Anchor point in selection area")
     GuiAddDropDownList("x+2 gupdateUIpastePanel w" txtWid2 - widu*2 - 4 " AltSubmit Choose" PasteInPlaceOrientation " vPasteInPlaceOrientation", "0°|90°|180°|270°", "Image orientation")
     GuiAddCheckbox("x+2 yp hp w" widu " gupdateUIpastePanel Checked" PasteInPlaceOrientFlipX " vPasteInPlaceOrientFlipX", "Flip horizontally", "X")
     GuiAddCheckbox("x+2 yp hp wp gupdateUIpastePanel Checked" PasteInPlaceOrientFlipY " vPasteInPlaceOrientFlipY", "Flip vertically", "Y")
     bpp := (viewportQPVimage.imgHandle) ? FreeImage_GetBPP(viewportQPVimage.imgHandle) : 32
-    bppz := (bpp!=32 && PasteInPlaceToolMode=1) ? "initial area (must be a RGBA image)" : "the initially selected area "
+    bppz := (bpp!=32 && PasteInPlaceToolMode=1) ? "initial area (must be an RGBA image)" : "the initially selected area "
     thu := (PasteInPlaceToolMode!=1) ? " w1 h1 " : " hp "
     Gui, Add, Checkbox, xs y+7 %thu% gupdateUIpastePanel Checked%PasteInPlaceEraseInitial% vPasteInPlaceEraseInitial +hwndhTemp, &Erase %bppz%
     ToolTip2ctrl(hTemp, "The preview will be inaccurate for the erased area when using blending modes or alpha masks.")
@@ -49265,7 +49265,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
     Gui, Add, Checkbox, xs y+7 hp gupdateUIpastePanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit image object
     GuiAddSlider("PasteInPlaceBlurAmount", 0,255, 0, "Image blur", "updateUIpastePanel", 1, "xs y+10 w" txtWid2 " hp")
     Gui, Add, Checkbox, x+5 hp gupdateUIpastePanel Checked%PasteInPlaceBlurEdgesSoft% vPasteInPlaceBlurEdgesSoft, &Soft edges
-    Gui, Add, Checkbox, xs y+7 hp gupdateUIpastePanel Checked%forceSlowLivePreviewMode% vforceSlowLivePreviewMode +hwndhTemp, &Force larger than viewport preview
+    Gui, Add, Checkbox, xs y+7 hp gupdateUIpastePanel Checked%forceSlowLivePreviewMode% vforceSlowLivePreviewMode +hwndhTemp, &Force larger-than-viewport preview
     ToolTip2ctrl(hTemp, "QPV can become utterly slow if this option is activated...")
 
     slimeWid := (PrefsLargeFonts=1) ? 215 : 155
@@ -49283,7 +49283,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
     GuiAddDropDownList("x+15 y+15 w" txtWid2 " Section gupdateUIpastePanel AltSubmit Choose" PasteInPlaceBlendMode " vPasteInPlaceBlendMode", "No blend mode|" userBlendModesList, "Blending mode")
     GuiAddFlipBlendLayers("x+1 yp hp w" widu " gupdateUIpastePanel")
     GuiAddDropDownList("x+2 w" txtWid2 - widu - 3 " AltSubmit Choose" PasteInPlaceGlassy " vPasteInPlaceGlassy gupdateUIpastePanel", "No glass effect|Weak|Mild|Moderate|Strong|Extreme", "Glass effect")
-    GuiAddSlider("PasteInPlaceOpacity", 1,512, 255, ".updateLabelPasteImgOpacity", "updateUIpastePanel", 1, "xs y+10 w" txtWid - widu - 2 " hp", "Opacity above 100% allows user to restore partially`nvisible pixels in the manipulated image object.")
+    GuiAddSlider("PasteInPlaceOpacity", 1,512, 255, ".updateLabelPasteImgOpacity", "updateUIpastePanel", 1, "xs y+10 w" txtWid - widu - 2 " hp", "Opacity above 100% allows the user to restore partially`nvisible pixels in the manipulated image object.")
     GuiAddCheckbox("x+1 hp w" widu " gupdateUIpastePanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
     Gui, Add, Checkbox, xs y+15 w%txtWid2% hp gupdateUIpastePanel Checked%PasteInPlaceApplyColorFX% vPasteInPlaceApplyColorFX, Color adjustments
     Gui, Add, Checkbox, x+5 wp hp gupdateUIpastePanel Checked%userimgGammaCorrect% vuserimgGammaCorrect, Gamma correction
@@ -49294,7 +49294,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
     ; friendlyBtn := (toolu="paste") ? "&Paste" : "&Transform"
     sml := (PrefsLargeFonts=1) ? 82 : 65
     ml := (PrefsLargeFonts=1) ? 35 : 25
-    friendlyTitle := (toolu="paste") ? "Paste in place image: " : "Transform selected area: "
+    friendlyTitle := (toolu="paste") ? "Paste image in place: " : "Transform selected area: "
     GuiAddCollapseBtn("xm+0 y+15 Section h" thisBtnHeight " w" ml)
     GuiAddToggleLivePreview("x+5 yp hp wp gupdateUIpastePanel")
     Gui, Add, Button, x+5 w%sml% hp Default gapplyIMGeditFunction vbtnLiveApplyTool, &Apply
@@ -49307,7 +49307,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
 }
 
 BtnHelpTransform() {
-    msgBoxWrapper(appTitle ": HELP", "The transform panel hosts a multitude of functions: clone, crop, resize, skew, rotate, align images side by side, color adjust and/or blend images.`n`nClone image area. Select an image area and open this panel and make sure effects are applied by clicking on the Reset button.`n`nRotate the image. Locate the dot in the center of the selection area with the mouse cursor in the viewport, and click 'n drag to adjust the rotation angle. Alternatively, set the object orientation angle found in the Main tab.`n`nCrop an image. Set the first drop-down found in the Main tab, to «Original image size», make the selection as small as you need it to be and set the alignment of the pivot (Main tab). Then go to the Crop tab and set to the preferences available: crop shape, angle and so on.`n`nAdjust colors and blend images. In the «Adjust colors» tab one can activate the colour adjustments check-box, adjust opacity and choose different blending modes.`n`nWhen alpha masking is activated and the tab pertaining to this is also activated, users can click 'n drag inside the selection area to adjust the mask's gradient center. To reset the position, press Alt+L-Click inside the selection area.", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "The transform panel hosts a multitude of functions: clone, crop, resize, skew, rotate, align images side by side, adjust colours and/or blend images.`n`nClone an image area. Select an image area, open this panel and click the Reset button to make sure no effects are applied.`n`nRotate the image. Locate the dot in the center of the selection area with the mouse cursor in the viewport, and click 'n drag to adjust the rotation angle. Alternatively, set the object orientation angle found in the Main tab.`n`nCrop an image. Set the first drop-down in the Main tab to «Original image size», make the selection as small as you need it to be and set the alignment of the pivot (Main tab). Then go to the Crop tab and set the available preferences: crop shape, angle and so on.`n`nAdjust colors and blend images. In the «Adjust colors» tab one can activate the colour adjustments check-box, adjust opacity and choose different blending modes.`n`nWhen alpha masking is activated and its tab is selected, users can click 'n drag inside the selection area to adjust the mask's gradient center. To reset the position, press Alt+L-Click inside the selection area.", -1, 0, 0)
 }
 
 MenuResetTransformToolPos() {
@@ -50423,7 +50423,7 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
      If (showMainMenuBar=1)
         TriggerMenuBarUpdate()
 
-     msgBeepTimer("Draw freeform " LabelOpenLine LabelCurve A_Space LabelType "`nPress Right Click for the menu options", 0)
+     msgBeepTimer("Draw freeform " LabelOpenLine LabelCurve A_Space LabelType "`nRight-click for the menu options", 0)
      If (dummy="resume")
      {
         If (customShapePoints.Count()>4 && bezierSplineCustomShape=1)
@@ -51137,7 +51137,7 @@ PanelEditorImgResize() {
     If (viewportQPVimage.imgHandle)
        ResizeEnforceCanvas := 0
     clrW := (PrefsLargeFonts=1) ? 65 : 45
-    Gui, Add, Text, xs y+15 vInfoResized, Resulted dimensions for the resized image: TO DECIDE! `n and canvas
+    Gui, Add, Text, xs y+15 vInfoResized, Resulting dimensions for the resized image: TO DECIDE! `n and canvas
     Gui, Add, Checkbox, xs y+10 hp Checked%ResizeEnforceCanvas% vResizeEnforceCanvas gupdateUIresizeImgEditPanel, Set the given dimensions as canvas size
     sml := (PrefsLargeFonts=1) ? 90 : 60
     ha := (PrefsLargeFonts=1) ? 28 : 19
@@ -51163,7 +51163,7 @@ BTNimgResizeEditor() {
     impx := Round((imgW * imgH)/1000000, 1)
     If (max(cmpx, impx)>536.7 && !viewportQPVimage.imgHandle)
     {
-       msgResult := msgBoxWrapper(appTitle ": WARNING", "You are trying to resize the currently opened image to a very large resolution: " Round(max(cmpx, impx)) " megapixels. Several image editing tools will not be available with such images. Additionally, no undo levels will be recorded and the current undo levels will be discarded if you choose to continue.`n `nSome of the options in this panel might be ignored upon resize.`n`nPlease choose how to proceed.", "&Continue|C&ancel", 1, "exclamation")
+       msgResult := msgBoxWrapper(appTitle ": WARNING", "You are trying to resize the currently open image to a very large resolution: " Round(max(cmpx, impx)) " megapixels. Several image editing tools will not be available with such images. Additionally, no undo levels will be recorded and the current undo levels will be discarded if you choose to continue.`n `nSome of the options in this panel might be ignored upon resize.`n`nPlease choose how to proceed.", "&Continue|C&ancel", 1, "exclamation")
        If InStr(msgResult, "Continue")
        {
           BtnCloseWindow()
@@ -51179,12 +51179,12 @@ BTNimgResizeEditor() {
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     trGdip_GetImageDimensions(whichBitmap, oImgW, oImgH)
     If (oImgW=tUserNewWidth && oImgH=tUserNewHeight)
-       Return msgBeepTimer("WARNING: The provided values are identical with the original size")
+       Return msgBeepTimer("WARNING: The provided values are identical to the original size")
 
     If ((min(imgW, imgH, tUserNewWidth, tUserNewHeight)<3
     || max(imgW, imgH, tUserNewWidth, tUserNewHeight)>199000) && !viewportQPVimage.imgHandle)
     {
-       Return msgBeepTimer("WARNING: Incorrect values provided to resize image.`nValues must be between 3 and 199000 pixels.")
+       Return msgBeepTimer("WARNING: Incorrect values provided to resize the image.`nValues must be between 3 and 199000 pixels.")
     }
 
     WriteSettingsEditorResizePanel()
@@ -51209,7 +51209,7 @@ BTNimgResizeEditor() {
     G2 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap, thisImgQuality)
     If !G2
     {
-       msgBeepTimer("Failed to create the graphics object to resize image", 0)
+       msgBeepTimer("Failed to create the graphics object to resize the image", 0)
        trGdip_DisposeImage(newBitmap)
        ResetImgLoadStatus()
        Return
@@ -51417,7 +51417,7 @@ PanelManageVectorShapes() {
     thumbSize := (PrefsLargeFonts=1) ? 96 : 64
     Gui, Add, Tab3, %tabzDarkModus% AltSubmit gBtnTabsInfoUpdate hwndhCurrTab vCurrentPanelTab Choose1, Shapes gallery|Detailed list
     Gui, Tab, 2
-    Gui, Add, Text, x+15 y+15 Section +hwndhTmpTxtu, Freeform vector shapes already saved
+    Gui, Add, Text, x+15 y+15 Section +hwndhTmpTxtu, Saved freeform vector shapes
     hLVmainu := GuiAddListView("xs y+10 w" lstWid " +LV0x10000 +LV0x400 r" uLVr " Grid gBTNlvCustomShapes -multi AltSubmit vLViewDynas", "Name|Date|#", "Saved vector shapes")
     GuiControlGet, txtp, Pos, %hTmpTxtu%
     GuiControlGet, lvp, Pos, %hLVmainu%
@@ -51499,12 +51499,12 @@ BTNdeleteCustomShape() {
    If (StrLen(givenName)<2 || !FileExist(mainCompiledPath "\resources\vector-shapes\" givenName ".vqpv"))
       Return
 
-   msgResult := msgBoxWrapper(appTitle ": Confirmation", "You have selected to DELETE the vector shape named: " givenName ". Please confirm with Yes you want to remove it.", 4, 0, "exclamation")
+   msgResult := msgBoxWrapper(appTitle ": Confirmation", "You have selected to DELETE the vector shape named: " givenName ". Please confirm with Yes that you want to remove it.", 4, 0, "exclamation")
    If (msgResult="Yes")
    {
       FileRecycle, % mainCompiledPath "\resources\vector-shapes\" givenName ".vqpv"
       removeVectorShapeFromLVs(givenName)
-      msgBeepTimer("Vector shape file moved to recycle bin:`n " givenName ".vqpv", 0)
+      msgBeepTimer("Vector shape file moved to the Recycle Bin:`n " givenName ".vqpv", 0)
    }
 }
 
@@ -52036,7 +52036,7 @@ saveCurrentVectorShape(givenName, allowMsg:=1, givenPoints:=0) {
    thisFile := mainCompiledPath "\resources\vector-shapes\" givenName ".vqpv"
    If (FileExist(thisFile) && allowMsg=1 && givenName!="_Last_Temporarily_Saved_Shape")
    {
-      msgResult := msgBoxWrapper(appTitle ": Confirmation", "A vector shape was already defined with the provided name: " givenName ". Do you want to overwrite it? This action is irreversible.", "&Overwrite|&Cancel", 2, "exclamation")
+      msgResult := msgBoxWrapper(appTitle ": Confirmation", "A vector shape with the provided name already exists: " givenName ". Do you want to overwrite it? This action is irreversible.", "&Overwrite|&Cancel", 2, "exclamation")
       If (msgResult!="overwrite")
          Return -1
    }
@@ -52057,7 +52057,7 @@ saveCurrentVectorShape(givenName, allowMsg:=1, givenPoints:=0) {
    If (allowMsg=1)
    {
       If (errorOccurred=1)
-         msgBeepTimer("Failed to save vector shape into:`n" mainCompiledPath "\")
+         msgBeepTimer("Failed to save the vector shape in:`n" mainCompiledPath "\")
       Else prevNameSavedVectorShape := givenName
    }
 
@@ -52426,15 +52426,15 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
        Gui, Add, Text, xs y+15 w%btnWid%, Pen clipping
        Gui, Add, Text, x+5 wp, Styling
        GuiAddDropDownList("xs y+7 wp AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign gupdateUIdrawShapesPanel", "Inside|None|Outside", "Pen clipping to shape")
-       GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaDashStyle " vDrawLineAreaDashStyle gupdateUIdrawShapesPanel", "Continous|Dashes|Dots|Dashes and dots", "Line style")
+       GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaDashStyle " vDrawLineAreaDashStyle gupdateUIdrawShapesPanel", "Continuous|Dashes|Dots|Dashes and dots", "Line style")
        Gui, Add, Checkbox, xs y+6 wp hp +0x1000 Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIdrawShapesPanel, &Double line
-       GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaCapsStyle " vDrawLineAreaCapsStyle gupdateUIdrawShapesPanel", "No caps|Square caps|Round caps", "Line ends style")
+       GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaCapsStyle " vDrawLineAreaCapsStyle gupdateUIdrawShapesPanel", "No caps|Square caps|Round caps", "Line end style")
     } Else
     {
        Gui, Add, Checkbox, xs y+7 w%btnWid% hp +0x1000 Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIdrawShapesPanel, &Double line
        GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign gupdateUIdrawShapesPanel", "Inside|No clipping|Outside", "Pen clipping to shape")
        Gui, Add, Checkbox, xs y+7 wp +0x1000 hp Checked%DrawLineAreaJoinsStyle% vDrawLineAreaJoinsStyle gupdateUIdrawShapesPanel +hwndhTemp, &Round joins
-       GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaCapsStyle " vDrawLineAreaCapsStyle gupdateUIdrawShapesPanel", "No caps|Square caps|Round caps", "Line ends style")
+       GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaCapsStyle " vDrawLineAreaCapsStyle gupdateUIdrawShapesPanel", "No caps|Square caps|Round caps", "Line end style")
        ; Gui, Add, Checkbox, x+5 Checked%FillAreaDoBehind% vFillAreaDoBehind gupdateUIdrawShapesPanel, &Fill behind the image
     }
     
@@ -52449,7 +52449,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     } Else
     {
        GuiAddSlider("DrawLineAreaThickScale", 100, 650, 100, "Thickness scale: $€ %", "updateUIdrawShapesPanel", 1, "xs y+7 w" slideWid - 2 " hp")
-       GuiAddSlider("DrawLineAreaMitersBorder", 100, 500, 100, "Miters boundary: $€ %", "updateUIdrawShapesPanel", 1, "x+5 wp-30 hp", "Acute angles can cause miters to exceed the bounding box.`nIncrease miters boundary to avoid the clipping of miters.")
+       GuiAddSlider("DrawLineAreaMitersBorder", 100, 500, 100, "Miter boundary: $€ %", "updateUIdrawShapesPanel", 1, "x+5 wp-30 hp", "Acute angles can cause miters to exceed the bounding box.`nIncrease the miter boundary to avoid clipping the miters.")
        ToolTip2ctrl(hTemp, "Line segments will be connected with rounded joins.")
     }
 
@@ -52705,7 +52705,7 @@ PanelDrawParametricLines() {
     Gui, Tab, 1
     Gui, Add, Checkbox, x+15 y+15 w%btnWid% Section gupdateUIdrawParamLinesPanel Checked%DrawLineAreaLineGenerator% vDrawLineAreaLineGenerator, Line generator
     Gui, Add, Text, x+10 wp vtxtLine2, Crop output
-    GuiAddDropDownList("xs y+8 wp gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaBorderCenter " vDrawLineAreaBorderCenter", "Margins|Mid lines|Diagonals|Rays|Grid|Spiral|Circular / Polar|Maurer rose", "Lines generator type")
+    GuiAddDropDownList("xs y+8 wp gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaBorderCenter " vDrawLineAreaBorderCenter", "Margins|Mid lines|Diagonals|Rays|Grid|Spiral|Circular / Polar|Maurer rose", "Line generator type")
     GuiAddDropDownList("x+10 wp gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaCropShape " vDrawLineAreaCropShape", "No cropping|Rectangular|Elliptical", "Crop output")
     Gui, Add, Checkbox, xs y+10 Section w%sml% h%btnHeight% +0x1000 gupdateUIdrawParamLinesPanel Checked%DrawLineAreaBorderArcA% vDrawLineAreaBorderArcA,○
     Gui, Add, Checkbox, x+1 wp hp +0x1000 gupdateUIdrawParamLinesPanel Checked%DrawLineAreaBorderTop% vDrawLineAreaBorderTop,─
@@ -52727,7 +52727,7 @@ PanelDrawParametricLines() {
     ToolTip2ctrl(hTemp, "This defines the behaviour of the object when rotated")
     GuiAddDropDownList("xp yp wp gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaPolarMode " vDrawLineAreaPolarMode", "Inside|Outside|X-axis only", "Skewing mode")
     GuiAddDropDownList("x+10 wp gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaSpiralCenterMode " vDrawLineAreaSpiralCenterMode", "Cone|Inverted cone|Rotobilæ", "Spiral center mode")
-    GuiAddDropDownList("xp yp wp gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaGridCenter " vDrawLineAreaGridCenter", "Bulge warp|Center warp|Vertical courtain|Horizontal courtain", "Grid center mode")
+    GuiAddDropDownList("xp yp wp gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaGridCenter " vDrawLineAreaGridCenter", "Bulge warp|Center warp|Vertical curtain|Horizontal curtain", "Grid center mode")
     GuiAddSlider("DrawLineAreaPolarSection", 1,1440, 1440, ".updateLabelPolarSect", "updateUIdrawParamLinesPanel", 3, "xp yp wp hp")
     GuiAddButton("x+1 hp w35 gBtnHelpParametricPivot vBtn2", " ?", "Help")
 
@@ -52747,11 +52747,11 @@ PanelDrawParametricLines() {
     Gui, Add, Text, x+10 wp -wrap, % (viewportQPVimage.imgHandle) ? "-" : "Alignment"
     If (!viewportQPVimage.imgHandle)
     {
-       GuiAddDropDownList("xs y+8 w" btnWid " gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaDashStyle " vDrawLineAreaDashStyle", "Continous|Dashes|Dots|Dashes and dots", "Line style")
+       GuiAddDropDownList("xs y+8 w" btnWid " gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaDashStyle " vDrawLineAreaDashStyle", "Continuous|Dashes|Dots|Dashes and dots", "Line style")
        GuiAddDropDownList("x+10 wp gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign", "Inside|Centered|Outside", "Pen alignment")
     }
 
-    GuiAddDropDownList("xs y+10 wp AltSubmit Choose" DrawLineAreaCapsStyle " vDrawLineAreaCapsStyle gupdateUIdrawParamLinesPanel", "No caps|Square caps|Round caps", "Line ends style")
+    GuiAddDropDownList("xs y+10 wp AltSubmit Choose" DrawLineAreaCapsStyle " vDrawLineAreaCapsStyle gupdateUIdrawParamLinesPanel", "No caps|Square caps|Round caps", "Line end style")
     Gui, Add, Checkbox, x+10 wp hp +0x1000 gupdateUIdrawParamLinesPanel Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles, Double line
     ; If (viewportQPVimage.imgHandle)
     ;    Gui, Add, Checkbox, x+10 wp hp +0x1000 Checked%DrawLineAreaJoinsStyle% vDrawLineAreaJoinsStyle gupdateUIdrawParamLinesPanel, &Round joins
@@ -53019,7 +53019,7 @@ PanelFloodFillTool() {
     ; color similarity
     Gui, Add, Text, xs y+15 w%lblWid% h%ha% +0x200, Color similarity:
     GuiAddSlider("FloodFillTolerance", 0,255, 10, "Tolerance", "updateUIfloodFillPanel", 1, "x+6 w" fullWid - lblWid - 6 " hp")
-    GuiAddDropDownList("xs y+8 w" colWid " gupdateUIfloodFillPanel AltSubmit Choose" FloodFillAltToler " vFloodFillAltToler", "Grayscale [fast]|L*a'b' based grayscale|CIE 2000 Delta E [accurate]", "Color similarity algorithm", "The selected algorithm is used to determine the degree of similarity between the colors")
+    GuiAddDropDownList("xs y+8 w" colWid " gupdateUIfloodFillPanel AltSubmit Choose" FloodFillAltToler " vFloodFillAltToler", "Grayscale [fast]|L*a*b*-based grayscale|CIE 2000 Delta E [accurate]", "Color similarity algorithm", "The selected algorithm is used to determine the degree of similarity between the colors")
     Gui, Add, Checkbox, x+10 yp hp gupdateUIfloodFillPanel Checked%FloodFillEightWays% vFloodFillEightWays, Follow thin lines
 
     ; fill mode and affected area
@@ -53062,7 +53062,7 @@ PanelEraseSelectedArea() {
     }
     If (viewportQPVimage.imgHandle)
        EraseAreaUseAlpha := 0
-    Gui, Add, Text, x15 y15 Section w%txtWid%, Please decide how to erase or fade selected area:
+    Gui, Add, Text, x15 y15 Section w%txtWid%, Please decide how to erase or fade the selected area:
     Gui, Add, Checkbox, xs y+10 hp+6 Checked%EraseAreaInvert% vEraseAreaInvert gupdateUIerasePanel, &Invert selection area
     Gui, Add, Checkbox, x+10 wp hp Checked%EraseAreaFader% vEraseAreaFader gupdateUIerasePanel, &Fade selected area
 
@@ -53809,7 +53809,7 @@ PanelPixelizeSelectedArea() {
     If (uiUseDarkMode=1)
        Gui, Font, c%darkControlColor%
 
-    Gui, Add, Text, xp y+10 wp Center vPrinterPageInfos, Click and drag to change the preview area, or in the viewport.
+    Gui, Add, Text, xp y+10 wp Center vPrinterPageInfos, Click and drag to change the preview area, or click in the viewport.
     If (PrefsLargeFonts=1)
        Gui, Font, s%LargeUIfontValue%
 
@@ -53929,7 +53929,7 @@ PanelBlurSelectedArea() {
     If (uiUseDarkMode=1)
        Gui, Font, c%darkControlColor%
 
-    Gui, Add, Text, xp y+10 wp Center vPrinterPageInfos, Click and drag to change the preview area, or in the viewport.
+    Gui, Add, Text, xp y+10 wp Center vPrinterPageInfos, Click and drag to change the preview area, or click in the viewport.
     If (PrefsLargeFonts=1)
        Gui, Font, s%LargeUIfontValue%
 
@@ -53945,7 +53945,7 @@ PanelBlurSelectedArea() {
     Gui, Add, Tab3, %tabzDarkModus% x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
     Gui, Tab, 1
     Gui, Add, Checkbox, x+10 y+10 w%thisW% Section Checked%blurAreaSoftEdges% vblurAreaSoftEdges gupdateUIblurPanel +hwndhTemp, &Soft edges%friendly%
-    GuiAddDropDownList("x+5 w60 AltSubmit Choose" blurAreaSoftLevel " gupdateUIblurPanel vblurAreaSoftLevel", "0.3x|0.6x|1x|2x|3x|4x", "Edges softness level")
+    GuiAddDropDownList("x+5 w60 AltSubmit Choose" blurAreaSoftLevel " gupdateUIblurPanel vblurAreaSoftLevel", "0.3x|0.6x|1x|2x|3x|4x", "Edge softness level")
     Gui, Add, Checkbox, xs y+5 hp Checked%blurAreaTwice% vblurAreaTwice gupdateUIblurPanel, &Blur twice in one go (for large images)
     Gui, Add, Text, xs y+15 w%thisW% hp +0x200 -wrap +hwndhTemp, Blur mode:
     GuiAddDropDownList("x+5 wp AltSubmit Choose" blurAreaMode " gupdateUIblurPanel vblurAreaMode", "Blur (GDI+)" friendly "|Box blur|Gaussian / stack blur|Gaussian blur (slow)|Median blur (slow)|Dilate|Erode|Open|Close|Dissolve", [hTemp])
@@ -54281,7 +54281,7 @@ PanelAddNoiserImage() {
     }
 
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
-    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Add noise in selected area: " appTitle, winPos)
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Add noise to selected area: " appTitle, winPos)
     SetTimer, updateUIaddNoisePanel, -200
 }
 
@@ -54409,7 +54409,7 @@ PanelNewImage() {
 
     thisOpacity := Round((FillAreaOpacity / 255) * 100)
     Global PickuOutlierFillColor, infoResultRes
-    Gui, Add, Text, x15 y15 Section, Create new RGBA image. Please set image dimensions.
+    Gui, Add, Text, x15 y15 Section, Create a new RGBA image. Please set the image dimensions.
     GuiAddDropDownList("y+10 wp gupdateUInewImagePanel AltSubmit Choose" PredefinedDocsSizes " vPredefinedDocsSizes", "Viewport size|Screen size|Current image size|640x480|800x600|1024x768|HD 480p|HD 720p|HD 1080p|HD 2160p [4K]|A4 @ 300 dpi|A4 @ 150 dpi|Previously used dimensions", "Image dimensions preset")
     Gui, Add, Text, xs y+10 w%EditWid%, Width (px)
     Gui, Add, Text, x+4 wp, Height (px)
@@ -54418,7 +54418,7 @@ PanelNewImage() {
     GuiAddEdit("x+5 wp gNewImageEditResponder r1 limit6 +number -multi -wantTab -wrap vUserNewHeight", UserNewHeight, "Height")
     GuiAddEdit("x+5 wp-10 gNewImageEditResponder r1 limit4 +number -multi -wantTab -wrap vUserNewDPI", UserNewDPI, "DPI")
     Gui, Add, Text, x+5 hp wp+55 +0x200 vinfoLine -wrap, -
-    Gui, Add, Checkbox, xs y+10 Checked%NewImageReverseDimensions% vNewImageReverseDimensions, Rotate canvas 90° degrees
+    Gui, Add, Checkbox, xs y+10 Checked%NewImageReverseDimensions% vNewImageReverseDimensions, Rotate canvas 90°
     Gui, Add, Checkbox, xs y+10 gupdateUInewImagePanel Checked%NewDocUseColor% vNewDocUseColor, Fill background with color
     ha := (PrefsLargeFonts=1) ? 28 : 19
     clrW := (PrefsLargeFonts=1) ? 65 : 45
@@ -54588,12 +54588,12 @@ PanelPrintImage() {
     gH := (PrefsLargeFonts=1) ? 319 : 263
     printerlist := SGDIPrint_GetDefaultPrinter() "||" SGDIPrint_EnumPrinters("|") 
     Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE +hwndhCropCornersPic gUIresponderPrintPreview, Print preview
-    ToolTip2ctrl(hCropCornersPic, "Click to set image position on page.`nCtrl+click to set its size.")
+    ToolTip2ctrl(hCropCornersPic, "Click to set the image position on the page.`nCtrl+click to set its size.")
     Gui, Add, Text, xp y+10 wp Center vPrinterPageInfos, -`n-`n-`n-
     Gui, Add, Tab3, %tabzDarkModus% x+20 ys Section, General|Text line
 
     Gui, Tab, 1
-    Gui, Add, Text, x+15 y+15 Section, Please choose printer:
+    Gui, Add, Text, x+15 y+15 Section, Please choose a printer:
     GuiAddDropDownList("y+7 wp+90 gupdateUIprintPreview vSelectedPrinteru", printerlist, "Device")
     Gui, Add, Button, x+5 hp gBtnSetPrinterDefault, Set as &default
     GuiAddDropDownList("xs y+10 w" EditWid " gupdateUIprintPreview AltSubmit Choose" PrintPaperOrient " vPrintPaperOrient", "Portrait|Landscape", "Page orientation")
@@ -54604,7 +54604,7 @@ PanelPrintImage() {
     {
        Gui, Add, Text, xs y+10 +0x200 +hwndhTemp, Pages to print
        GuiAddDropDownList("x+5 wp gupdateUIprintPreview AltSubmit Choose" PrintPDFpagesRange " vPrintPDFpagesRange", "Current|All|Given range", [hTemp])
-       GuiAddEdit("x+5 wp hp gupdateUIprintPreview r1 limit100 -multi -wantTab -wrap vPrintPDFpagesGivenEdit", PrintPDFpagesGivenEdit, "Range of pages be printed")
+       GuiAddEdit("x+5 wp hp gupdateUIprintPreview r1 limit100 -multi -wantTab -wrap vPrintPDFpagesGivenEdit", PrintPDFpagesGivenEdit, "Range of pages to print")
     }
     Gui, Add, Checkbox, xs y+10 hp gupdateUIprintPreview Checked%PrintAdaptToFit% vPrintAdaptToFit, Automatically adapt image to cover page
     GuiAddSlider("PrintPosX", 0,100, 0, "X", "updateUIprintPreview", 1, "xs+15 y+10 w" EditWid " hp")
@@ -54641,7 +54641,7 @@ PanelPrintImage() {
     GuiAddCheckbox("x+2 yp hp wp gupdateUIprintPreview Checked" TextInAreaFontItalic " vTextInAreaFontItalic", "Italic", "I")
     GuiAddCheckbox("x+2 yp hp wp gupdateUIprintPreview Checked" TextInAreaFontUline " vTextInAreaFontUline", "Underline", "&U")
     If (filesElected>1)
-       Gui, Add, Text, xs y+10, Use "{fname}" as a place-holder for file names.
+       Gui, Add, Text, xs y+10, Use "{fname}" as a placeholder for file names.
 
     Gui, Tab
     f := (filesElected>1) ? "all" : "now"
@@ -54805,7 +54805,7 @@ BtnStartPrintingNow(a, b) {
    WriteSettingsPrintPanel()
    BtnCloseWindow()
    imgPath := getIDimage(currentFileIndex)
-   showTOOLtip("Please wait, preparing to print image")
+   showTOOLtip("Please wait, preparing to print the image")
    zPlitPath(imgPath, 0, OutFileName, OutDir)
    Sleep, 2
    multiFramesMode := (RegExMatch(imgPath, "i)(.\.pdf|tiff|tif)$") && totalFramesIndex>1) ? 1 : 0
@@ -54939,7 +54939,7 @@ batchImgPrinting(PrintOptions, multiFramesMode:=0, givenFile:=0, totalPages:=0) 
       someErrors .= "`nFor " groupDigits(failedFiles) A_Space alabelu ", printing failed"
 
    If (abandonAll=1)
-      msgBeepTimer("Operation aborted. " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected " alabelu "`nthe printing process began" someErrors)
+      msgBeepTimer("Operation aborted. " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected " alabelu "`nwere sent to the printer" someErrors)
    Else
       msgBeepTimer(groupDigits(countFilez) " out of " groupDigits(filesElected) " selected " alabelu " were processed for printing." someErrors, 900)
 
@@ -55016,7 +55016,7 @@ PanelIMGselProperties() {
     Gui, Add, Checkbox, xs y+10 gupdateUIselPropPanel Checked%rotateSelBoundsKeepRatio% vrotateSelBoundsKeepRatio, &Keep aspect ratio on rotation
     Gui, Add, Text, xs y+10 hp +0x200 +hwndhTemp, Lock aspect ratio:
     thisW := (PrefsLargeFonts=1) ? 190 : 120
-    GuiAddDropDownList("x+10 w" thisW " gupdateUIselPropPanel AltSubmit Choose" lockSelectionAspectRatio " vlockSelectionAspectRatio", "Unlocked|Current selection ratio|Current window|Current image|Square [1:1]|SDTV [4:3]|35mm film [3:2]|HDTV [16:9]|Wide screens [16:10]|Phone", [hTemp])
+    GuiAddDropDownList("x+10 w" thisW " gupdateUIselPropPanel AltSubmit Choose" lockSelectionAspectRatio " vlockSelectionAspectRatio", "Unlocked|Current selection ratio|Current window|Current image|Square [1:1]|SDTV [4:3]|35mm film [3:2]|HDTV [16:9]|Widescreen [16:10]|Phone", [hTemp])
 
     thisW := (PrefsLargeFonts=1) ? 125 : 80
     Gui, Add, Button, xs y+25 w%thisW% h%thisBtnHeight% gBTNselectEntireImg, &Select all
@@ -55522,7 +55522,7 @@ BtnCreateNewImage() {
     {
        superLarge := 1
        SoundBeep, 300, 100
-       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image dimensions exceed 536 MPx. Some image editing tools are not yet implemented for such large images and only one undo level will be available if sufficient system memory is accessible.`n`nTo lower the memory consumption, choose 24-bits RGBA.`n`nDo you want to create the new image?", "&32-bits RGBA|&24-bits RGB|&Abandon", 1, "exclamation")
+       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image dimensions exceed 536 MPx. Some image editing tools are not yet implemented for such large images and only one undo level will be available if sufficient system memory is accessible.`n`nTo lower the memory consumption, choose «24-bits RGB».`n`nDo you want to create the new image?", "&32-bits RGBA|&24-bits RGB|&Abandon", 1, "exclamation")
        ; msgResult := msgBoxWrapper(appTitle ": WARNING", "The image dimensions exceed the maximum limits. Width and height cannot exceed 199000 pixels, and total image size cannot exceed 536 MPx.`n`nWould you like to adapt the dimensions and create the new image?", "&Yes|&No", 1, "exclamation")
        If InStr(msgResult, "-bits")
           Sleep, -1 ; capIMGdimensionsGDIPlimits(UserNewWidth, UserNewHeight)
@@ -55538,7 +55538,7 @@ BtnCreateNewImage() {
     isImgOpen := isImgEditingNow()
     If (viewportQPVimage.imgHandle)
     {
-       If askAboutFileSave(" and new image will be created")
+       If askAboutFileSave(" and a new image will be created")
           Return
 
        discardSRCfileCaches()
@@ -55597,7 +55597,7 @@ BtnCreateNewImage() {
           ; Gdip_GraphicsClear(G2, "0x99FF1122")
           Gdip_DeleteGraphics(G2)
        } Else
-          addJournalEntry("Failed to fill the new image with the user defined background color. GDI+ object was not created.")
+          addJournalEntry("Failed to fill the new image with the user-defined background color. GDI+ object was not created.")
     }
 
     If (!currentFileIndex || !CurrentSLD || !maxFilesIndex)
@@ -55652,7 +55652,7 @@ BtnDrawParametricLinesSelectedArea() {
   If (DrawLineAreaBorderTop=0 && DrawLineAreaBorderBottom=0 && DrawLineAreaBorderLeft=0 && DrawLineAreaBorderRight=0 && DrawLineAreaLineGenerator=1
   && DrawLineAreaBorderCenter=1 && DrawLineAreaBorderArcA=0 && DrawLineAreaBorderArcB=0 && DrawLineAreaBorderArcC=0 && DrawLineAreaBorderArcD=0)
   {
-     Return msgBeepTimer("WARNING: No lines to draw selected")
+     Return msgBeepTimer("WARNING: No lines selected to draw")
   }
 
   ViewPortBMPcache := trGdip_DisposeImage(ViewPortBMPcache, 1)
@@ -55712,7 +55712,7 @@ updateUIdrawParamLinesPanel(actionu:=0, b:=0) {
     actu := (isVarEqualTo(DrawLineAreaBorderCenter, 4, 5, 7, 8) && DrawLineAreaLineGenerator=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "DrawLineAreaGridX")
 
-    stringu := (DrawLineAreaBorderCenter=4) ? "Lines density" : "Density X"
+    stringu := (DrawLineAreaBorderCenter=4) ? "Line density" : "Density X"
     If (DrawLineAreaBorderCenter=8)
        stringu := "Aberration"
 
@@ -57080,7 +57080,7 @@ BtnAdjustColorsSimpleImgSelArea() {
    If markedSelectFile
    {
       SoundBeep 300, 100
-      msgBoxWrapper(appTitle ": WARNING", "You have selected " groupDigits(markedSelectFile) " images for batch processing. You cannot apply the tool on the image active in the viewport in this context.`n`nTo edit an image individually, close the panel, drop the files selection and reopen this panel.", 0, 0, "exclamation")
+      msgBoxWrapper(appTitle ": WARNING", "You have selected " groupDigits(markedSelectFile) " images for batch processing. You cannot apply the tool to the image active in the viewport in this context.`n`nTo edit an image individually, close the panel, drop the files selection and reopen this panel.", 0, 0, "exclamation")
       Return
    }
 
@@ -57397,7 +57397,7 @@ BtnFillSelectedArea() {
        bpp := FreeImage_GetBPP(viewportQPVimage.imgHandle)
        If (FillAreaDoBehind=1 && bpp!=32)
        {
-          msgBoxWrapper(appTitle ": WARNING", "You have selected to fill behind semi-transparent pixels. However, the current image does not seem to have an alpha channel or is not a 32-bits image. Operation abandoned.", 0, 0, "exclamation")
+          msgBoxWrapper(appTitle ": WARNING", "You have selected to fill behind semi-transparent pixels. However, the current image does not seem to have an alpha channel or is not a 32-bit image. Operation abandoned.", 0, 0, "exclamation")
           Return
        }
     }
@@ -57524,7 +57524,7 @@ BtnALLviewedImages2List(dummy:=0) {
       CurrentSLD := backCurrentSLD
       If (SLDtypeLoaded=3)
          activeSQLdb.Exec("COMMIT TRANSACTION;")
-      Return msgBeepTimer("Found no already seen images in the database", 0, msgDisplayTime//2)
+      Return msgBeepTimer("Found no seen images in the database", 0, msgDisplayTime//2)
    }
 
    If (SLDtypeLoaded=3)
@@ -57576,8 +57576,8 @@ PanelPDFreadTexts() {
     GuiAddListView("xs y+5 w" txtWid " +LV0x10000 r11 Grid -multi AltSubmit vLViewPDFlink gLVactPDFtexts", "#|Link (URL)", "Links")
 
     Gui, Tab, 3
-    Gui, Add, Text, x+15 y+15 Section w%txtWid%, Press space or double-click a PDF embedded bookmark to jump through the document.
-    GuiAddListView("xs y+5 w" txtWid " +LV0x10000 r11 Grid -multi AltSubmit vLViewPDFbookmarks gLVactPDFtexts", "#|Page|Section title", "PDF bookmars")
+    Gui, Add, Text, x+15 y+15 Section w%txtWid%, Press space or double-click an embedded PDF bookmark to jump to it in the document.
+    GuiAddListView("xs y+5 w" txtWid " +LV0x10000 r11 Grid -multi AltSubmit vLViewPDFbookmarks gLVactPDFtexts", "#|Page|Section title", "PDF bookmarks")
     If (thumbsDisplaying=1 && InStr(filesFilter, "i)(QPV:PAGES:")=1)
        userActivePDFpage := currentFileIndex - 1
 
@@ -57589,7 +57589,7 @@ PanelPDFreadTexts() {
        Gui, Add, Text, xs y+5 wp, If any of the selected files are PDFs, you can extract the texts in one go.`nNo optical character recognition will be performed.
        GuiAddDropDownList("xs y+10 w" ml " AltSubmit Choose1 vUserPDFtextExtractMode", "Texts|Links|Both: texts and links", "What to extract from PDFs")
 
-       Gui, Add, Text, xs y+10 hp +0x200, Folder destination:
+       Gui, Add, Text, xs y+10 hp +0x200, Destination folder:
        thisWid := (PrefsLargeFonts=1) ? 105 : 65
        GuiAddEdit("xp+15 y+5 w" ml " r1 -Border right -wrap vResizeDestFolder", ResizeDestFolder)
        Gui, Add, Button, x+5 hp w%thisWid% gBTNchangeResizeDestFolder vbtnFldr, C&hoose
@@ -57604,7 +57604,7 @@ PanelPDFreadTexts() {
     Gui, Tab
     getPDFpageCountProtectState(getIDimage(currentFileIndex), "", isProtectedPDF, pageCount)
     If (isProtectedPDF=1)
-       Gui, Add, Text, xs y+10, The PDF permissions dictate it is forbidden to copy texts. Proceed mindfully.
+       Gui, Add, Text, xs y+10, The PDF permissions forbid copying texts. Proceed mindfully.
 
     ml := (PrefsLargeFonts=1) ? 35 : 25
     GuiAddButton("xs y+10 h" thisBtnHeight " w" ml " gBtnPrevImg", "<<", "Previous image")
@@ -57616,14 +57616,14 @@ PanelPDFreadTexts() {
     Gui, Add, Button, x+5 hp wp gBTNhelpPDFtexts, &Help
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, C&lose
 
-    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Extract texts in PDF: " appTitle)
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Extract texts from PDF: " appTitle)
     SetTimer, ResetImgLoadStatus, -100
     SetTimer, UIpopulatePDFtexts, -100
     SetTimer, UIpopulatePDFbookmarks, -250
 }
 
 BTNhelpPDFtexts() {
-    msgBoxWrapper(appTitle ": HELP", "This tool allows users to extract texts from PDFs.  It extracts only texts stored as text. No optical character recognition is performed on images to identify additional texts to be extracted.`n`nIn some cases, the text is encoded in unsupported character encoding formats. Therefore, the tool might retrieve gibberish contents.`n`nThe tool can be executed on multiple files.", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "This tool allows users to extract texts from PDFs. It extracts only texts stored as text. No optical character recognition is performed on images to identify additional texts to be extracted.`n`nIn some cases, the text is encoded in unsupported character encoding formats. Therefore, the tool might retrieve gibberish.`n`nThe tool can be executed on multiple files.", -1, 0, 0)
 }
 
 BTNcopyPDFtexts(CtrlHwnd:=0, b:=0, c:=0) {
@@ -57797,7 +57797,7 @@ RetrievePDFbookmarks(imgPath, pwd, allowBonuses, ByRef pageCount, ByRef errorTyp
    If (errorType=-2)
       txt := "No bookmarks retrieved."
    Else If errorType
-      txt := "An error occurred retrieving the PDF embedded bookmarks: " errorType "."
+      txt := "An error occurred while retrieving the embedded PDF bookmarks: " errorType "."
    Else If (buffer && bufferSize>1)
    {
       If (asked=1)
@@ -57949,7 +57949,7 @@ BTNextractALLtextsCurrentPDF() {
       zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt, nExt)
       b := RetrievePDFbookmarks(imgPath, pwd, 0, pageCount, errorType)
       If (errorType=0)
-         txt := "PDF boookmarks:`n" b "`n`n" txt
+         txt := "PDF bookmarks:`n" b "`n`n" txt
 
       FileAppend, % txt, % file2save, UTF-8
       If ErrorLevel
@@ -57958,7 +57958,7 @@ BTNextractALLtextsCurrentPDF() {
          Return
       }
 
-      msgBeepTimer("Text file succesfully saved:`n" OutFileName "`n" OutDir "\", 0)
+      msgBeepTimer("Text file successfully saved:`n" OutFileName "`n" OutDir "\", 0)
       quickBarOpenResult(file2save, 1)
    }
 }
@@ -58478,7 +58478,7 @@ PanelJournalWindow(tabu:=1) {
        Gui, Add, Button, xs y+5 hp gBtnBrowsePrivateFolder, &Browse
        Gui, Add, Button, x+2 hp wp gBtnApplyPrivateFolder, &Apply
        Gui, Add, Button, x+2 hp wp gBtnRemPrivateFolder +hwndhTempu, &None
-       ToolTip2ctrl(hTempu, "Clear the private folder edit field and apply change")
+       ToolTip2ctrl(hTempu, "Clear the private folder edit field and apply the change")
        ; Gui, Add, Text, xs y+5 wp+50, TIP: To retrieve the images seen on a given day or month`, open the statistics panel.
     } Else
     {
@@ -58637,13 +58637,13 @@ PanelInsertTextArea() {
     GuiAddCheckbox("x+2 yp hp+1 w" widu " gupdateUIInsertTextPanel Checked" TextInAreaFontBold " vTextInAreaFontBold", "Bold", "B")
     GuiAddCheckbox("x+2 yp hp wp gupdateUIInsertTextPanel Checked" TextInAreaFontItalic " vTextInAreaFontItalic", "Italic", "I")
     GuiAddCheckbox("x+2 yp hp wp gupdateUIInsertTextPanel Checked" TextInAreaFontUline " vTextInAreaFontUline", "Underline", "&U")
-    GuiAddCheckbox("x+2 yp hp wp gupdateUIInsertTextPanel Checked" TextInAreaFontStrike " vTextInAreaFontStrike", "Strike through", "S")
+    GuiAddCheckbox("x+2 yp hp wp gupdateUIInsertTextPanel Checked" TextInAreaFontStrike " vTextInAreaFontStrike", "Strikethrough", "S")
     ; GuiAddDropDownList("x+5 w" ddWid " Sort Choose1 gupdateUIInsertTextPanel vTextInAreaFontName", TextInAreaFontName)
     Gui, Add, Checkbox, x+5 hp +0x1000 gupdateUIInsertTextPanel Checked%TextInAreaAutoWrap% vTextInAreaAutoWrap, Word-&wrap
     GuiAddDropDownList("xs y+5 wp+20 gupdateUIInsertTextPanel Choose" TextInAreaCaseTransform " AltSubmit vTextInAreaCaseTransform", "No transform|CAPITALIZED|lowercase|Title Case|Leet speak", "Text case transformation")
     GuiAddCheckbox("x+5 wp-35 hp+1 gupdateUIInsertTextPanel Checked" TextInAreaFlipV " vTextInAreaFlipV", "Flip text vertically", "Flip V")
     GuiAddCheckbox("x+5 wp hp gupdateUIInsertTextPanel Checked" TextInAreaFlipH " vTextInAreaFlipH", "Flip text horizontally", "Flip H")
-    GuiAddButton("x+5 hp w" ml " gBTNapplyCaseTransfm vbtn5", ">", "Apply test case transformation in the edit field")
+    GuiAddButton("x+5 hp w" ml " gBTNapplyCaseTransfm vbtn5", ">", "Apply text case transformation in the edit field")
 
     ha := (PrefsLargeFonts=1) ? 27 : 18
     wa := (PrefsLargeFonts=1) ? 145 : 100
@@ -58652,7 +58652,7 @@ PanelInsertTextArea() {
 
     Gui, Tab, 2
     GuiAddSlider("TextInAreaUsrMarginz", 0,500, 0, "Text margins: $€ px", "updateUIInsertTextPanel", 1, "x+15 y+15 Section w" opaciSlideW " h" ha)
-    GuiAddSlider("TextInAreaCharSpacing", -100,255, 0, "Letters spacing: $€", "updateUIInsertTextPanel", 3, "x+5 wp hp")
+    GuiAddSlider("TextInAreaCharSpacing", -100,255, 0, "Letter spacing: $€", "updateUIInsertTextPanel", 3, "x+5 wp hp")
     GuiAddSlider("TextInAreaFontLineSpacing", -950,950, 0, "Line spacing: $€ px", "updateUIInsertTextPanel", 2, "xs y+10 wp hp")
     Gui, Add, Checkbox, x+5 yp hp gupdateUIInsertTextPanel Checked%TextInAreaOnlyBorder% vTextInAreaOnlyBorder, &Draw only the border
     GuiAddDropDownList("xs y+10 wp gupdateUIInsertTextPanel Altsubmit Choose" TextInAreaBorderOut " vTextInAreaBorderOut", "No border|Centered|Contour", "Text border type")
@@ -58695,7 +58695,7 @@ PanelInsertTextArea() {
     GuiAddDropDownList("x+1 wp gupdateUIInsertTextPanel AltSubmit Choose" TextInAreaBlendMode " vTextInAreaBlendMode", "None|" userBlendModesList, [hTemp])
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIInsertTextPanel")
     GuiAddCheckbox("x+1 hp w26 gupdateUIInsertTextPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
-    Gui, Add, Checkbox, xs y+%ml% Checked%userimgGammaCorrect% vuserimgGammaCorrect gupdateUIInsertTextPanel, &Apply gamma corrections
+    Gui, Add, Checkbox, xs y+%ml% Checked%userimgGammaCorrect% vuserimgGammaCorrect gupdateUIInsertTextPanel, &Apply gamma correction
 
     Gui, Add, Checkbox, xs y+%ml% gupdateUIInsertTextPanel Checked%TextInAreaDoBlurs% vTextInAreaDoBlurs, Apply blur effect
     sml := (PrefsLargeFonts=1) ? 55 : 35
@@ -59044,8 +59044,8 @@ PanelPreferencesWindow() {
     ToolTip2ctrl(hTemp, "When this option is activated, the performance of QPV will be drastically reduced.`nSome features or functions might be disabled.")
     Gui, Add, Checkbox, xs y+7 gToggleImgQuality Checked%userimgQuality% vuserimgQuality, High quality image resampling in the viewport
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%userHQraw% vuserHQraw, Load Camera RAW files at high quality
-    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%allowMultiCoreMode% vallowMultiCoreMode +hwndhTemp, Multi-threaded thumbnails processing (experimental)
-    ToolTip2ctrl(hTemp, "Multiple execution threads can be used to generate thumbnails and perform image duplicates detection.")
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%allowMultiCoreMode% vallowMultiCoreMode +hwndhTemp, Multi-threaded thumbnail processing (experimental)
+    ToolTip2ctrl(hTemp, "Multiple execution threads can be used to generate thumbnails and detect duplicate images.")
     GuiAddEdit("xs+18 y+7 gupdateUIsettings w" editWid//1.5 " r1 limit2 -multi number -wantCtrlA -wantReturn -wantTab -wrap vEditFb", userMultiCoresLimit)
     EnvGet, sc, NUMBER_OF_PROCESSORS
     sc := sc//2 + 1
@@ -59061,7 +59061,7 @@ PanelPreferencesWindow() {
     Gui, Add, Checkbox, xs y+7 gtoggleFreeIMGpanning Checked%allowFreeIMGpanning% vallowFreeIMGpanning, Allow outside viewport image panning
     Gui, Add, Checkbox, xs y+7 gToggleIMGalign Checked%imageAlignVPtopLeft% vimageAlignVPtopLeft, Top-left image alignment in the viewport
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%lockZoomLevel% vlockZoomLevel +hwndhTemp, Retain zoom level on image change (lock zoom level)
-    ToolTip2ctrl(hTemp, "When this option is deactivated, QPV attempts to retain the dimensions`nin the viewport even if it is a larger or a smaller one,`nto improve the user experience.")
+    ToolTip2ctrl(hTemp, "When this option is deactivated, QPV attempts to retain the dimensions`nin the viewport, whether the new image is larger or smaller,`nto improve the user experience.")
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%resetImageViewOnChange% vresetImageViewOnChange, Auto-reset viewport color adjustments on image change
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%LimitSelectBoundsImg% vLimitSelectBoundsImg, Limit selection area to image boundaries 
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%allowGIFsPlayEntirely% vallowGIFsPlayEntirely, Wait for animations to play once during slideshows
@@ -59078,16 +59078,16 @@ PanelPreferencesWindow() {
 
     Gui, Tab, 4
     pp := (FIMfailed2init=1) ? "( ! )"
-    Gui, Add, Checkbox, x+15 y+15 Section gupdateUIsettings Checked%allowUserQuickFileActions% vallowUserQuickFileActions, Associate the «Quick file action» shortcuts [1 to 6 keys]
+    Gui, Add, Checkbox, x+15 y+15 Section gupdateUIsettings Checked%allowUserQuickFileActions% vallowUserQuickFileActions, Activate the «Quick file action» shortcuts [keys 1 to 6]
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%MustLoadSLDprefs% vMustLoadSLDprefs, Auto-load settings from QPV slideshows when opened (.SLD / .SLDB)
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%alwaysOpenWithFIM% valwaysOpenWithFIM +hwndhTemp, Attempt to load any image format using FreeImage %pp%
     If (FIMfailed2init=1)
        ToolTip2ctrl(hTemp, "This option is disabled because FreeImage.DLL failed to initialize.")
 
-    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%askDeleteFiles% vaskDeleteFiles, Prompt before file delete action
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%askDeleteFiles% vaskDeleteFiles, Prompt before deleting files
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%autoRemDeadEntry% vautoRemDeadEntry, Automatically remove index entries pointing to inexistent files
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%skipDeadFiles% vskipDeadFiles, Automatically skip inexistent files
-    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%autoPlaySNDs% vautoPlaySNDs, Automatically play sound files associated to images
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%autoPlaySNDs% vautoPlaySNDs, Automatically play sound files associated with images
     GuiAddSlider("mediaSNDvolume", 1,100, 50, "QPV audio volume", "dummy", 1, "xs+16 y+7 w" slideWid " hp")
     Gui, Add, Checkbox, xs y+7 gToggleToolBarViewModa Checked%toolbarViewerMode% vtoolbarViewerMode, Image viewer toolbar (simplified mode)
     Gui, Add, Checkbox, xs y+7 gtoggleCustomaToolbara Checked%userCustomizedToolbar% vuserCustomizedToolbar, Use customized list of toolbar icons
@@ -59096,7 +59096,7 @@ PanelPreferencesWindow() {
 
     Gui, Tab, 5
     txtWid += 50
-    Gui, Add, Text, x+15 y+15 w%txtWid% Section, The following options will not be saved under any circumstance.
+    Gui, Add, Text, x+15 y+15 w%txtWid% Section, The following options will not be saved under any circumstances.
     Gui, Add, Checkbox, y+7 gupdateUIsettings Checked%allowWICloader% vallowWICloader, Allow Windows Imaging Component (WIC) loader
     Gui, Add, Checkbox, y+7 gupdateUIsettings Checked%allowFIMloader% vallowFIMloader, Allow FreeImage loader
     Gui, Add, Checkbox, y+7 gupdateUIsettings Checked%noQualityWarnings% vnoQualityWarnings, Reduce the number of warnings
@@ -59104,7 +59104,7 @@ PanelPreferencesWindow() {
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%userPrivateMode% vuserPrivateMode, Private mode UI
     Gui, Add, Text, xs+18 y+7 w%txtWid%, Hidden file names and blurred images.
     Gui, Add, Text, xs y+10, Maximum thumbnails to hold in memory:
-    GuiAddSlider("maxMemThumbsCache", 10, 2048, 420, "Bitmaps cachable: $€", "dummy", 1, "xs+18 y+7 w" editWid * 2 " hp")
+    GuiAddSlider("maxMemThumbsCache", 10, 2048, 420, "Bitmaps cacheable: $€", "dummy", 1, "xs+18 y+7 w" editWid * 2 " hp")
 
     Gui, Tab
     Gui, Add, Button, xm+0 y+20 h%thisBtnHeight% w%btnWid% gOpenUImenu, &More options
@@ -59196,7 +59196,7 @@ PanelAdjustToneMapping() {
 }
 
 BtnHelpToneMapping() {
-   msgBoxWrapper(appTitle ": HELP", "High-dynamic range images (HDRIs) must be converted to 24 bits to be displayed on screen. You can choose the algorithm to use for this and also configure it.`n`nWhen the option to load Camera RAW images with high quality is activated, the tone-mapping options can be applied on these as well. Color management, when activated, is applied after the tone mapping.`n`nDeactivating tone-mapping for HDR, EXR and PFM image file formats is not possible.`n`nThe OpenCV implementations execute faster and may produce better results, but the alpha channel, if present, will not be preserved.`n`nUse the reset button to identify commonly used settings for each algorithm implementation.`n`nPlease note: the preview may not accurately match the output in the viewport.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "High-dynamic range images (HDRIs) must be converted to 24 bits to be displayed on screen. You can choose the algorithm to use for this and also configure it.`n`nWhen the option to load Camera RAW images with high quality is activated, the tone-mapping options can be applied to these as well. Color management, when activated, is applied after the tone mapping.`n`nDeactivating tone-mapping for HDR, EXR and PFM image file formats is not possible.`n`nThe OpenCV implementations execute faster and may produce better results, but the alpha channel, if present, will not be preserved.`n`nUse the reset button to identify commonly used settings for each algorithm implementation.`n`nPlease note: the preview may not accurately match the output in the viewport.", -1, 0, 0)
 }
 
 killToneMapImageCacheObj() {
@@ -59242,7 +59242,7 @@ SetUItoneMapPanelInfoLine() {
     Else If (userPerformColorManagement=1 && isVarEqualTo(f.tmNoCM, 1, 2, 3))
        msg := "Image in linear light converted to display colors. Deactivate color management to tone-map it."
     Else If isInRange(f.type, 2, 8)
-       msg := "A single-channel image: Displayed as 8-bit grey, not tone-mapped."
+       msg := "A single-channel image: displayed as 8-bit grey, not tone-mapped."
     Else
        msg := "Tone-mapping does not apply to this image."
 
@@ -59376,7 +59376,7 @@ updateUIfimBeforeIMG(modus:=0) {
 updateUIfimToneMappedIMG() {
    Static uiBoxW := 460, uiBoxH := 320
    If !globalhFIFtoneMap
-      Return msgBeepTimer("ERROR: The image failed to be loaded with FreeImage.")
+      Return msgBeepTimer("ERROR: FreeImage failed to load the image.")
 
    updateUIfimBeforeIMG()
    ; as FIMapplyToneMapper() decides: FITM_REQUIRED [2] and FITM_PQ [3] always, FITM_OPTIONAL [1] when allowed
@@ -59724,7 +59724,7 @@ InvokeStandardDialogColorPicker(hC, event, c) {
      If GetKeyState("Shift", "P")
      {
         wasOkay := copyTextToClippy(%ctrl%)
-        msg2show := (wasOkay=0) ? " Failed to copy the color to clipboard" : "HEX color copied to clipboard: " %ctrl%
+        msg2show := (wasOkay=0) ? " Failed to copy the color to the clipboard" : "HEX color copied to clipboard: " %ctrl%
      } Else If GetKeyState("Alt", "P")
      {
         Try clr := Trimmer(Clipboard)
@@ -59861,9 +59861,9 @@ invokeTlbrContextMenu(givenCoords:=0) {
    If (TLBRverticalAlign=1 || TLBRtwoColumns=1)
       kMenu("PvUItoolbarMenu", "Check", "&Vertical toolbar")
 
-   kMenu("PvUItoolbarMenu", "Add/Uncheck", "&Two columns vertical", "toggleToolbarTwoColumns",, " (toolbar)")
+   kMenu("PvUItoolbarMenu", "Add/Uncheck", "&Two-column vertical", "toggleToolbarTwoColumns",, " (toolbar)")
    If (TLBRtwoColumns=1)
-      kMenu("PvUItoolbarMenu", "Check", "&Two columns vertical",,, " (toolbar)")
+      kMenu("PvUItoolbarMenu", "Check", "&Two-column vertical",,, " (toolbar)")
 
    kMenu("PvUItoolbarMenu", "Add/Uncheck", "Attach to main &window", "ToggleToolbarLockPositionWin",, " (toolbar)")
    If (lockToolbar2Win=1)
@@ -59954,12 +59954,12 @@ PanelDefineEntireSlideshowLength() {
     GuiAddEdit("x+5 wp gUpdateSlideshowPanel r1 limit2 Number -multi -wantTab -wrap vuserSecDur", Round(Sec))
     Gui, Add, Text, xs y+5 wp +0x200 +hwndhTemp, Speed:
     GuiAddDropDownList("x+5 wp gChooseSlideSpeed AltSubmit vuserDefinedSpeedSlideshow", "-||30 FPS|15 FPS|7 FPS|2 FPS|1 sec.|2 sec.|4 sec.|8 sec.|16 sec.", [hTemp])
-    Gui, Add, Button, x+5 hp w75 gTimeLapseInfoBox, Infos
+    Gui, Add, Button, x+5 hp w75 gTimeLapseInfoBox, Info
     thisW := (PrefsLargeFonts=1) ? 105 : 80
     Gui, Add, Button, x+5 hp w%thisW% gSetTimeLapseMode, Timelapse
     Gui, Add, Text, xs y+5 w85 +0x200 +hwndhTemp, Mode:
     GuiAddDropDownList("x+5 wp gUpdateSlideshowPanel AltSubmit Choose" SlideHowMode " vSlideHowMode", "Random|Backwards|Forwards", [hTemp])
-    Gui, Add, Checkbox, x+5 hp Checked%allowGIFsPlayEntirely% vallowGIFsPlayEntirely gUpdateSlideshowPanel, &Allow GIFs play entirely
+    Gui, Add, Checkbox, x+5 hp Checked%allowGIFsPlayEntirely% vallowGIFsPlayEntirely gUpdateSlideshowPanel, &Allow GIFs to play entirely
 
     Gui, Add, Text, xs y+15 w%txtWid% vinfoLine, One image every: %infoSliSpeed%`nEstimated slideshow duration: %etaTime%
     ; Gui, Add, Text, xp+15 y+7 wp-20, - based on current file index position, direction and previous image load time;
@@ -59971,11 +59971,11 @@ PanelDefineEntireSlideshowLength() {
 }
 
 TimeLapseInfoBox() {
-    msgBoxWrapper(appTitle ": HELP", "The estimated slideshow duration displayed in the panel includes the time estimated to load each image. Based on previously loaded images, it takes about " groupDigits(drawModeCzeit) " milliseconds to load an image.`n `nIf the option to allow GIFs play entirely during slideshows is selected, the duration of the slideshow will be influenced by how many GIFs are indexed and how long they are.`n `nFor optimal timelapses [or very fast slideshows] set zoom at 100`%, disable image rotation and color adjustments and «skip already seen images».", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "The estimated slideshow duration displayed in the panel includes the time estimated to load each image. Based on previously loaded images, it takes about " groupDigits(drawModeCzeit) " milliseconds to load an image.`n `nIf the option to allow GIFs to play entirely during slideshows is selected, the duration of the slideshow will be influenced by how many GIFs are indexed and how long they are.`n `nFor optimal timelapses [or very fast slideshows] set zoom to 100`%, disable image rotation and color adjustments and «skip already seen images».", -1, 0, 0)
 }
 
 SetTimeLapseMode() {
-    msgResult := msgBoxWrapper(appTitle ": Confirmation", "Are you sure you want to set slideshow mode to timelapse? This will set zoom level to 100% and disable any image effect or adjustment.`n`nThe slideshow speed will be set at ~30 FPS [33 images/sec.].", 4, 0, "question")
+    msgResult := msgBoxWrapper(appTitle ": Confirmation", "Are you sure you want to set slideshow mode to timelapse? This will set zoom level to 100% and disable any image effect or adjustment.`n`nThe slideshow speed will be set to ~30 FPS [33 images/sec.].", 4, 0, "question")
     If (msgResult="Yes")
     {
        IMGresizingMode := 4
@@ -60132,7 +60132,7 @@ PanelJump2index() {
       currentFileIndex := doOpenStartFolder()
 
    If (maxFilesIndex<2)
-      Return msgBeepTimer("WARNING: Insufficient indexed files to open panel")
+      Return msgBeepTimer("WARNING: Insufficient indexed files to open the panel")
 
    If (RandyIMGnow=-1 || !RandyIMGids.Count())
       coreGenerateRandomList()
@@ -60143,9 +60143,9 @@ PanelJump2index() {
    If (maxFilesIndex<3 && thumbsDisplaying!=1 && totalFramesIndex>1)
    {
       simplex := 1
-      msgResult := msgBoxWrapper("panelu|Skip to given index: " appTitle, "Please type a number to skip at in the frames or pages list.`n`nTotal frames / pages: " groupDigits(totalFramesIndex) ".", "&Skip to|C&ancel", 1, "fast-forward", 0, 0, 0, "limit9050 +number", desiredFrameIndex, 2)
+      msgResult := msgBoxWrapper("panelu|Skip to given index: " appTitle, "Please type the number to skip to in the frames or pages list.`n`nTotal frames / pages: " groupDigits(totalFramesIndex) ".", "&Skip to|C&ancel", 1, "fast-forward", 0, 0, 0, "limit9050 +number", desiredFrameIndex, 2)
    } Else {
-      msgResult := msgBoxWrapper("panelu|Skip to given index: " appTitle, "Please type a number to skip at in the files list`nand choose the action.`n`nTotal entries: " groupDigits(maxFilesIndex) "`nCurrent random index: " groupDigits(RandyIMGnow), "&Skip to...|C&ancel", 1, "fast-forward", 0, 0, "Skip to files list index`f`fR: Skip to index in the randomized files list`fS: Select from the current file index to the given index" isAnim, "limit9050", currentFileIndex, 2)
+      msgResult := msgBoxWrapper("panelu|Skip to given index: " appTitle, "Please type the number to skip to in the files list`nand choose the action.`n`nTotal entries: " groupDigits(maxFilesIndex) "`nCurrent random index: " groupDigits(RandyIMGnow), "&Skip to...|C&ancel", 1, "fast-forward", 0, 0, "Skip to files list index`f`fR: Skip to index in the randomized files list`fS: Select from the current file index to the given index" isAnim, "limit9050", currentFileIndex, 2)
    }
 
    If InStr(msgResult.btn, "skip")
@@ -60220,7 +60220,7 @@ saveHugeVPimageFile(imgPath, file2save, hFIFimgA, depth) {
    {
       If (usrColorDepth>1 || imgFxMode>1)
       {
-         msgResult := msgBoxWrapper(appTitle ": WARNING", "In the viewport, the image seems to be displayed with color adjustments. QPV cannot apply these on the image itself, because of the very large size. The image will be saved with its original colors.`n`nGo to Image > Filters > Adjust image colors, to apply color filters on such images.`n`nDo you want to continue?", "&Yes|&No", 2, "exclamation")
+         msgResult := msgBoxWrapper(appTitle ": WARNING", "In the viewport, the image seems to be displayed with color adjustments. QPV cannot apply these to the image itself, because of its very large size. The image will be saved with its original colors.`n`nGo to Image > Filters > Adjust image colors to apply color filters to such images.`n`nDo you want to continue?", "&Yes|&No", 2, "exclamation")
          If (msgResult!="Yes")
             Return "user-abort"
       }
@@ -60231,9 +60231,9 @@ saveHugeVPimageFile(imgPath, file2save, hFIFimgA, depth) {
       If (thisImgBPP && vpFmt<thisImgBPP)
          msgu := "The color format of the image file is " pixFmt ".`n`nWhen the image was loaded, " appTitle " converted it to " vpFmt " bits. Therefore, some color information was lost. The file will be saved from the " vpFmt "-bit image."
 
-      pff := msgu ? "The image " : "The image you currently have opened "
+      pff := msgu ? "The image " : "The image you currently have open "
       If (currIMGdetails.Frames>1)
-         msgu .= "`n`n" pff "has " currIMGdetails.Frames " frames or pages.`n`nOnly the current frame will be preserved, the other frames will be discarded upon save."
+         msgu .= "`n`n" pff "has " currIMGdetails.Frames " frames or pages.`n`nOnly the current frame will be preserved; the other frames will be discarded upon save."
 
       If msgu
       {
@@ -60368,7 +60368,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
 
       If !RegExMatch(file2save, thisRegEXsaveFmts)
       {
-         msgBoxWrapper(appTitle ": ERROR", "Please save the file in one of the supported file format extensions: " saveTypesFriendly ". ", 0, 0, "error")
+         msgBoxWrapper(appTitle ": ERROR", "Please save the file with one of the supported file extensions: " saveTypesFriendly ". ", 0, 0, "error")
          Return
       }
 
@@ -60398,21 +60398,21 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
          SoundBeep, 300, 100
          mgpx := Round((ImgW * ImgH)/1000000, 1)
          thisLimit := "The limit is 16350 px in width or height and 267.2 megapixels."
-         msgBoxWrapper(appTitle ": ERROR", "The image dimensions exceed the accepted limits of the file format selected: .WEBP. To preserve its dimensions choose another file format, eg., JPG, PNG or TIFF. " thisLimit "`n`nImage dimensions: " imgW " x " imgH " px (" mgpx " MPx).", 0, 0, "error")
+         msgBoxWrapper(appTitle ": ERROR", "The image dimensions exceed the limits of the selected file format: .WEBP. To preserve its dimensions choose another file format, e.g., JPG, PNG or TIFF. " thisLimit "`n`nImage dimensions: " imgW " x " imgH " px (" mgpx " MPx).", 0, 0, "error")
          Return
       } Else If (isImgSizeTooLarge(imgW, imgH, nExt, !huge) && isVarEqualTo(nExt, "jng", "jpg", "jpeg", "jfif", "gif", "tga"))
       {
          SoundBeep, 300, 100
          mgpx := Round((ImgW * ImgH)/1000000, 1)
          thisLimit := "The limit is 65530 px in width or height and 4294 megapixels."
-         msgBoxWrapper(appTitle ": ERROR", "The image dimensions exceed the accepted limits of the file format selected: ." Format("{:U}", nExt) ". Please resize the image or choose another file format, eg., PNG or TIFF. " thisLimit "`n`nImage dimensions: " imgW " x " imgH " px (" mgpx " MPx).", 0, 0, "error")
+         msgBoxWrapper(appTitle ": ERROR", "The image dimensions exceed the limits of the selected file format: ." Format("{:U}", nExt) ". Please resize the image or choose another file format, e.g., PNG or TIFF. " thisLimit "`n`nImage dimensions: " imgW " x " imgH " px (" mgpx " MPx).", 0, 0, "error")
          Return
       } Else If (isImgSizeTooLarge(imgW, imgH, nExt, !huge) && isVarEqualTo(nExt, "jp2", "j2k"))
       {
          SoundBeep, 300, 100
          mgpx := Round((ImgW * ImgH)/1000000, 1)
          thisLimit := "The limit is 32760 px in width or height and 1073 megapixels."
-         msgBoxWrapper(appTitle ": ERROR", "The image dimensions exceed the accepted limits of the file format selected: .JP2. Please resize the image or choose another file format, eg., PNG or TIFF. " thisLimit "`n`nImage dimensions: " imgW " x " imgH " px (" mgpx " MPx).", 0, 0, "error")
+         msgBoxWrapper(appTitle ": ERROR", "The image dimensions exceed the limits of the selected file format: .JP2. Please resize the image or choose another file format, e.g., PNG or TIFF. " thisLimit "`n`nImage dimensions: " imgW " x " imgH " px (" mgpx " MPx).", 0, 0, "error")
          Return
       }
 
@@ -60437,7 +60437,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
 
       If (noQualityWarnings!=1 && hasAlpha && lostAlpha)
       {
-         msgResult := msgBoxWrapper(appTitle ": WARNING", "The selected image or color format does not have support for the alpha channel (RGBA). The image may look differently after saving it in this format. Do you want to continue?", "&Yes|&No", 2, "exclamation")
+         msgResult := msgBoxWrapper(appTitle ": WARNING", "The selected image or color format does not support the alpha channel (RGBA). The image may look different after saving it in this format. Do you want to continue?", "&Yes|&No", 2, "exclamation")
          If (msgResult!="Yes")
             Return
       }
@@ -60449,13 +60449,13 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
       lastInvoked := A_TickCount
       If (testWasImageEditedInVP()=1 && imgPath!=file2save && FileRexists(imgPath) && noQualityWarnings!=1)
       {
-         msgResult := dilemma := (oExt!=nExt) ? "Do you want QPV to preserve the original color depth? If the destination file format does not allow it, the next best match would be chosen." : "The destination image file format is the same as the original one. Do you want QPV to preserve the original color depth and pixel data, to avoid any potential quality loss? The image will not be re-encoded."
+         msgResult := dilemma := (oExt!=nExt) ? "Do you want QPV to preserve the original color depth? If the destination file format does not allow it, the next best match will be chosen." : "The destination image file format is the same as the original one. Do you want QPV to preserve the original color depth and pixel data, to avoid any potential quality loss? The image will not be re-encoded."
          If (desiredFrameIndex>0)
             dilemma := ""
 
          If dilemma
          {
-            msgResult := msgBoxWrapper(appTitle ": Confirmation", "You are about to resave an unmodified image. The original file will be used, not the viewport data if you answer affirmatively.`n`n" dilemma "`n`n" OutFileName "`n`n" OutDir "\", 3, 0, "question")
+            msgResult := msgBoxWrapper(appTitle ": Confirmation", "You are about to resave an unmodified image. If you answer affirmatively, the original file will be used, not the viewport data.`n`n" dilemma "`n`n" OutFileName "`n`n" OutDir "\", 3, 0, "question")
             If (msgResult="Yes")
                quickieSave := 1
             Else If (msgResult="No")
@@ -60557,7 +60557,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
             friendly := "`nFile size: " fileSizeFriendly(OutputVar)
 
          sOutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
-         showTOOLtip("Image file succesfully saved`n" OutFileName "`n" sOutDir "\" friendly)
+         showTOOLtip("Image file successfully saved`n" OutFileName "`n" sOutDir "\" friendly)
          testMem := getIDimage(currentFileIndex)
          lastZeitIMGsaved := [A_Now, currentUndoLevel, undoLevelsRecorded, OutFileName, OutDir, currentFileIndex, testMem]
          If (currentFileIndex=0 && maxFilesIndex<1) || (InStr(testMem, "Q:\temporary memory object\") && maxFilesIndex<1)
@@ -60884,7 +60884,7 @@ BtnIdentifyFileRoots(hCtl:=0) {
    alistu := IdentifyFileFolderRoots("cached")
    ToolTip
    If !alistu[2]
-      Return msgBeepTimer(alistu[3] ? "WARNING: None of the selected files is on a drive with a letter; network paths are not supported" : "WARNING: Insufficient files selected for the operations")
+      Return msgBeepTimer(alistu[3] ? "WARNING: None of the selected files is on a drive with a letter; network paths are not supported" : "WARNING: Insufficient files selected for the operation")
 
    listu := alistu[1]
    Try Menu, Manna, Delete
@@ -60904,8 +60904,8 @@ BtnIdentifyFileRoots(hCtl:=0) {
 
    If (alistu[2]>15)
    {
-      Try Menu, Manna, Add, % "... and " alistu[2] - 15 " folders more", dummy
-      Try Menu, Manna, Disable, % "... and " alistu[2] - 15 " folders more"
+      Try Menu, Manna, Add, % "... and " alistu[2] - 15 " more folders", dummy
+      Try Menu, Manna, Disable, % "... and " alistu[2] - 15 " more folders"
    }
    showThisMenu("Manna", 0, hCtl ? "hwnd" : 0, hCtl)
 }
@@ -61058,12 +61058,12 @@ PanelCustomizeToolbar() {
     Gui, Tab, 1
     Gui, Add, Text, x+10 y+15 w%txtWid% Section , Active toolbar mode: %k%.
     Gui, Add, Text, xs y+15 w%btnWid% Section , Buttons available for this mode:
-    Gui, Add, Text, x+10 wp , User defined custom list:
+    Gui, Add, Text, x+10 wp , Custom list:
     Gui, Add, ListBox, xs y+5 wp r10 Choose1 vUImainTlbrList gBtnMainListToolbarIconsAction, % btnzList
     Gui, Add, ListBox, x+10 wp r10 Choose1 vUIuserTlbrList gBtnUserListToolbarIconsAction , % userList
     Gui, Add, Button, xs y+5 wp h%thisBtnHeight% gBTNaddCustomTlbrIcon vtxtLine1, A&dd to custom list
     Gui, Add, Button, x+10 wp hp gBTNremCustomTlbrIcon vtxtLine2, &Remove from custom list
-    Gui, Add, Checkbox, xs y+10 hp Checked%userCustomizedToolbar% vuserCustomizedToolbar gBTNtglCustoTlbr, Use custom defined toolbar
+    Gui, Add, Checkbox, xs y+10 hp Checked%userCustomizedToolbar% vuserCustomizedToolbar gBTNtglCustoTlbr, Use custom toolbar
     If (pp="disabled")
        GuiControl, Disable, userCustomizedToolbar
 
@@ -61073,11 +61073,11 @@ PanelCustomizeToolbar() {
     ToolTip2ctrl(hTemp, "This option is useful when a bright background color is used")
     Gui, Add, Checkbox, y+10 Checked%lockToolbar2Win% vlockToolbar2Win, Attached to the main &window
     Gui, Add, Checkbox, y+10 Checked%TLBRverticalAlign% vTLBRverticalAlign, Vertical toolbar
-    Gui, Add, Checkbox, x+10 Checked%TLBRtwoColumns% vTLBRtwoColumns, Two columns vertical
+    Gui, Add, Checkbox, x+10 Checked%TLBRtwoColumns% vTLBRtwoColumns, Two-column vertical
     Gui, Add, Text, xs y+10 h%thisBtnHeight% +0x200, Toolbar background color:
     GuiAddPickerColor("x+5 hp w35", "ToolbarBgrColor")
     GuiAddColor("x+5 hp w" ml, "ToolbarBgrColor", "Toolbar background color")
-    GuiAddSlider("ToolbarScaleFactor", 0.2, 5.0, "1.15f", "Icons scale: $€ x", "dummy", 1, "xs y+10 wp+100 hp")
+    GuiAddSlider("ToolbarScaleFactor", 0.2, 5.0, "1.15f", "Icon scale: $€ x", "dummy", 1, "xs y+10 wp+100 hp")
 
     Gui, Tab
     thisW := (PrefsLargeFonts=1) ? 90 : 65
@@ -61092,7 +61092,7 @@ PanelCustomizeToolbar() {
 PanelCustomKeysMiniManager() {
     If (allowCustomKeys!=1)
     {
-        msgResult := msgBoxWrapper(appTitle ": Confirmation", "To customize keyboard shortcuts, the option to allow custom user defined keyboard shortcuts must be activated. Would you like to activate it now?", 4, 0, "question")
+        msgResult := msgBoxWrapper(appTitle ": Confirmation", "To customize keyboard shortcuts, the option to allow user-defined keyboard shortcuts must be activated. Would you like to activate it now?", 4, 0, "question")
         If (msgResult="Yes")
         {
            ToggleCustomKBDsMode()
@@ -61121,8 +61121,8 @@ PanelCustomKeysMiniManager() {
     lp := defineKBDcontexts(0)
     Gui, Add, Text, x+10 y+15 Section +0x200 +hwndhTemp, Application contexts:
     GuiAddDropDownList("x+10 w" btnWid " AltSubmit Choose" lp " vwhichUIkbdContext gupdateUIKeysListManager", listu, [hTemp])
-    GuiAddListView("xs y+10 w" txtWid " -multi +LV0x10000 +LV0x400 r7 Grid vLViewOthers gBtnLVcustomKBDies", "Key|Menu item|Menu container|Function", "User defined shortcuts")
-    Gui, Add, Text, xs y+10 wp, The shortcuts can be customized in the Quick Menus Search box.`nTo open it, click Customize.`n`nThis panel is meant to provide an overview of the already defined custom keyboard shortcuts.
+    GuiAddListView("xs y+10 w" txtWid " -multi +LV0x10000 +LV0x400 r7 Grid vLViewOthers gBtnLVcustomKBDies", "Key|Menu item|Menu container|Function", "User-defined shortcuts")
+    Gui, Add, Text, xs y+10 wp, The shortcuts can be customized in the Quick Menus Search box.`nTo open it, click Customize.`n`nThis panel gives an overview of the custom keyboard shortcuts defined so far.
  
     thisW := (PrefsLargeFonts=1) ? 130 : 115
     Gui, Add, Button, xs y+20 h%thisBtnHeight% w%thisW% Default gPanelQuickSearchMenuOptions, C&ustomize
@@ -61316,7 +61316,7 @@ PanelAutoColors() {
     GuiAddSlider("userAutoColorIntensity", 5, 255, 255, "Intensity", "dummy", 1, "xs y+10 Section wp+30 h" ha)
     If (thumbsDisplaying=1)
     {
-       Gui, Add, Checkbox, xs y+10 Checked%PreserveDateTimeOnSave% vPreserveDateTimeOnSave, &Preserve files date and time
+       Gui, Add, Checkbox, xs y+10 Checked%PreserveDateTimeOnSave% vPreserveDateTimeOnSave, &Preserve file dates and times
        GuiAddSlider("userJpegQuality", 1,100, 95, "JPEG / WEBP quality on save", "iniSaveJPGquality", 1, "xs y+10 wp h" ha)
     }
 
@@ -61449,7 +61449,7 @@ PanelSharpenImage() {
     GuiAddSlider("ImageSharpenAmount", 0,100, 10, "Sharpen amount", "updateUIsharpenPanel", 1, "xs y+10 w" txtWid " hp")
     GuiAddSlider("ImageSharpenRadius", 0,255, 15, "Radius: $€", "updateUIsharpenPanel", 1, "xs y+10 wp hp")
     Gui, Add, Checkbox, xs y+10 Checked%BlurAreaInverted% vBlurAreaInverted gupdateUIsharpenPanel, &Invert selection area
-    Gui, Add, Text, xs y+10 w%txtWid% vtxtLine3, In advanced mode, the effect is masked using the edges detection filter.
+    Gui, Add, Text, xs y+10 w%txtWid% vtxtLine3, In advanced mode, the effect is masked using the edge detection filter.
 
     If !testAllowSelInvert()
        GuiControl, Disable, BlurAreaInverted
@@ -61474,7 +61474,7 @@ PanelSharpenImage() {
     Gui, Add, Button, xs y+25 h%thisBtnHeight% w%btnWid% Default gBTNdoSharpenFX, &Sharpen image
     Gui, Add, Button, x+5 hp w%thisW% gBtnCloseWindow, C&ancel
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
-    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Sharpen image selected area: " appTitle)
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Sharpen selected image area: " appTitle)
     SetTimer, updateUIsharpenPanel, -200
 }
 
@@ -61545,20 +61545,20 @@ PanelStructuredCopyMoveWindow() {
     ml := (PrefsLargeFonts=1) ? 110 : 70
     Gui, SettingsGUIA: +Delimiter`n
     sml := (PrefsLargeFonts=1) ? 50 : 30
-    Gui, Add, Text, x15 y15 Section, This panels allows users to copy or move folder structures.`nPlease select source and destination folders.`nThe files not found in the source folder (and its sub-folders)`, will be skipped.
+    Gui, Add, Text, x15 y15 Section, This panel allows users to copy or move folder structures.`nPlease select source and destination folders.`nThe files not found in the source folder (and its sub-folders) will be skipped.
     Gui, Add, Text, xs y+10 w%ml% +0x200 +hwndhSrcLbl, &Source: 
     hSrcEdit := GuiAddEdit("x+5 w" EditWid " gUIeditsGenericAllowCtrlBksp r1 -WantReturn -wantTab -multi vUsrEditFileSource", srcDir)
     ; the label takes the field's height, to be centred beside it [0x200: SS_CENTERIMAGE] as «Destination:»
     z := GetWindowPlacement(hSrcLbl), r := GetWindowPlacement(hSrcEdit)
     SetWindowPlacement(hSrcLbl, z.x, z.y, z.w, r.h, 1)
     Gui, Add, Button, x+1 hp gBtnCpyMvStrctrdChooseFilesSrc hwndhTemp, &Browse
-    ToolTip2ctrl(hTemp, "Please define the correct source path for the optimal experience.`nYou must choose the root folder of all the images to be copied or moved.`nThe selected files that are not in this source path [or in a sub-folder], will be skipped.")
+    ToolTip2ctrl(hTemp, "Please define the correct source path for the optimal experience.`nYou must choose the root folder of all the images to be copied or moved.`nThe selected files that are not in this source path [or in a sub-folder] will be skipped.")
     GuiAddButton("x+1 w" sml " hp gBtnIdentifyFileRoots", pp "triangle-down" pk ".png", "Possible source paths", "Possible source folders: the deepest folder that holds the selected files.`nFiles on other drives, or in other folders under the drive root,`nget a folder of their own.")
     Gui, Add, Text, xs y+10 w%ml% hp +0x200, &Destination:
     cleanFolderPath(UsrEditFileDestination, destFull)
     GuiAddEdit("x+5 w" EditWid " gUIeditsGenericAllowCtrlBksp r1 -WantReturn -wantTab -multi vUsrEditFileDestination", destFull ? UsrEditFileDestination : "")
     Gui, Add, Button, x+1 hp gBtnCpyMvStrctrdChooseFilesDst hwndhTemp, B&rowse
-    ToolTip2ctrl(hTemp, "In the destination folder, the folder structure will be created containing the selected files.")
+    ToolTip2ctrl(hTemp, "The folder structure holding the selected files will be recreated in the destination folder.")
     thisW := (PrefsLargeFonts=1) ? 190 : 120
     Gui, Add, Text, xs y+15 hp +0x200 +hwndhTempu, On file name &conflicts:
     zh := GuiAddDropDownList("x+5 w" thisW " AltSubmit Choose" userCopyMoveStructuredConflictMode " vuserCopyMoveStructuredConflictMode", "Skip files`nAuto-rename`nOverwrite`nAsk user", [hTempu])
@@ -61583,7 +61583,7 @@ updateUIstructuredCopyMove() {
 }
 
 BtnHelpStructuredCopyMove() {
-   msgBoxWrapper(appTitle ": HELP", "The tool allows users to copy or move files from the source folder to destination folder. The subfolders from the user defined source folder will be recreated in the destination folder. The selected files from the list that are not found in the defined source (sub-)folders will be skipped. Therefore, if the user selects as source an unrelated folder to the selected files, no file action will be performed.`n `nEXAMPLE:`nSource: c:\temp\imgs\`nDestination: d:\ordered\images\`n `nFiles selected:`nc:\temp\imgs\imgA.png`nc:\temp\imgs\imgB.png`nc:\temp\imgs\new\img01.jpg`nc:\temp\imgs\new\img02.jpg`nc:\temp\imgs\old\img02.jpg`nc:\other-files\DSC0202.bmp [skipped]`nc:\temp\CRW0292303.tga [skipped]`n `nFiles in Destination:`nd:\ordered\images\imgA.png`nd:\ordered\images\imgB.png`nd:\ordered\images\new\img01.jpg`nd:\ordered\images\new\img02.jpg`nd:\ordered\images\old\img02.jpg", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "The tool allows users to copy or move files from the source folder to the destination folder. The subfolders of the user-defined source folder will be recreated in the destination folder. The selected files from the list that are not found in the defined source (sub-)folders will be skipped. Therefore, if the user selects as source a folder unrelated to the selected files, no file action will be performed.`n `nEXAMPLE:`nSource: c:\temp\imgs\`nDestination: d:\ordered\images\`n `nFiles selected:`nc:\temp\imgs\imgA.png`nc:\temp\imgs\imgB.png`nc:\temp\imgs\new\img01.jpg`nc:\temp\imgs\new\img02.jpg`nc:\temp\imgs\old\img02.jpg`nc:\other-files\DSC0202.bmp [skipped]`nc:\temp\CRW0292303.tga [skipped]`n `nFiles in Destination:`nd:\ordered\images\imgA.png`nd:\ordered\images\imgB.png`nd:\ordered\images\new\img01.jpg`nd:\ordered\images\new\img02.jpg`nd:\ordered\images\old\img02.jpg", -1, 0, 0)
 }
 
 BTNuiProceedStructuredOperation() {
@@ -61593,7 +61593,7 @@ BTNuiProceedStructuredOperation() {
    GuiControlGet, userCopyMoveStructuredConflictMode
    GuiControlGet, UsrCopyMoveOperation
    If (UsrCopyMoveOperation=1)
-      Return msgBeepTimer("WARNING: Please select action to perform: copy or move files")
+      Return msgBeepTimer("WARNING: Please select the action to perform: copy or move files")
 
    fS := cleanFolderPath(UsrEditFileSource, srcFull)
    dS := cleanFolderPath(UsrEditFileDestination, destFull, destOnDrive)
@@ -61609,7 +61609,7 @@ BTNuiProceedStructuredOperation() {
    If (dS=fS)
       Return msgBeepTimer("ERROR: The source and destination folders cannot be the same")
 
-   If askAboutFileSave(" and the files operations will be executed")
+   If askAboutFileSave(" and the file operations will be executed")
       Return
 
    filesElected := getSelectedFiles(0, 1)
@@ -61620,13 +61620,13 @@ BTNuiProceedStructuredOperation() {
       If (msgResult!="Yes")
          Return 0
    } Else If !filesElected 
-      Return msgBeepTimer("WARNING: Insufficient files selected for the operations")
+      Return msgBeepTimer("WARNING: Insufficient files selected for the operation")
 
    If (!FolderExist(dS) || !dS)
    {
       If destOnDrive
       {
-         msgResult := msgBoxWrapper(appTitle ": Confirmation", "The destination folder seems to not exist.`n`n" dS "\`n`nWould you like to create it now?", 4, 0, "question")
+         msgResult := msgBoxWrapper(appTitle ": Confirmation", "The destination folder does not seem to exist.`n`n" dS "\`n`nWould you like to create it now?", 4, 0, "question")
          If (msgResult="Yes")
          {
             FileCreateDir, %dS%
@@ -61783,9 +61783,9 @@ BtnHelpCopyMovePanel() {
   zPlitPath(imgPath, 0, OutFileName, OutDir)
   btnName := (UsrCopyMoveOperation=2) ? "Move" : "Copy"
   If (AnyWindowOpen=9)
-     moreInfo := "`n`nIf you click on «Mark files (Explorer)» button, the selected file(s) will be marked as «COPY» or «CUT» and you can paste them in any file manager, or in another session of " appTitle "."
+     moreInfo := "`n`nIf you click the «Mark files (Explorer)» button, the selected file(s) will be marked as «COPY» or «CUT» and you can paste them in any file manager, or in another session of " appTitle "."
 
-  msgBoxWrapper(appTitle ": HELP", "Recognized patterns:`n`na) " btnName " files to parent folder: .\`n`nb) " btnName " files to a new or existing sub-folder: \given-folder`n`nc) " btnName " files into a new or existing folder within the parent folder: .\given-folder`n`nThe destination folder for every selected file(s) will be calculated relative to its own location path.`n `nUse [group-by-month-year], [group-by-years] or [group-by-file-types] as folder name to automatically group files in newly created folders named based on files' modification date or file types." moreInfo, -1, 0, 0)
+  msgBoxWrapper(appTitle ": HELP", "Recognized patterns:`n`na) " btnName " files to parent folder: .\`n`nb) " btnName " files to a new or existing sub-folder: \given-folder`n`nc) " btnName " files into a new or existing folder within the parent folder: .\given-folder`n`nThe destination folder for each selected file will be calculated relative to its own location.`n `nUse [group-by-month-year], [group-by-years] or [group-by-file-types] as folder name to automatically group files in newly created folders named after the files' modification dates or file types." moreInfo, -1, 0, 0)
 }
 
 changeCopyMoveAction() {
@@ -61980,7 +61980,7 @@ BtnCopyMoveAction(dummy:=0) {
 
   If (UsrCopyMoveOperation=2) ; on file move
   {
-     If askAboutFileSave(" and the files operations will be executed")
+     If askAboutFileSave(" and the file operations will be executed")
         Return 0
   }
 
@@ -62107,9 +62107,9 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0, typedD
        SetTimer, ResetImgLoadStatus, -200
        SoundBeep, 300, 100 
        If (dummy="quick-actu")
-          showTOOLtip("WARNING: Illegal operation. The destination folder is the same with the initial location:`n" sOldOutDir "\")
+          showTOOLtip("WARNING: Illegal operation. The destination folder is the same as the initial location:`n" sOldOutDir "\")
        Else
-          msgBoxWrapper(appTitle ": WARNING", "Illegal operation. The destination folder is the same with the initial location:`n" finalDest "\", 0, 0, "exclamation")
+          msgBoxWrapper(appTitle ": WARNING", "Illegal operation. The destination folder is the same as the initial location:`n" finalDest "\", 0, 0, "exclamation")
        Return 0
     }
 
@@ -62134,7 +62134,7 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0, typedD
        {
           OutDir := PathCompact(finalDest, "a", 1, OSDfontSize)
           If isOwnFolder
-             msgBeepTimer("WARNING: Illegal operation. The destination folder is the same with the initial location:`n" OutDir "\")
+             msgBeepTimer("WARNING: Illegal operation. The destination folder is the same as the initial location:`n" OutDir "\")
           Else
              msgBeepTimer("WARNING: Another file with the same file name already exists in the destination folder:`n" OldOutFileName "`n" OutDir "\`nOperation aborted.")
           SetTimer, ResetImgLoadStatus, -200
@@ -62547,7 +62547,7 @@ batchConvert2format() {
    filesElected := getSelectedFiles(0, 1)
    If (filesElected>50)
    {
-      msgInfos := "Are you sure you want to convert " groupDigits(filesElected) " files to the ." rDesireWriteFMT " format ? "
+      msgInfos := "Are you sure you want to convert " groupDigits(filesElected) " files to the ." rDesireWriteFMT " format? "
       If (ResizeUseDestDir=1)
          msgInfos .= "`n`nThe files will be saved in " ResizeDestFolder "\"
       If (userActionConflictingFile=3)
@@ -62564,7 +62564,7 @@ batchConvert2format() {
    {
       FileCreateDir, % ResizeDestFolder
       If ErrorLevel
-         Return msgBeepTimer("ERROR: Destination folder does not seem to exist or permission denied.`nAn unsuccesful attempt was made to create the destination folder.`nOperation abandoned.")
+         Return msgBeepTimer("ERROR: Destination folder does not seem to exist or permission denied.`nAn unsuccessful attempt was made to create the destination folder.`nOperation abandoned.")
    }
 
    setImageLoading()
@@ -62762,7 +62762,7 @@ batchConvert2format() {
    ForceRefreshNowThumbsList()
    dummyTimerDelayiedImageDisplay(100)
    If (abandonAll=1)
-      msgBeepTimer("Operation aborted. " groupDigits(filesConverted) " out of " groupDigits(filesElected) " selected files were converted to ." rDesireWriteFMT " until now" someErrors)
+      msgBeepTimer("Operation aborted. " groupDigits(filesConverted) " out of " groupDigits(filesElected) " selected files were converted to ." rDesireWriteFMT " so far" someErrors)
    Else
       msgBeepTimer("Finished converting to ." rDesireWriteFMT " format`n" groupDigits(filesConverted) " out of " groupDigits(filesElected) " selected files" someErrors, 900)
 
@@ -63717,9 +63717,9 @@ convert2format(givenIndex) {
   Else If (mode="first")
      showTOOLtip("Only the first page of the file was converted to ." rDesireWriteFMT "`n" savedFileName "`n" savedDir "\" friendly)
   Else If (mode="multi")
-     showTOOLtip("File converted succesfully to ." rDesireWriteFMT ", " groupDigits(pagesWritten) " / " groupDigits(pages) " pages`n" savedFileName "`n" savedDir "\" friendly)
+     showTOOLtip("File converted successfully to ." rDesireWriteFMT ", " groupDigits(pagesWritten) " / " groupDigits(pages) " pages`n" savedFileName "`n" savedDir "\" friendly)
   Else
-     showTOOLtip("File converted succesfully to ." rDesireWriteFMT "`n" savedFileName "`n" savedDir "\" friendly)
+     showTOOLtip("File converted successfully to ." rDesireWriteFMT "`n" savedFileName "`n" savedDir "\" friendly)
 
   SoundBeep, % r ? 300 : 900, 100
   If (OnConvertKeepOriginals!=1 && !r && !keepOriginal && file2rem!=savedFile)
@@ -63729,7 +63729,7 @@ convert2format(givenIndex) {
      Sleep, 1
      FileRecycle, %file2rem%
      If ErrorLevel
-        showTOOLtip("Failed to remove original file, however the file was converted succesfully to ." rDesireWriteFMT "`n" savedFileName "`n" savedDir "\")
+        showTOOLtip("Failed to remove the original file; however, the file was converted successfully to ." rDesireWriteFMT "`n" savedFileName "`n" savedDir "\")
 
      resultedFilesList[givenIndex, 1] := savedFile
      resultedFilesList[givenIndex, 4] := 1
@@ -63849,7 +63849,7 @@ batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
       someErrors .= "`nFiles whose " ((pdfTextMode=1) ? "text file" : "frames") " got a [N] suffix: " groupDigits(renamedFiles)
 
    If (abandonAll=1)
-      msgBeepTimer("Operation aborted. " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files were processed until now" someErrors)
+      msgBeepTimer("Operation aborted. " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files were processed so far" someErrors)
    Else
       msgBeepTimer(groupDigits(countFilez) " out of " groupDigits(countTFilez) " selected files were processed" someErrors, 900)
 
@@ -64189,7 +64189,7 @@ coreExtractBatchModeTextsFromGivenPDF(modus, thisFileIndex, prevMSGdisplay, bonu
 
    b := RetrievePDFbookmarks(imgPath, pwd, 0, pageCount, errorType)
    If (errorType=0)
-      txt := "PDF boookmarks:`n" b "`n`n" txt
+      txt := "PDF bookmarks:`n" b "`n`n" txt
 
    FileAppend, % txt, % file2save, UTF-8
    If ErrorLevel
@@ -64496,7 +64496,7 @@ combineImagesMultiTiffGDIp(destFilePath) {
    {
       FileCreateDir, % OutDir
       If ErrorLevel
-         Return msgBeepTimer("ERROR: Unable to create destination folder of the multipaged file.`nOperation abandoned.")
+         Return msgBeepTimer("ERROR: Unable to create the destination folder of the multipage file.`nOperation abandoned.")
    }
 
    filesElected := getSelectedFiles(0, 1)
@@ -64650,7 +64650,7 @@ combineImagesMultiTiffGDIp(destFilePath) {
             ; fnOutputDebug(rg " first img=" _E "p=" _p "; elem=" elem "; nCount=" nCount "; pCodec=" pCodec)
             If _E
             {
-               fattalErr := "ERROR: Failed to create the multipaged .TIFF file. Error code: " _E
+               fattalErr := "ERROR: Failed to create the multipage .TIFF file. Error code: " _E
                Break
             }
             selectedFiles++
@@ -64689,21 +64689,21 @@ combineImagesMultiTiffGDIp(destFilePath) {
 
    If (abandonAll=1)
    {
-      msgBeepTimer("Operation aborted by user. Multipaged .TIFF file not created.")
+      msgBeepTimer("Operation aborted by user. Multipage .TIFF file not created.")
       FileDelete, % destFilePath
    } Else If fattalErr
    {
       msgBeepTimer(fattalErr "`n" OutFileName "`n" OutDir "\")
    } Else If !selectedFiles
    {
-      msgBeepTimer("ERROR: Failed to create the multipaged .TIFF file. No image could be embedded.`n" OutFileName "`n" OutDir "\")
+      msgBeepTimer("ERROR: Failed to create the multipage .TIFF file. No image could be embedded.`n" OutFileName "`n" OutDir "\")
    } Else
    {
       If (failedFiles>0)
          rr .= "`nFailed to embed " groupDigits(failedFiles) " images.`nFiles selected to embed: " groupDigits(filesElected)
 
       FileGetSize, OutputVar, % destFilePath
-      msgBeepTimer("Finished creating the multipaged .TIFF file:`n" OutFileName "`nImages embedded: " groupDigits(selectedFiles) "`nFile size: " fileSizeFriendly(OutputVar) rr, 900)
+      msgBeepTimer("Finished creating the multipage .TIFF file:`n" OutFileName "`nImages embedded: " groupDigits(selectedFiles) "`nFile size: " fileSizeFriendly(OutputVar) rr, 900)
    }
 
    ResetImgLoadStatus()
@@ -64727,7 +64727,7 @@ combineImagesFimMultiPage(modus, userFmt, destFilePath, setW, setH, setRes) {
    {
       FileCreateDir, % OutDir
       If ErrorLevel
-         Return msgBeepTimer("ERROR: Unable to create destination folder of the multipage file.`nOperation abandoned.")
+         Return msgBeepTimer("ERROR: Unable to create the destination folder of the multipage file.`nOperation abandoned.")
    }
 
    filesElected := getSelectedFiles(0, 1)
@@ -64824,7 +64824,7 @@ combineImagesFimMultiPage(modus, userFmt, destFilePath, setW, setH, setRes) {
          If (addedPages>=maxMultiPagesAllowed || memUsed>maxMemLimitMultiPage)
          {
             SoundBeep 300, 100
-            msgu := (addedPages>=maxMultiPagesAllowed) ? "The limit of maximum allowed pages was reached: " groupDigits(maxMultiPagesAllowed) : "The memory allowed for the operation was used up: " fileSizeFriendly(maxMemLimitMultiPage)
+            msgu := (addedPages>=maxMultiPagesAllowed) ? "The maximum number of pages allowed was reached: " groupDigits(maxMultiPagesAllowed) : "The memory allowed for the operation was used up: " fileSizeFriendly(maxMemLimitMultiPage)
             msgResult := msgBoxWrapper(appTitle ": ERROR", msgu ". If you choose to continue, the remaining images will be skipped and the ." fmt " file will be created with the " groupDigits(addedPages) " pages added so far.", "&Continue|&Abort", 0, "error")
             If (msgResult!="continue")   ; closing the dialog is not a licence to carry on
                abandonAll := 1
@@ -65034,7 +65034,7 @@ LoadBitmapAsFreeImage(imgPath, allowHDR, allowFallback, ByRef oImgW, ByRef oImgH
             hFIFimgA := hFIFimgD
          } Else
          {
-            addJournalEntry(A_ThisFunc "(): Failed to convert imported image to 24/32-bits color depth.")
+            addJournalEntry(A_ThisFunc "(): Failed to convert imported image to 24/32-bit color depth.")
             FreeImage_UnLoad(hFIFimgA)
             hFIFimgA := ""
          }
@@ -65778,7 +65778,7 @@ RefreshImageFileAction() {
          Return
 
       If InStr(imgPath, "Q:\temporary memory object\")
-         Return msgBeepTimer("WARNING: This image is currently unsaved. Unable to refresh object.")
+         Return msgBeepTimer("WARNING: This image is currently unsaved. Unable to reload it.")
 
       If askAboutFileSave(" and the original file will be reloaded")
          Return
@@ -65817,7 +65817,7 @@ RefreshImageFile() {
 
 RefreshFilesList() {
   If !CurrentSLD
-     Return msgBeepTimer("WARNING: No folder or files list index currently opened", 300, msgDisplayTime//2)
+     Return msgBeepTimer("WARNING: No folder or files list index currently open", 300, msgDisplayTime//2)
 
   stopSlideshow()
   If InStr(CurrentSLD, "\QPV\favourite-images-list.SLD")
@@ -65953,7 +65953,7 @@ OpenDialogFiles() {
          } Else If (OutFileName!="")
          {
             FriendlyName := FileExist(imgPath) ? "malformed" : "inexistent"
-            msgBoxWrapper(appTitle ": ERROR", "Error opening file: " OutFileName ". It seems to be " FriendlyName " .`n`nAnother file from the folder will be displayed now. Files indexed: " groupDigits(maxFilesIndex) ".", 0, 0, "error")
+            msgBoxWrapper(appTitle ": ERROR", "Error opening file: " OutFileName ". It seems to be " FriendlyName ".`n`nAnother file from the folder will be displayed now. Files indexed: " groupDigits(maxFilesIndex) ".", 0, 0, "error")
             RandomPicture()
          }
       } Else If (maxFilesIndex>0)
@@ -65993,7 +65993,7 @@ askAboutSlidesListSave() {
    {
       stopSlideshow()
       zPlitPath(CurrentSLD, 0, OutFileName, OutDir)
-      msgResult := msgBoxWrapper(appTitle ": Save files list", "The currently opened files list has been modified and the changes have not been saved. To continue with the action you chose, select the Discard button.`n`nWould like to save the currently opened files list?`n`n" OutFileName, "&Save|&Discard|&Cancel", 0, "question")
+      msgResult := msgBoxWrapper(appTitle ": Save files list", "The currently open files list has been modified and the changes have not been saved. To continue with the action you chose, select the Discard button.`n`nWould you like to save the currently open files list?`n`n" OutFileName, "&Save|&Discard|&Cancel", 0, "question")
       If (msgResult="Save")
       {
          If AnyWindowOpen
@@ -66251,7 +66251,7 @@ importSLDplainText(whichFile) {
       Return
 
    If (whichFile=CurrentSLD)
-      Return msgBeepTimer("WARNING: Illegal operation. You cannot import the already opened files list`nNo one likes duplicates :-)")
+      Return msgBeepTimer("WARNING: Illegal operation. You cannot import the currently open files list`nNo one likes duplicates :-)")
 
    If (StrLen(filesFilter)>1)
    {
@@ -66311,10 +66311,10 @@ importSLDBintoSLDB(whichFile) {
    }
 
    If (whichFile=CurrentSLD)
-      Return msgBeepTimer("WARNING: Illegal operation. You cannot import the already opened database")
+      Return msgBeepTimer("WARNING: Illegal operation. You cannot import the currently open database")
 
    If (dbVersion!=dbExpectedVersion)
-      Return msgBeepTimer("WARNING: Illegal operation. You cannot import into the currently opened database, because it was saved with a different version of QPV. Please rebuild this database.")
+      Return msgBeepTimer("WARNING: Illegal operation. You cannot import into the currently open database, because it was saved with a different version of QPV. Please rebuild this database.")
 
    otherVersion := readSLDBsettingFrom(whichFile, "dbVersion")
    If (otherVersion!=dbExpectedVersion)
@@ -66470,7 +66470,7 @@ importSLDBintoSLDB(whichFile) {
    ; COALESCE in it is the same "the imported value wins when it has one" rule the k%i%
    ; loop below applies column by column.
    ; ATTACH before BEGIN: SQLite will not attach or detach while a transaction is open
-   showTOOLtip("Merging databases contents, please wait")
+   showTOOLtip("Merging database contents, please wait")
    pixelsCarried := 1
    pixelsRenamed := 0
    escapedOther := whichFile
@@ -66547,9 +66547,9 @@ importSLDBintoSLDB(whichFile) {
       {
          etaTime := ETAinfos(A_Index, countFiles, startOperation)
          If errorsOccurred
-            moreSpam := "`n" groupDigits(errorsOccurred) " errors occurred until now"
+            moreSpam := "`n" groupDigits(errorsOccurred) " errors occurred so far"
 
-         showTOOLtip("Merging databases contents, please wait" moreSpam etaTime, 0, 0, A_Index/countFiles)
+         showTOOLtip("Merging database contents, please wait" moreSpam etaTime, 0, 0, A_Index/countFiles)
          prevMSGdisplay := A_TickCount
       }
 
@@ -66698,12 +66698,12 @@ importSLDBintoSLDB(whichFile) {
    newListu := cleanDynamicFoldersList(DynamicFoldersList)
    recreateDynaFoldersSQLdbList(newListu)
    If errorsOccurred
-      someErrors := "`n" groupDigits(errorsOccurred) " errors occurred during merger."
+      someErrors := "`n" groupDigits(errorsOccurred) " errors occurred during the merge."
 
    zeitOperation := A_TickCount - startZeit
    etaTime := SecToHHMMSS(Round(zeitOperation/1000, 3))
    OpenSLD(CurrentSLD, 1)
-   showDelayedTooltip("Databases merger has finished in " etaTime someErrors "`nTotal files: " groupDigits(maxFilesIndex))
+   showDelayedTooltip("Database merge finished in " etaTime someErrors "`nTotal files: " groupDigits(maxFilesIndex))
    ; res := sldGenerateFilesList(whichFile, 0, mustRemQuotes, 0)
    msgBeepTimer("", errorsOccurred ? 300 : 900)
    ; GenerateRandyList()
@@ -66754,7 +66754,7 @@ coreAddNewFiles(imgsListu, countFiles, SelectedDir, selectNewOnes:=0) {
     If CurrentSLD
        dropFilesSelection(1)
 
-    showTOOLtip("Adding " groupDigits(countFiles) " files into the current files list")
+    showTOOLtip("Adding " groupDigits(countFiles) " files to the current files list")
     If (StrLen(filesFilter)>1)
        remFilesListFilter("simple")
 
@@ -66922,7 +66922,7 @@ askFolderImportMode(SelectedDir, foldersListu:=0, actu:=0, coveredModus:=0, allo
          If (coverage.exactly!=1)
          {
             msgu := "The folder you want to import is already indexed:`n`n" thisFolder "\`n`n"
-            msgu .= "It is placed inside this entry of the folders list, that is scanned recursively:`n`n" coverage.folder "\`n`n"
+            msgu .= "It lies inside this entry of the folders list, which is scanned recursively:`n`n" coverage.folder "\`n`n"
             msgu .= "Do you want to rescan the entire entry, or only the folder you want to import?"
             zbtn := "&Rescan the entry|Rescan &only this folder"
             zdef := 2 ; rescanning the entire entry can be a much longer operation
@@ -66933,7 +66933,7 @@ askFolderImportMode(SelectedDir, foldersListu:=0, actu:=0, coveredModus:=0, allo
          } Else
          {
             msgu := "The folder you want to import is already in the list of folders that generates the files index, but only the image files placed directly in it are indexed:`n`n" thisFolder "\`n`n"
-            msgu .= "Do you want to rescan it as it is, or to scan it recursively, through all its subfolder?"
+            msgu .= "Do you want to rescan it as it is, or to scan it recursively, through all its subfolders?"
             zbtn := "&Rescan|Scan recursi&vely"
             zdef := (actu="recursive") ? 2 : 1 ; the caller already asked for it
          }
@@ -67395,7 +67395,7 @@ GuiDroppedFiles(ByRef imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) 
 
       If (thumbsDisplaying!=1 && countFiles=1 && isImgEditingNow()=1 && !AnyWindowOpen)
       {
-         msgResult := msgBoxWrapper(appTitle ": Import image", "You dropped an image file into the QPV window.`n`nWould you like to open it and add it to the files list`nor paste it in place, in the opened image?", "&Open image|&Paste in place|&Cancel", 0, "question")
+         msgResult := msgBoxWrapper(appTitle ": Import image", "You dropped an image file into the QPV window.`n`nWould you like to open it and add it to the files list`nor paste it in place, in the open image?", "&Open image|&Paste in place|&Cancel", 0, "question")
          If InStr(msgResult, "paste")
          {
             If (editingSelectionNow!=1)
@@ -67420,7 +67420,7 @@ GuiDroppedFiles(ByRef imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) 
    {
       If (thumbsDisplaying!=1 && countFiles=1 && isImgEditingNow()=1 && !AnyWindowOpen)
       {
-         msgResult := msgBoxWrapper(appTitle ": Import image", "You dropped an image file into the QPV window.`n`nWould you like to open it and add it to the files list`nor paste it in place, in the opened image?", "&Open image|&Paste in place|&Cancel", 0, "question")
+         msgResult := msgBoxWrapper(appTitle ": Import image", "You dropped an image file into the QPV window.`n`nWould you like to open it and add it to the files list`nor paste it in place, in the open image?", "&Open image|&Paste in place|&Cancel", 0, "question")
          If InStr(msgResult, "paste")
          {
             If (editingSelectionNow!=1)
@@ -67535,13 +67535,13 @@ ForceRemoveTooltip() {
 PanelAssociateQPV() {
    If isWinStore()
    {
-      msgBoxWrapper(appTitle ": WARNING", "You are currently running " appTitle " (QPV) from the Microsoft Store. Due to stringent security measures on the store, QPV cannot change file format associations. Therefore, you must manually associate QPV with the desired image file formats.`n`nOpen Explorer and use «Open with» and select " apptitle " from the list. Make sure to check «Always use this app».", 0, 1, "exclamation")
+      msgBoxWrapper(appTitle ": WARNING", "You are currently running " appTitle " (QPV) from the Microsoft Store. Due to stringent security measures on the store, QPV cannot change file format associations. Therefore, you must manually associate QPV with the desired image file formats.`n`nOpen Explorer, use «Open with» and select " apptitle " from the list. Make sure to check «Always use this app».", 0, 1, "exclamation")
       Return
    }
 
    fakeWinCreator(52, A_ThisFunc, 1)
    p := TestQPVisAssociated() ? "`n`nQPV seems to be associated with the file format of the selected image file." : ""
-   msgResult := msgBoxWrapper("panelu|Associate " appTitle, "Please choose what to associate " appTitle " with." p "`n`nPlease note, you may receive several warnings about system settings being changed and to allow to execute the command line app. To succesfully associate QPV with the image file formats, please answer affirmatively when prompted.", "&Proceed|C&ancel", 1, "settings", "Add ""Open in QPV"" file explorer context menu for folders", 0, "Associate with common image formats`f`fAssociate with all supported image formats`fAssociate with QPV slideshow / files list formats`fRemove QPV files associations`fDo not change files associations", 0, 0)
+   msgResult := msgBoxWrapper("panelu|Associate " appTitle, "Please choose what to associate " appTitle " with." p "`n`nPlease note that you may receive several warnings about system settings being changed, and requests to allow the command line app to run. To successfully associate QPV with the image file formats, please answer affirmatively when prompted.", "&Proceed|C&ancel", 1, "settings", "Add ""Open in QPV"" file explorer context menu for folders", 0, "Associate with common image formats`f`fAssociate with all supported image formats`fAssociate with QPV slideshow / files list formats`fRemove QPV file associations`fDo not change file associations", 0, 0)
    If InStr(msgResult.btn, "Proceed")
    {
       ; If (!A_IsCompiled && !isWinStore())
@@ -67718,7 +67718,7 @@ associateWithImages(modus) {
 
   If errorOccurred
   {
-     msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred during associating " appTitle " with image file formats.", 0, 0, "error")
+     msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred while associating " appTitle " with image file formats.", 0, 0, "error")
      Return
   } Else associateWithExplorer(2, modus)
 
@@ -67793,7 +67793,7 @@ askAboutFilesSelect(act) {
    Static doNotAskAgain := 0
    If (isInRange(markedSelectFile, 25, clampInRange(maxFilesIndex - 25, 0, maxFilesIndex)) && maxFilesIndex>150 && doNotAskAgain=0)
    {
-      msgResult := msgBoxWrapper(appTitle ": Discard selection", "The current opened files list has " groupDigits(markedSelectFile) " files selected. Are you sure you want to " act " ?", "&Yes|&No", 2, "question", "Do not ask again in the current session")
+      msgResult := msgBoxWrapper(appTitle ": Discard selection", "The currently open files list has " groupDigits(markedSelectFile) " files selected. Are you sure you want to " act "?", "&Yes|&No", 2, "question", "Do not ask again in the current session")
       If !InStr(msgResult.btn, "Yes")
          Return 1
       Else
@@ -67969,7 +67969,7 @@ createMenuSelectionRotationAspectRatio() {
    kMenu("PVselRatio", "Add/Uncheck", "&SDTV [4:3]", "MenuSetLockSelRatioSDTV",, " (selection aspect ratio)")
    kMenu("PVselRatio", "Add/Uncheck", "&35mm film [3:2]", "MenuSetLockSelRatio35mmFilm",, " (selection aspect ratio)")
    kMenu("PVselRatio", "Add/Uncheck", "&HDTV [16:9]", "MenuSetLockSelRatioHDTV",, " (selection aspect ratio)")
-   kMenu("PVselRatio", "Add/Uncheck", "&Wide screens [16:10]", "MenuSetLockSelRatioWide",, " (selection aspect ratio)")
+   kMenu("PVselRatio", "Add/Uncheck", "&Widescreen [16:10]", "MenuSetLockSelRatioWide",, " (selection aspect ratio)")
    kMenu("PVselRatio", "Add/Uncheck", "&Phone", "MenuSetLockSelRatioPhone",, " (selection aspect ratio)")
    If (lockSelectionAspectRatio<=1)
       kMenu("PVselRatio", "Check", "&Unlocked",,, " aspect ratio (selection)")
@@ -67988,7 +67988,7 @@ createMenuSelectionRotationAspectRatio() {
    Else If (lockSelectionAspectRatio=8)
       kMenu("PVselRatio", "Check", "&HDTV [16:9]",,, " (selection aspect ratio)")
    Else If (lockSelectionAspectRatio=9)
-      kMenu("PVselRatio", "Check", "&Wide screens [16:10]",,, " (selection aspect ratio)")
+      kMenu("PVselRatio", "Check", "&Widescreen [16:10]",,, " (selection aspect ratio)")
    Else If (lockSelectionAspectRatio=10)
       kMenu("PVselRatio", "Check", "&Phone",,, " (selection aspect ratio)")
 }
@@ -68096,10 +68096,10 @@ createMenuSelectSizeShapes(dummy:=0, b:=0) {
       kMenu("PVselSize", "Add", "Flip shape &horizontally" keyu, "MenuSelectionFlipH")
       keyu := (AnyWindowOpen) ? "`tShift+V" : ""
       kMenu("PVselSize", "Add", "&Flip shape vertically" keyu, "MenuSelectionFlipV")
-      kMenu("PVselSize", "Add/Uncheck", "&Open ended path", "toggleOpenClosedViewerCustomShape", "opened closed vector")
-      kMenu("PVselSize", "Add", "Set &points tension", ":PVshapeTension")
+      kMenu("PVselSize", "Add/Uncheck", "&Open-ended path", "toggleOpenClosedViewerCustomShape", "opened closed vector")
+      kMenu("PVselSize", "Add", "Set &point tension", ":PVshapeTension")
       If (closedLineCustomShape=0)
-         kMenu("PVselSize", "Check", "&Open ended path")
+         kMenu("PVselSize", "Check", "&Open-ended path")
    }
 }
 
@@ -68437,7 +68437,7 @@ InvokeMenuBarVectorSelection(manuID:=0, justBuild:=0) {
          kMenu("pvMenuBarSelection", "Add", "Cop&y points", "MenuCopyVectorPoints")
 
       kMenu("pvMenuBarSelection", "Add", "Deselect points`tCtrl+D", "MenuSelNoVectorPoints")
-      kMenu("pvMenuBarSelection", "Add", "In&vert points selection`tShift+I", "MenuSelInvertVectorPoints")
+      kMenu("pvMenuBarSelection", "Add", "In&vert point selection`tShift+I", "MenuSelInvertVectorPoints")
       kMenu("pvMenuBarSelection", "Add", "&Delete selected points`tDelete", "MenuRemSelVectorPoints")
       If (bezierSplineCustomShape=1)
       {
@@ -68482,9 +68482,9 @@ InvokeMenuBarVectorEdit(manuID:=0, justBuild:=0) {
          kMenu("pvMenuBarEdit", "Check", "Symmetrical anchors`tR")
    }
 
-   kMenu("pvMenuBarEdit", "Add/Uncheck", "&Open ended path`tO", "toggleOpenClosedLineEditorCustomShape", "opened closed vector")
+   kMenu("pvMenuBarEdit", "Add/Uncheck", "&Open-ended path`tO", "toggleOpenClosedLineEditorCustomShape", "opened closed vector")
    If (closedLineCustomShape=0)
-      kMenu("pvMenuBarEdit", "Check", "&Open ended path`tO")
+      kMenu("pvMenuBarEdit", "Check", "&Open-ended path`tO")
 
    If (justBuild!=1)
       showThisMenu("pvMenuBarEdit", 0, 1, manuID)
@@ -68582,7 +68582,7 @@ InvokeMenuBarFile(manuID:=0, justBuild:=0) {
       {
          createMenuOpenFileOptions("simple")
          kMenu("pvMenuBarFile", "Add", "Open this&...", ":PVtFileOpen")
-         kMenu("pvMenuBarFile", "Add", "File inform&ations`tAlt+Enter", "PanelImageInfos")
+         kMenu("pvMenuBarFile", "Add", "File inform&ation`tAlt+Enter", "PanelImageInfos")
          kMenu("pvMenuBarFile", "Add", "File prope&rties (Explorer)", "OpenFileProperties")
          kMenu("pvMenuBarFile", "Add", "&Containing folder properties (Explorer)", "OpenThisFilePropFolder", "external")
       } Else
@@ -68606,10 +68606,10 @@ InvokeMenuBarFile(manuID:=0, justBuild:=0) {
       kMenu("PVtActFile", "Add", "&Open with external app`tO", "OpenThisFileMenu")
       kbdu := (thumbsDisplaying=1) ? "`tAlt+E" : ""
       kMenu("PVtActFile", "Add", "Open file in a new &QPV instance`tCtrl+Enter", "SoloNewQPVinstance")
-      kMenu("PVtActFile", "Add", "Open in QPV the containin&g folder" kbdu, "OpenQPVfileFolder")
+      kMenu("PVtActFile", "Add", "Open the containin&g folder in QPV" kbdu, "OpenQPVfileFolder")
       kMenu("PVtActFile", "Add", "&Explore containing folder`tCtrl+E", "OpenThisFileFolder")
       If ((!FolderExist(OutDir) || StrReplace(CurrentSLD, "|")=OutDir) && !mustOpenStartFolder)
-         kMenu("PVtActFile", "Disable", "Open in QPV the containin&g folder" kbdu)
+         kMenu("PVtActFile", "Disable", "Open the containin&g folder in QPV" kbdu)
       If !FolderExist(OutDir)
          kMenu("PVtActFile", "Disable", "&Explore containing folder`tCtrl+E")
 
@@ -68650,7 +68650,7 @@ InvokeMenuBarEdit(manuID:=0, justBuild:=0) {
             kMenu("pvMenuBarEdit", "Add", "&Undo file action", "MenuFileUndoAction", "history restore actions records")
     
          If (fileActsHistoryArray.Count()>0)
-            kMenu("pvMenuBarEdit", "Add", "Undo previous file actions(s) (chronologically)`tCtrl+Shift+Z", "doUndoFileActsChronos", "records actions files rename move copy history restore")
+            kMenu("pvMenuBarEdit", "Add", "Undo previous file action(s) (chronologically)`tCtrl+Shift+Z", "doUndoFileActsChronos", "records actions files rename move copy history restore")
 
          If (hasFileIndexUndo(currentFileIndex) || fileActsHistoryArray.Count()>0)
             kMenu("pvMenuBarEdit", "AddSeparator", 0)
@@ -68775,7 +68775,7 @@ InvokeMenuBarEdit(manuID:=0, justBuild:=0) {
    {
       kMenu("pvMenuBarEdit", "Add", "&Undo file action`tCtrl+Z", "ImgUndoAction", "history restore actions records")
       kMenu("pvMenuBarEdit", "Add", "Undo history", "PanelFileUndoHistory", "records actions files rename move copy restore")
-      kMenu("pvMenuBarEdit", "Add", "Undo last actions(s) (chronologically)`tCtrl+Shift+Z", "doUndoFileActsChronos", "records actions files rename move copy history restore")
+      kMenu("pvMenuBarEdit", "Add", "Undo last action(s) (chronologically)`tCtrl+Shift+Z", "doUndoFileActsChronos", "records actions files rename move copy history restore")
       If !hasFileIndexUndo(currentFileIndex)
          kMenu("pvMenuBarEdit", "Disable", "&Undo file action`tCtrl+Z")
 
@@ -68880,7 +68880,7 @@ InvokeMenuBarEditorSelection(manuID:=0, justBuild:=0) {
 
       kMenu("PVselv", "Add", "&Select all`tCtrl+A", "selectEntireImage")
       If (innerSelectionCavityX>0 && innerSelectionCavityY>0)
-         kMenu("PVselv", "Add", "R&eset exclude area`tShift+\", "resetSelectionAreaCavity")
+         kMenu("PVselv", "Add", "R&eset exclusion area`tShift+\", "resetSelectionAreaCavity")
 
       kMenu("PVselv", "Add", "&Flip selection area W/H`tW", "flipSelectionWH")
       kMenu("PVselv", "Add/Uncheck", "&Limit selection to image area`tL", "toggleLimitSelection")
@@ -68977,7 +68977,7 @@ InvokeMenuBarSelection(manuID:=0, justBuild:=0) {
          createMenuSelectSizeShapes("mnb")
          createMenuSelectionAlign()
          If (innerSelectionCavityX>0 && innerSelectionCavityY>0)
-            kMenu("pvMenuBarSelection", "Add", "R&eset exclude area`tShift+\", "resetSelectionAreaCavity")
+            kMenu("pvMenuBarSelection", "Add", "R&eset exclusion area`tShift+\", "resetSelectionAreaCavity")
 
          kMenu("pvMenuBarSelection", "Add", "&Drop and reset`tCtrl+D", "resetImgSelection", "hide")
          If isSelEntireOutside()
@@ -69221,7 +69221,7 @@ InvokeMenuBarList(manuID:=0, justBuild:=0) {
   If (maxFilesIndex>1)
      kMenu("pvMenuBarList", "Add", "Save files list as .S&LD`tCtrl+Shift+S", "PanelSaveSlideShowu")
 
-  infoMenuRefresh := RegExMatch(CurrentSLD, sldsPattern) ? "Reload .SLD file" : "Refresh opened folder(s)"
+  infoMenuRefresh := RegExMatch(CurrentSLD, sldsPattern) ? "Reload .SLD file" : "Refresh open folder(s)"
   pathu := PathCompact(CurrentSLD, 40)
   If pathu
       kMenu("pvMenuBarList", "Add", infoMenuRefresh "`tShift+F5", "RefreshFilesList", "reload refresh list files")
@@ -69241,7 +69241,7 @@ InvokeMenuBarList(manuID:=0, justBuild:=0) {
         kMenu("pvMenuBarList", "Check", "Auto-remove entries of dead files")
 
      ; If RegExMatch(CurrentSLD, sldsPattern)
-     labelu := (SLDtypeLoaded=3) ? "Clean inexistent files entries" : "Clean &duplicate and inexistent entries"
+     labelu := (SLDtypeLoaded=3) ? "Clean inexistent file entries" : "Clean &duplicate and inexistent entries"
      kMenu("pvMenuBarList", "Add", labelu, "cleanDeadFilesList", "remove dead files erase")
      If (mustRecordSeenImgs=1)
         kMenu("pvMenuBarList", "Add", "Remove alread&y seen images", "removeFilesListSeenImages", "eliminate")
@@ -69569,7 +69569,7 @@ createMenuAlphaMask(givenMenu:="PValpha") {
 createMenuHelpQPV() {
    If (thumbsDisplaying=1 && maxFilesIndex>1)
    {
-      kMenu("PVhelp", "Add", "Capture screen shot of QPV", "ScreenCaptureListView", "screenshot")
+      kMenu("PVhelp", "Add", "Capture screenshot of QPV", "ScreenCaptureListView", "screenshot")
       Menu, PVhelp, Add,
    }
 
@@ -69649,7 +69649,7 @@ checkForUpdatesNow() {
      If (cmp=1)
      {
         msg .= "`n`nA new version is available."
-        friendly := "Download latest version"
+        friendly := "Download the latest version"
      } Else If (cmp=-1)
      {
         msg .= "`n`nYou are running a version newer than the latest published release."
@@ -69762,9 +69762,9 @@ createMenuBonusNoImageOpened() {
       If (showImgAnnotations=1)
          kMenu("PVmenu", "Check", "&Show image captions`tN")
 
-      kMenu("PVmenu", "Add/Uncheck", "&Two lines status bar", "ToggleMultiLineStatus", "statusbar info")
+      kMenu("PVmenu", "Add/Uncheck", "&Two-line status bar", "ToggleMultiLineStatus", "statusbar info")
       If (multilineStatusBar=1)
-         kMenu("PVmenu", "Check", "&Two lines status bar")
+         kMenu("PVmenu", "Check", "&Two-line status bar")
    }
 
    If (undoLevelsRecorded<1 && thumbsDisplaying!=1 && hasFileIndexUndo(currentFileIndex))
@@ -69779,7 +69779,7 @@ createMenuBonusNoImageOpened() {
 
    userSeenSlideImages := userSeenSessionImagesArray.Count()
    If (userSeenSlideImages>1 && maxFilesIndex>2 && CurrentSLD)
-      kMenu("PVmenu", "Add", "Select seen images in current session", "selectSeenFilesSession")
+      kMenu("PVmenu", "Add", "Select images seen in the current session", "selectSeenFilesSession")
 
    kMenu("PVmenu", "Add/Uncheck", "Allow FreeImage loader", "ToggleFIMloader")
    kMenu("PVmenu", "Add/Uncheck", "Private mode UI", "TogglePrivateMode")
@@ -69789,7 +69789,7 @@ createMenuBonusNoImageOpened() {
       kMenu("PVmenu", "Check", "Allow FreeImage loader")
 
    If (isImgEditingNow()=1)
-      kMenu("PVmenu", "Add", "Convert / teleport viewport image to Freeimage", "MenuPerformTeleportToFIM")
+      kMenu("PVmenu", "Add", "Convert / teleport viewport image to FreeImage", "MenuPerformTeleportToFIM")
 
    If (isImgEditingNow()=1 && animGIFsSupport=1)
    {
@@ -69830,15 +69830,15 @@ createMenuSoloFile(modus:=0) {
    kMenu("PVtActFile", "Add", "Open file in a new &QPV instance", "SoloNewQPVinstance")
    zPlitPath(resultedFilesList[currentFileIndex, 1], 0, OutFileName, OutDir)
    kbdu := (thumbsDisplaying=1) ? "`tAlt+E" : ""
-   kMenu("PVtActFile", "Add", "Open in QPV the containin&g folder" kbdu, "OpenQPVfileFolder")
+   kMenu("PVtActFile", "Add", "Open the containin&g folder in QPV" kbdu, "OpenQPVfileFolder")
    kMenu("PVtActFile", "Add", "&Explore containing folder`tCtrl+E", "OpenThisFileFolder")
    If !FolderExist(OutDir)
    {
-      kMenu("PVtActFile", "Disable", "Open in QPV the containin&g folder" kbdu)
+      kMenu("PVtActFile", "Disable", "Open the containin&g folder in QPV" kbdu)
       kMenu("PVtActFile", "Disable", "&Explore containing folder`tCtrl+E")
    }
    If (StrReplace(CurrentSLD, "|")=OutDir)
-      kMenu("PVtActFile", "Disable", "Open in QPV the containin&g folder" kbdu)
+      kMenu("PVtActFile", "Disable", "Open the containin&g folder in QPV" kbdu)
 
    kMenu("PVtActFile", "Add", "Set containing folder as the &protected folder", "setContaintFolderAsProtected")
    If (mustPreventMenus=1)
@@ -70198,8 +70198,8 @@ createMenuImgSizeAdapt(dummy:=0) {
 
          kMenu("PVview", "Add", "C&ycle histogram modes`tG", "ToggleImgHistogram",,,1)
          keyu := (liveDrawingBrushTool=1 && thumbsDisplaying!=1 || AnyWindowOpen=63) ? "" : "`tQ"
-         kMenu("PVview", "Add", "C&ycle simulate color depths" keyu, "ToggleImgColorDepth",,,1)
-         kMenu("PVview", "Add", "C&ycle colors display modes`tF", "ToggleImgFX",,,1)
+         kMenu("PVview", "Add", "C&ycle simulated color depths" keyu, "ToggleImgColorDepth",,,1)
+         kMenu("PVview", "Add", "C&ycle color display modes`tF", "ToggleImgFX",,,1)
 
          infoThumbsList := defineListViewModes()
          infoThumbsMode := (thumbsDisplaying=1) ? "Switch to image view" : "Switch to " infoThumbsList " list view"
@@ -70305,14 +70305,14 @@ createMenuMainPreferences() {
       If (allowUserQuickFileActions=1)
          kMenu("PVprefs", "Check", "&Activate Quick File Action shortcuts")
 
-      kMenu("PVprefs", "Add/Uncheck", "&Multi-threaded thumbnails generation", "toggleMultiCoresUse")
+      kMenu("PVprefs", "Add/Uncheck", "&Multi-threaded thumbnail generation", "toggleMultiCoresUse")
       If (allowMultiCoreMode=1)
-         kMenu("PVprefs", "Check", "&Multi-threaded thumbnails generation")
+         kMenu("PVprefs", "Check", "&Multi-threaded thumbnail generation")
    }
 
-   kMenu("PVprefs", "Add/Uncheck", "&Prompt before file delete", "TogglePromptDelete", "ask remove erase question user")
+   kMenu("PVprefs", "Add/Uncheck", "&Prompt before deleting files", "TogglePromptDelete", "ask remove erase question user")
    If (askDeleteFiles=1)
-      kMenu("PVprefs", "Check", "&Prompt before file delete")
+      kMenu("PVprefs", "Check", "&Prompt before deleting files")
 
    Menu, PVprefs, Add 
    kMenu("PVprefs", "Add/Uncheck", "&Record seen images", "ToggleRecordSeenImages", "history viewed")
@@ -70377,9 +70377,9 @@ createMenuMainView() {
          kMenu("PVview", "Check", "Image details list")
 
       Menu, PVview, Add
-      kMenu("PVview", "Add/Uncheck", "&Two lines status bar", "ToggleMultiLineStatus", "statusbar info")
+      kMenu("PVview", "Add/Uncheck", "&Two-line status bar", "ToggleMultiLineStatus", "statusbar info")
       If (multilineStatusBar=1)
-         kMenu("PVview", "Check", "&Two lines status bar")
+         kMenu("PVview", "Check", "&Two-line status bar")
 
       kMenu("PVview", "Add/Uncheck", "Private mode UI", "TogglePrivateMode")
       If (userPrivateMode=1)
@@ -70501,8 +70501,8 @@ createMenuMainView() {
             kMenu("PVview", "Add", "Decrease viewport text size`tCtrl+-", "MenuChangeOSDZoomMinus", "disability handicap eyes eyesight large",,1)
          } Else
          {
-            kMenu("PVview", "Add", "Decrease thumbnails size`t=", "MenuChangeImgZoomPlus")
-            kMenu("PVview", "Add", "Increase thumbnails size`t-", "MenuChangeImgZoomMinus")
+            kMenu("PVview", "Add", "Decrease thumbnail size`t=", "MenuChangeImgZoomPlus")
+            kMenu("PVview", "Add", "Increase thumbnail size`t-", "MenuChangeImgZoomMinus")
          }
       } Else
       {
@@ -70589,9 +70589,9 @@ createMenuOpenFileOptions(modus:=0) {
 
    zPlitPath(resultedFilesList[currentFileIndex, 1], 0, OutFileName, OutDir)
    kbdu := (thumbsDisplaying=1) ? "`tAlt+E" : ""
-   kMenu("PVtFileOpen", "Add", "&Open in QPV the containing folder" kbdu, "OpenQPVfileFolder")
+   kMenu("PVtFileOpen", "Add", "&Open the containing folder in QPV" kbdu, "OpenQPVfileFolder")
    If (StrReplace(CurrentSLD, "|")=OutDir)
-      kMenu("PVtFileOpen", "Disable", "&Open in QPV the containing folder" kbdu)
+      kMenu("PVtFileOpen", "Disable", "&Open the containing folder in QPV" kbdu)
 
    If !markedSelectFile
    {
@@ -70651,7 +70651,7 @@ createMenuCurrentFilesActs(dummy:=0) {
       kMenu("PVfilesActs", "Add", "&Undo file action`tCtrl+Z", "MenuFileUndoAction", "history restore actions records")
 
    If (fileActsHistoryArray.Count()>0)
-      kMenu("PVfilesActs", "Add", "Undo previous actions(s) (chronologically)`tCtrl+Shift+Z", "doUndoFileActsChronos", "records actions files rename move copy history restore")
+      kMenu("PVfilesActs", "Add", "Undo previous action(s) (chronologically)`tCtrl+Shift+Z", "doUndoFileActsChronos", "records actions files rename move copy history restore")
 
    kMenu("PVfilesActs", "AddSeparator", 0)
    kMenu("PVfilesActs", "Add", "&Copy", ":PVcopy")
@@ -70675,7 +70675,7 @@ createMenuCurrentFilesActs(dummy:=0) {
       kMenu("PVfilesActs", "Add", "Preview all pa&ges", "MenuPreviewFramesFilterList", "animated gifs webp tiffs pdfs thumbnails display")
 
    If (RegExMatch(imgPath, "i)(.\.pdf)$") || markedSelectFile)
-      kMenu("PVfilesActs", "Add", "Extract texts from PDF pages", "PanelPDFreadTexts", "convert retrieve read search links pdf get")
+      kMenu("PVfilesActs", "Add", "Extract text from PDF pages", "PanelPDFreadTexts", "convert retrieve read search links pdf get")
 
    If WinOCR_IsSupported()
       kMenu("PVfilesActs", "Add", "Text recognition (&OCR)", "PanelOCRtextRecognition", "optical character recognition extract read texts words clipboard")
@@ -70718,7 +70718,7 @@ createMenuCurrentFilesActs(dummy:=0) {
       {
          kMenu("PVfilesActs", "Add", "Re&group dispersed files", "regroupSelectedFiles")
          keyu := (thumbsDisplaying=1) ? "`tShift+L" : ""
-         kMenu("PVfilesActs", "Add", "&Calculate total files size" keyu, "CalculateSelectedFilesSizes", "file details")
+         kMenu("PVfilesActs", "Add", "&Calculate total file size" keyu, "CalculateSelectedFilesSizes", "file details")
          keyu := (thumbsDisplaying=1) ? "`tR" : ""
          kMenu("PVfilesActs", "Add", "Revie&w selected files" keyu, "PanelReviewSelectedFiles")
       } Else kMenu("PVfilesActs", "Add", "&File information`tAlt+Enter", "PanelImageInfos", "properties image details")
@@ -71025,7 +71025,7 @@ createMenuVPhudHisto() {
 createMenuColorDepth() {
    infoColorDepth := (usrColorDepth>1) ? "Original / reset" : defineColorDepth()
    keyu := (liveDrawingBrushTool=1 && thumbsDisplaying!=1 || AnyWindowOpen=64) ? "" : "`tQ"
-   kMenu("PVimgSdepth", "Add", "C&ycle simulate color depths" keyu, "ToggleImgColorDepth",,,1)
+   kMenu("PVimgSdepth", "Add", "C&ycle simulated color depths" keyu, "ToggleImgColorDepth",,,1)
    Menu, PVimgSdepth, Add
    kMenu("PVimgSdepth", "Add/Uncheck", infoColorDepth, "MenuResetImageColorDepth")
    kMenu("PVimgSdepth", "Add/Uncheck", "2 bits (4 colors)", "MenuSetImageDepth2bits",, "Color depth: " sillySeparator)
@@ -71067,7 +71067,7 @@ createMenuImgColorsFX() {
    infolumosAdjust := (imgFxMode=2 || imgFxMode=3) ? Round(lumosAdjust, 2) : Round(lumosGrayAdjust, 2)
    infoGammosAdjust := (imgFxMode=2 || imgFxMode=3) ? Round(GammosAdjust, 2) : Round(GammosGrayAdjust, 2)
    infoSatAdjust := (imgFxMode=4) ? zatAdjust : Round(satAdjust*100)
-   kMenu("PVimgColorsFX", "Add", "C&ycle colors display modes`tF", "ToggleImgFX",,,1)
+   kMenu("PVimgColorsFX", "Add", "C&ycle colour display modes`tF", "ToggleImgFX",,,1)
    kMenu("PVimgColorsFX", "Add", DefineFXmodes(), "dummy")
    kMenu("PVimgColorsFX", "Disable", DefineFXmodes())
    If (imgFxMode=2 || imgFxMode=3 || imgFxMode=4)
@@ -71309,7 +71309,7 @@ createMenuLiveEditSelectionArea(isToolGood, isWinCustomShapeFriendly) {
    Menu, PVselv, Add
    kMenu("PVselv", "Add", "&Select all`tCtrl+A", "selectEntireImage",, " (image canvas)")
    If (innerSelectionCavityX>0 && innerSelectionCavityY>0)
-      kMenu("PVselv", "Add", "R&eset exclude area`tShift+\", "resetSelectionAreaCavity")
+      kMenu("PVselv", "Add", "R&eset exclusion area`tShift+\", "resetSelectionAreaCavity")
 
    If isSelEntireOutside()
       kMenu("PVselv", "Add", "Focus selection area", "focusImgSelArea", "find viewport", " (selection area)")
@@ -71739,8 +71739,8 @@ BuildSecondMenu(givenCoords:=0) {
             kMenu("PVmenu", "Add", "Decrease text size`t-", "MenuChangeOSDZoomMinus",,,1)
          } Else
          {
-            kMenu("PVmenu", "Add", "More thumbnails columns`t=", "MenuChangeImgZoomPlus")
-            kMenu("PVmenu", "Add", "Fewer thumbnails columns`t-", "MenuChangeImgZoomMinus")
+            kMenu("PVmenu", "Add", "More thumbnail columns`t=", "MenuChangeImgZoomPlus")
+            kMenu("PVmenu", "Add", "Fewer thumbnail columns`t-", "MenuChangeImgZoomMinus")
          }
       } Else
       {
@@ -71889,7 +71889,7 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
          kMenu("PVmenu", "Add", "&Undo file action`tCtrl+Z", "ImgUndoAction", "history restore actions records")
 
       If (fileActsHistoryArray.Count()>0)
-         kMenu("PVmenu", "Add", "Undo last actions(s)`tCtrl+Shift+Z", "doUndoFileActsChronos", "records actions files rename move copy history restore")
+         kMenu("PVmenu", "Add", "Undo last action(s)`tCtrl+Shift+Z", "doUndoFileActsChronos", "records actions files rename move copy history restore")
    }
 
    If ((validBMP(UserMemBMP) || currentImgModified=1 && viewportQPVimage.imgHandle) && thumbsDisplaying!=1 && (showMainMenuBar!=1 || mustPreventMenus=1))
@@ -72029,7 +72029,7 @@ createMenuSeenImages() {
    If (maxFilesIndex>2 && CurrentSLD)
    {
       kMenu("PVmenu", "Add", "&Identify already seen images in the list", "quickFindSeenImages", "saw")
-      kMenu("PVmenu", "Add", "&Identify never seen images in the list", "quickFindUnseenImages", "unseen")
+      kMenu("PVmenu", "Add", "&Identify unseen images in the list", "quickFindUnseenImages", "unseen")
    }
 
    If (userSeenSessionImagesArray.Count()>1)
@@ -72601,7 +72601,7 @@ ToggleDBdefaultSQLsort() {
    prevFilesSortMode := 0
    IniSLDBWrite("prevFilesSortMode", prevFilesSortMode)
    INIaction(1, "prevOpenFolderPath", "General")
-   msgBeepTimer("Default sorting of the files is now set to none.`nTo set it otherwise,please choose a sorting mode in the Sort menu.", 0)
+   msgBeepTimer("Default sorting of the files is now set to none.`nTo set it otherwise, please choose a sorting mode in the Sort menu.", 0)
 }
 
 createMenuFilesSelections(whichMenu) {
@@ -72639,7 +72639,7 @@ createMenuFilesSelections(whichMenu) {
       keyu := (thumbsDisplaying=1) ? "`tR" : ""
       kMenu(whichMenu, "Add", "Revie&w selected files" keyu, "PanelReviewSelectedFiles")
       keyu := (thumbsDisplaying=1) ? "`tShift+L" : ""
-      kMenu(whichMenu, "Add", "&Calculate total files size" keyu, "CalculateSelectedFilesSizes", "file details")
+      kMenu(whichMenu, "Add", "&Calculate total file size" keyu, "CalculateSelectedFilesSizes", "file details")
       kMenu(whichMenu, "Add", "Filter files list to selection`tCtrl+Tab", "filterToFilesSelection")
    }
 }
@@ -73420,7 +73420,7 @@ ToggleGIFsPlayEntirely() {
    allowGIFsPlayEntirely := !allowGIFsPlayEntirely
    INIaction(1, "allowGIFsPlayEntirely", "General")
    friendly := (allowGIFsPlayEntirely=1) ? "ACTIVATED" : "DEACTIVATED"
-   showTOOLtip("Allow animations play entirely during slideshows:`n" friendly, A_ThisFunc, 1)
+   showTOOLtip("Allow animations to play entirely during slideshows:`n" friendly, A_ThisFunc, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -73429,7 +73429,7 @@ ToggleRecordSeenImages() {
    If (sqlFailedInit=1 && mustRecordSeenImgs=1)
    {
       mustRecordSeenImgs := 0
-      msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred when attempting to initialize SqlLite Database.`n`nFeature not available.", 0, 0, "error")
+      msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred when attempting to initialize the SQLite database.`n`nFeature not available.", 0, 0, "error")
    }
 
    INIaction(1, "mustRecordSeenImgs", "General")
@@ -73684,7 +73684,7 @@ invokeFoldersListerMenu() {
         Try Menu, % A_LoopField, Delete
 
     If (userPrivateMode=1)
-       Return msgBeepTimer("WARNING: Private mode is activated. Access to this feature is denied,`nbecause it would be a breach of privacy.")
+       Return msgBeepTimer("WARNING: Private mode is activated. Access to this feature is denied`nbecause it would be a breach of privacy.")
 
     baseFolder := (SLDtypeLoaded=1) ? CurrentSLD : resultedFilesList[currentFileIndex, 1]
     If (SLDtypeLoaded!=1)
@@ -74073,7 +74073,7 @@ toggleImgSelectLockedRatio() {
 }
 
 defineSelectionAspectRatios(doFlipper:=0, modus:=0) {
-   Static types := {0:"NONE", 1:"NONE", 2:"CURRENT RATIO", 3:"CURRENT WINDOW", 4:"CURRENT IMAGE", 5:"SQUARE [1:1]", 6:"SDTV [4:3]", 7:"35MM FILM [3:2]", 8:"HDTV [16:9]", 9:"WIDE SCREENS [16:10]", 10:"PHONE"}
+   Static types := {0:"NONE", 1:"NONE", 2:"CURRENT RATIO", 3:"CURRENT WINDOW", 4:"CURRENT IMAGE", 5:"SQUARE [1:1]", 6:"SDTV [4:3]", 7:"35MM FILM [3:2]", 8:"HDTV [16:9]", 9:"WIDESCREEN [16:10]", 10:"PHONE"}
         , flipper := 0
 
    If (doFlipper="yes" && isNumber(modus))
@@ -74275,7 +74275,7 @@ ToggleAutoRemEntries() {
    autoRemDeadEntry := !autoRemDeadEntry
    INIaction(1, "autoRemDeadEntry", "General")
    friendly := (autoRemDeadEntry=1) ? "ACTIVATED" : "DEACTIVATED"
-   showTOOLtip("Automatically remove entries to inexistent files: " friendly, A_ThisFunc, 1)
+   showTOOLtip("Automatically remove entries of inexistent files: " friendly, A_ThisFunc, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -74775,7 +74775,7 @@ toggleFreeIMGpanning() {
 
     INIaction(1, "allowFreeIMGpanning", "General")
     friendly := (allowFreeIMGpanning=1) ? "ACTIVATED" : "DEACTIVATED"
-    showTOOLtip("Allow image panning exceed the viewport area: " friendly, A_ThisFunc, 1)
+    showTOOLtip("Allow image panning beyond the viewport area: " friendly, A_ThisFunc, 1)
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -75522,7 +75522,7 @@ createGDIPcanvas(W:=0, H:=0, forceIT:=0) {
 
       hasInit := 1
       prevDimensions := newDimensions
-      addJournalEntry("Canvas infos: " prevDimensions " - glPG:" glPG " - glHDC:" glHDC " - glOBM:" glOBM " - glHbmp:" glHbitmap " - 2NDglPG:" 2NDglPG " - 2NDglHDC:" 2NDglHDC " - 2NDglOBM:" 2NDglOBM " - 2NDglHbmp:" 2NDglHbitmap)
+      addJournalEntry("Canvas info: " prevDimensions " - glPG:" glPG " - glHDC:" glHDC " - glOBM:" glOBM " - glHbmp:" glHbitmap " - 2NDglPG:" 2NDglPG " - 2NDglHDC:" 2NDglHDC " - 2NDglOBM:" 2NDglOBM " - 2NDglHbmp:" 2NDglHbitmap)
       If (!glPG || !glHDC || !glHbitmap || !glOBM || !2NDglPG || !2NDglHDC || !2NDglOBM || !2NDglHbitmap)
       {
          qpvCanvasHasInit := 0
@@ -75538,7 +75538,7 @@ createGDIPcanvas(W:=0, H:=0, forceIT:=0) {
 }
 
 handleFatalWinInitErrors() {
-   msgResult := msgBoxWrapper(appTitle ": FATAL ERROR", appTitle " was unable to initialize the GDI+ windows required to display images.`n`nWould you like to try initialize it again? By choosing to continue, the application may malfunction.", "&Try again|&Continue|&Exit", 1, "error")
+   msgResult := msgBoxWrapper(appTitle ": FATAL ERROR", appTitle " was unable to initialize the GDI+ windows required to display images.`n`nWould you like to try to initialize it again? If you continue, the application may malfunction.", "&Try again|&Continue|&Exit", 1, "error")
    If InStr(msgResult, "again")
    {
       restartEntireGui()
@@ -75768,7 +75768,7 @@ ToggleSeenIMGstatus() {
       countFilez := 0
       getSelectedFiles(0, 1)
       friendly := (mustRem=1) ? "NOT SEEN" : "SEEN"
-      showTOOLtip("Marking as " friendly A_Space groupDigits(markedSelectFile) " images, please wait")
+      showTOOLtip("Marking " groupDigits(markedSelectFile) " images as " friendly ", please wait")
       seenImagesDB.Exec("BEGIN TRANSACTION;")
       doStartLongOpDance()
       Loop, % maxFilesIndex
@@ -75779,7 +75779,7 @@ ToggleSeenIMGstatus() {
          If (A_TickCount - prevMSGdisplay>2000)
          {
             etaTime := ETAinfos(countFilez, markedSelectFile, startOperation)
-            showTOOLtip("Marking as " friendly " images, please wait" etaTime, 0, 0, countFilez / markedSelectFile)
+            showTOOLtip("Marking images as " friendly ", please wait" etaTime, 0, 0, countFilez / markedSelectFile)
             prevMSGdisplay := A_TickCount
          }
 
@@ -75841,7 +75841,7 @@ CleanDeadFilesSeenImagesDB(doPartial:=0, partu:=0) {
 
    If (doPartial!="yesu")
    {
-      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Are you sure you want to purge no longer existent files from the list of seen images?`n`nThis action is irreversible and may take awhile...", "&Continue|C&ancel", 2, "question")
+      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Are you sure you want to purge inexistent files from the list of seen images?`n`nThis action is irreversible and may take a while...", "&Continue|C&ancel", 2, "question")
       If !InStr(msgResult, "continue")
          Return
    }
@@ -75909,7 +75909,7 @@ CleanDeadFilesSeenImagesDB(doPartial:=0, partu:=0) {
          If (A_TickCount - prevMSGdisplay>2000)
          {
             etaTime := ETAinfos(A_Index, totalu, kp)
-            showTOOLtip("Commiting changes to the seen images database, please wait" etaTime "`n" groupDigits(entriesRemCount) " entries removed", 0, 0, A_Index / totalu)
+            showTOOLtip("Committing changes to the seen images database, please wait" etaTime "`n" groupDigits(entriesRemCount) " entries removed", 0, 0, A_Index / totalu)
             prevMSGdisplay := A_TickCount
          }
 
@@ -75931,7 +75931,7 @@ CleanDeadFilesSeenImagesDB(doPartial:=0, partu:=0) {
   etaTime := "`nElapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3))
   If (abandonAll=1)
   {
-     etaTime .= "`nOperation aborted. " groupDigits(entriesScanned) " / " groupDigits(entriesCount) " entries were scanned until now"
+     etaTime .= "`nOperation aborted. " groupDigits(entriesScanned) " / " groupDigits(entriesCount) " entries were scanned so far"
      showTOOLtip("No entries were removed from the seen images database" etaTime)
   } Else
      showTOOLtip(groupDigits(entriesRemCount) " entries of inexistent files were removed from the database" etaTime)
@@ -76082,7 +76082,7 @@ eraseSeenIMGsDB() {
    If !seenImagesDB
       Return
 
-   msgResult := msgBoxWrapper(appTitle ": Confirmation", "Are you sure you want to delete the list of seen images?`n`nThis action is irreversible. The actual files will be untouched, only the list of seen images is going to be erased.", "&Erase list|&Cancel", 2, "exclamation")
+   msgResult := msgBoxWrapper(appTitle ": Confirmation", "Are you sure you want to delete the list of seen images?`n`nThis action is irreversible. The actual files will be untouched; only the list of seen images is going to be erased.", "&Erase list|&Cancel", 2, "exclamation")
    If !InStr(msgResult, "erase list")
       Return
 
@@ -76093,7 +76093,7 @@ eraseSeenIMGsDB() {
    FileDelete, % mainCompiledPath "\seenImagesList.db"
    Sleep, 5
    seenImagesDB := ""
-   msgBeepTimer("Already seen images list is now empty.`nEntries will be added only if the option`nto skip seen images is activated.", 0)
+   msgBeepTimer("The list of already seen images is now empty.`nEntries will be added only if the option`nto skip seen images is activated.", 0)
    If (mustRecordSeenImgs=1)
       initSeenImagesListDB()
 }
@@ -76965,7 +76965,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
     InfoLoadTime := "`nViewport size: " groupDigits(mainWidth) " x " groupDigits(mainHeight) " px (" Round(mainWidth/mainHeight, 2) ")"
     If (thumbsDisplaying!=1 && directRefresh=1)
     {
-       InfoLoadTime .= "`nViewport refresh speed: ~" groupDigits(totalZeit) " milisec."
+       InfoLoadTime .= "`nViewport refresh speed: ~" groupDigits(totalZeit) " ms."
        If (currIMGdetails.HasAlpha=1)
           InfoLoadTime .= " (*)"
     }
@@ -76998,7 +76998,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
        infoAnim := "`nAnimation speed: " animPlaybackDelay() + Round(totalZeit) " ms / frame."
 
     If (imgFxMode>1 || usrColorDepth>1)
-       infoColors := "`nColors display mode: " DefineFXmodes()
+       infoColors := "`nColour display mode: " DefineFXmodes()
 
     If (thumbsDisplaying!=1)
     {
@@ -77373,7 +77373,7 @@ LoadFileWithWIA(imgPath, fastMode, noBMP:=0, sizesDesired:=0, ByRef newBitmap:=0
       } Else If isImgSizeTooLarge(wiaImg.width, wiaImg.height)
       {
          mainLoadedIMGdetails.TooLargeGDI := 1
-         setWindowTitle("Rescaling image to GDI+ maximum image dimensions limits")
+         setWindowTitle("Rescaling image to GDI+ maximum image dimension limits")
          changeMcursor()
          newW := wiaImg.width,  newH := wiaImg.height
          capIMGdimensionsGDIPlimits(newW, newH)
@@ -77653,7 +77653,7 @@ LoadFileWithGDIp(imgPath, noBPPconv:=0, frameu:=0, useICM:=0, sizesDesired:=0, B
         mustOpenWithWIC := 1
      } Else If (isImgSizeTooLarge(imgW, imgH) && mustRsize=0 && noBPPconv=0)
      {
-        addJournalEntry("Rescaling image to GDI+ maximum image dimensions limits")
+        addJournalEntry("Rescaling image to GDI+ maximum image dimension limits")
         newW := imgW, newH := imgH
         capIMGdimensionsGDIPlimits(newW, newH)
         nBitmap := trGdip_ResizeBitmap(A_ThisFunc, oBitmap, newW, newH, 1, 3, -1)
@@ -77807,7 +77807,7 @@ generalInternalErrorMsgBox(err, baseMsg, silentMode:=0) {
       message := "`n`n" Gdip_ErrorHandler(err, 0)
 
    friendly := (A_PtrSize=4) ? "`n`nPossible cause: memory limit reached." : ""
-   friendly .= (A_PtrSize=4 && A_is64BitOS) ? " Please use the 64-bits edition of this application." : ""
+   friendly .= (A_PtrSize=4 && A_is64BitOS) ? " Please use the 64-bit edition of this application." : ""
    If (InStr(message, "out_of_memory") && maxMemUndoLevels>12012)
       maxMemUndoLevels -= 100000
 
@@ -77824,7 +77824,7 @@ generalInternalErrorMsgBox(err, baseMsg, silentMode:=0) {
       If (InStr(baseMsg, glPG) || InStr(baseMsg, 2NDglPG)) && (forceSilent=0)
       {
          info := (debugModa=1) ? "" : "You can start QPV with /qpv-debug to view all error messages in a debug viewer."
-         msgResult := msgBoxWrapper(appTitle, "It seems you are receving errors related to core viewport components. Choose Yes to no longer receive GDI+ error messages.`n`nAnyhow, the application will likely continue to malfunction, but at least in silence.", 4, 0, "question")
+         msgResult := msgBoxWrapper(appTitle, "It seems you are receiving errors related to core viewport components. Choose Yes to no longer receive GDI+ error messages.`n`nAnyhow, the application will likely continue to malfunction, but at least in silence.", 4, 0, "question")
          If (msgResult="yes")
             forceSilent := 1
       }
@@ -78103,7 +78103,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
 
   If (canCancelImageLoad<3 && vpIMGrotation>0)
   {
-     setWindowTitle("Rotating image at " vpIMGrotation "°")
+     setWindowTitle("Rotating image by " vpIMGrotation "°")
      thisImgQuality := (userimgQuality=1) ? 6 : 5
      If (minimizeMemUsage=1 && rawFmt!="MEMORYBMP")
         thisImgQuality := ""
@@ -79314,7 +79314,7 @@ toggleBrushSymmetryModes() {
    }
 
    If (BrushToolType>5)
-      Return msgBeepTimer("WARNING: Symmetry painting not available for the current brush type")
+      Return msgBeepTimer("WARNING: Symmetry painting is not available for the current brush type")
 
    If (BrushToolSymmetryX=0 && BrushToolSymmetryY=0)
    {
@@ -79469,7 +79469,7 @@ toggleAlphaPaintingMode() {
       {
          allGood := 0
          liveDrawingBrushTool := 0
-         msgResult := msgBoxWrapper(appTitle ": Confirmation", "There is an already user painted bitmap created, but the alpha mask is currently set to a parametric / generated one. Would you like to rasterize this or return to the already created bitmap?`n`nPlease note, you can blend the current alpha mask with the user painted bitmap by using the «Rasterize» option from the main menu.", "&Rasterize this|Return to &bitmap|&Cancel", 1, "question")
+         msgResult := msgBoxWrapper(appTitle ": Confirmation", "A user painted bitmap already exists, but the alpha mask is currently set to a parametric / generated one. Would you like to rasterize this or return to the already created bitmap?`n`nPlease note, you can blend the current alpha mask with the user painted bitmap by using the «Rasterize» option from the main menu.", "&Rasterize this|Return to &bitmap|&Cancel", 1, "question")
          If InStr(msgResult, "rasterize")
          {
             allGood := 1
@@ -79800,7 +79800,7 @@ toggleBrushDrawInOutModes() {
          GuiControl, SettingsGUIA: Choose, FloodFillSelectionMode, % FloodFillSelectionMode
 
       If (editingSelectionNow!=1)
-         msgu := "WARNING: The image selection area is currently not created.`nPress E to create or display it.`n"
+         msgu := "WARNING: The image selection area has not been created yet.`nPress E to create or display it.`n"
 
       If (ShowAdvToolbar=1)
          decideIconBTNpaintBrushSelect()
@@ -79817,7 +79817,7 @@ toggleBrushDrawInOutModes() {
          GuiControl, SettingsGUIA: Choose, BrushToolOutsideSelection, % BrushToolOutsideSelection
 
       If (editingSelectionNow!=1)
-         msgu := "WARNING: The image selection area is currently not created.`nPress E to create or display it.`n"
+         msgu := "WARNING: The image selection area has not been created yet.`nPress E to create or display it.`n"
 
       If (ShowAdvToolbar=1)
          decideIconBTNpaintBrushSelect()
@@ -79923,7 +79923,7 @@ preventColorChange() {
 
        If (BrushToolType=3)
        {
-          msgBeepTimer("WARNING: You are currently using the cloner brush tool`nTo define the source pattern, press S.")
+          msgBeepTimer("WARNING: You are currently using the cloner brush tool.`nTo define the source pattern, press S.")
           CreateTempGuiButton("Define cloner source,,BtnSetClonerBrushSource", 0)
        } Else
           msgBeepTimer("WARNING: You are currently using a brush that does not rely on a given color")
@@ -80587,7 +80587,7 @@ ActFloodFillNow() {
 
       If (!validBMP(thisBMP) || G2="" || (pPath="" && allowSelectionCrop=1))
       {
-         msgBeepTimer("Failed to apply flood fill in the image selected area")
+         msgBeepTimer("Failed to apply flood fill in the selected image area")
          If (G2!="")
             Gdip_DeleteGraphics(G2)
          If (pPath!="")
@@ -82163,7 +82163,7 @@ defineVectorEditorStatusBar(ByRef mousePoint, ByRef dontAddPoint, canDoSymmetry,
       } Else
       {
          divu := !Instr(labelu, " symmetry") ? "Double click to divide in two." : ""
-         msgu := (dontAddPoint!=0) ? "Move existing " pk "point P[" labelu "]. " divu : "Click to add new point and extend path. Hold Alt, Ctrl or Shift for other modes."
+         msgu := (dontAddPoint!=0) ? "Move existing " pk "point P[" labelu "]. " divu : "Click to add a new point and extend the path. Hold Alt, Ctrl or Shift for other modes."
          If (dontAddPoint!=0 && customShapeHasSelectedPoints=1)
             msgu := "Click and drag to move selected points. Shift + L-Click to deselect " pk "P[" labelu "]."
       }
@@ -82177,7 +82177,7 @@ defineVectorEditorStatusBar(ByRef mousePoint, ByRef dontAddPoint, canDoSymmetry,
          If (dontAddPoint!=0 && vectorToolModus!=2)
             msgu := (selu=1) ? "SHIFT: Deselect " pk "point P[" labelu "]" : "SHIFT: Select " pk "point P[" labelu "]"
          Else If (dontAddPoint=0 && vectorToolModus!=5)
-            msgu := "SHIFT: Click to add new point snapped every 45° degrees and extend path"
+            msgu := "SHIFT: Click to add new point snapped every 45° and extend path"
          Else If (dontAddPoint=0 && vectorToolModus=5 && customShapeHasSelectedPoints=1)
             msgu := "SHIFT: Click and drag to uniformly rescale the selected points."
          Else
@@ -86837,7 +86837,7 @@ EraseThumbsCache(dummy:=0, remCacheOldDays:=0) {
 
       If (A_TickCount - prevMSGdisplay>3000)
       {
-         showTOOLtip("Emptying thumbnails cache, please wait`n" countFilez " removed until now.")
+         showTOOLtip("Emptying thumbnails cache, please wait`n" countFilez " removed so far.")
          prevMSGdisplay := A_TickCount
       }
    }
@@ -86849,7 +86849,7 @@ EraseThumbsCache(dummy:=0, remCacheOldDays:=0) {
    }
 
    If (abandonAll=1)
-      showTOOLtip("Operation aborted. Removed " countFilez " cached thumbnails until now")
+      showTOOLtip("Operation aborted. Removed " countFilez " cached thumbnails so far")
    Else If (A_TickCount - startZeit>1500) || (dummy="daysITis")
       showTOOLtip("Finished removing " countFilez moreInfo " cached thumbnails" friendly)
    
@@ -86964,7 +86964,7 @@ ScreenCaptureListView() {
       } Else
       {
          SoundBeep 300, 100
-         showDelayedTooltip("ERROR: Failed to set image to clipoard")
+         showDelayedTooltip("ERROR: Failed to set image to clipboard")
       }
    } Else
    {
@@ -88167,7 +88167,7 @@ BTNregenerateEntireList() {
        {
           msgu := (countu=1) ? "The seed folder will be scanned again" : "All " groupDigits(countu) " seed folders will be scanned again"
           titleu := (AnyWindowOpen=2) ? "Regenerate entire index" : "Rescan all"
-          msgResult := msgBoxWrapper(appTitle ": " titleu, msgu ", to generate the files list index anew. The files selection and any files filter are dropped.`n`nDo you want to continue?", 4, 1, "question")
+          msgResult := msgBoxWrapper(appTitle ": " titleu, msgu ", to generate the files list index anew. The files selection and any files filter will be dropped.`n`nDo you want to continue?", 4, 1, "question")
           If (msgResult!="yes")
              Return
        }
@@ -88290,7 +88290,7 @@ RegenerateEntireList() {
     {
        If (r="abandoned")
        {
-          showTOOLtip("Operation aborted: regenerate files list. The files list is unchanged.`nReopening now the database, please wait")
+          showTOOLtip("Operation aborted: regenerate files list. The files list is unchanged.`nReopening the database now, please wait")
           activeSQLdb.Exec("ROLLBACK TRANSACTION;")
           Sleep, 250
        } Else
@@ -88354,7 +88354,7 @@ RegenerateEntireList() {
 throwSQLqueryDBerror(funcu) {
    SetTimer, ResetImgLoadStatus, -150
    SoundBeep, 300, 100
-   showDelayedTooltip("ERROR: " funcu "() failed to query or commit changes the SQL database`n" activeSQLdb.ErrorMsg)
+   showDelayedTooltip("ERROR: " funcu "() failed to query or commit changes to the SQL database`n" activeSQLdb.ErrorMsg)
    ; SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -88763,7 +88763,7 @@ filterDupeResultsByHdist(threshold, candList, candCount, hadPriorPairs, ByRef gr
       Return 1
    }
 
-   showTOOLtip("Finishing preparing the duplicate images filtered list, please wait")
+   showTOOLtip("Finalizing the filtered list of duplicate images, please wait")
    r := changeHdistLevelCached(0, 0, threshold, 0, userFindDupesMSElvl, candList, candCount, groupsFound)
    ResetImgLoadStatus()
    If (r<1)
@@ -89653,7 +89653,7 @@ sldGenerateFilesList(readThisFile, doFilesCheck, mustRemQuotes, doOptionals:=1) 
        If (abandonAll=1)
           showDelayedTooltip("Operation aborted. The files list is now empty.")
        Else If (maxFilesIndex<1)
-          showDelayedTooltip("Found no files or folders in the SLD`nThe files list is now empty.")
+          showDelayedTooltip("Found no files or folders in the SLD.`nThe files list is now empty.")
 
        If (abandonAll=1 || maxFilesIndex<1)
        {
@@ -90266,7 +90266,7 @@ ReverseListNow() {
 RandomizeListNow() {
     If (StrLen(filesFilter)>1)
     {
-       msgResult := msgBoxWrapper(appTitle ": Randomize files list", "You currently have a files list filter applied. To randomize the list, it will be deactivated.", 4, 0, "question")
+       msgResult := msgBoxWrapper(appTitle ": Randomize files list", "You currently have a files list filter applied. To randomize the list, the filter will be deactivated.", 4, 0, "question")
        If InStr(msgResult, "yes")
        {
           markedSelectFile := 0
@@ -90640,25 +90640,25 @@ calcImgSelection2bmp(boundLess, imgW, imgH, newW, newH, ByRef imgSelPx, ByRef im
 
 BtnHelpResizePanel() {
     friendly := (thumbsDisplaying=1) ? "" : "This tool applies the image actions utilizing the original file, not the viewport image data.`n`n"
-    msgBoxWrapper(appTitle ": HELP", friendly "In «Advanced mode» the support for color depths other than 24 and 32 bits is very limited. All images are converted to 24 bits per pixel, or to 32 bits, if an alpha channel is present. When saving images in formats that do not support an alpha channel, the window background color is used.`n`nUse «Simple mode» to better preserve color depths or work with images larger than 536 MPx or larger than 199000 px width or height [if the given file format allows it]. This mode supports 1-, 8-, 24-, 32-, 16- (UINT16), 48- (RGB16), 64- (RGBA16), 32- (FLOAT), 96- (RGBF) and 128- (RGBAF) bits images. High-dynamic range formats supported: .EXR, .HDR, .JXR, .HDP, .PFM and .TIFF.`n`nPlease also note, while there is full support for multi-frames/paged images [for WEBP, PDFs, GIFs and TIFFs] in the viewport... on file (re)save, resize or format conversions, only the first frame will be preserved.`n`nSome file formats have image dimensions limited by design. WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. When this panel is used to resize images, the resulted image dimensions maybe be capped to the format specific limits. For any format, including TIFF, PNG and JPEG, the limit is 13579 megapixels, even when the «Simple mode» is used.", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", friendly "In «Advanced mode» the support for color depths other than 24 and 32 bits is very limited. All images are converted to 24 bits per pixel, or to 32 bits, if an alpha channel is present. When saving images in formats that do not support an alpha channel, the window background color is used.`n`nUse «Simple mode» to better preserve color depths or work with images larger than 536 MPx or larger than 199000 px in width or height [if the given file format allows it]. This mode supports 1-, 8-, 24-, 32-, 16- (UINT16), 48- (RGB16), 64- (RGBA16), 32- (FLOAT), 96- (RGBF) and 128- (RGBAF) bit images. High-dynamic range formats supported: .EXR, .HDR, .JXR, .HDP, .PFM and .TIFF.`n`nPlease also note, while there is full support for multi-frame/paged images [for WEBP, PDFs, GIFs and TIFFs] in the viewport... on file (re)save, resize or format conversions, only the first frame will be preserved.`n`nSome file formats have image dimensions limited by design. The WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. When this panel is used to resize images, the resulting image dimensions may be capped to the format-specific limits. For any format, including TIFF, PNG and JPEG, the limit is 13579 megapixels, even when the «Simple mode» is used.", -1, 0, 0)
 }
 
 BtnHelpSimpleResizePanel() {
-    msgBoxWrapper(appTitle ": HELP", "This tool applies the image actions utilizing the original file, not the viewport image data. It can better preserve color depths and it works with images larger than 536 MPx, if the file format allows it. The tool relies on the FreeImage library and it supports 1-, 8-, 24-, 32-, 16- (UINT16), 48- (RGB16), 64- (RGBA16), 32- (FLOAT), 96- (RGBF) and 128- (RGBAF) bits images. High-dynamic range formats supported: .EXR, .HDR, .JXR, .HDP, .PFM and .TIFF.`n`nPlease also note, while there is full support for multi-frames/paged images [for WEBP, PDFs, GIFs and TIFFs] in the viewport... on file (re)save, resize or format conversions, only the first frame will be preserved.`n`nSome file formats have image dimensions limited by design. WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. When this panel is used to resize images, the resulted image dimensions maybe be capped to the format specific limits. For any format, including TIFF, PNG and JPEG, the limit is 13579 megapixels.", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "This tool applies the image actions utilizing the original file, not the viewport image data. It can better preserve color depths and it works with images larger than 536 MPx, if the file format allows it. The tool relies on the FreeImage library and it supports 1-, 8-, 24-, 32-, 16- (UINT16), 48- (RGB16), 64- (RGBA16), 32- (FLOAT), 96- (RGBF) and 128- (RGBAF) bit images. High-dynamic range formats supported: .EXR, .HDR, .JXR, .HDP, .PFM and .TIFF.`n`nPlease also note, while there is full support for multi-frame/paged images [for WEBP, PDFs, GIFs and TIFFs] in the viewport... on file (re)save, resize or format conversions, only the first frame will be preserved.`n`nSome file formats have image dimensions limited by design. The WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. When this panel is used to resize images, the resulting image dimensions may be capped to the format-specific limits. For any format, including TIFF, PNG and JPEG, the limit is 13579 megapixels.", -1, 0, 0)
 }
 
 OpenGitHub() {
   Static thisURL := "https://github.com/marius-sucan/Quick-Picto-Viewer"
   Try Run, % thisURL
   Catch wasError
-        msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the URL:`n" thisURL, 0, 0, "error")
+        msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred while opening the URL:`n" thisURL, 0, 0, "error")
 }
 
 OpenGitHubReleases() {
   Static thisURL := "https://github.com/marius-sucan/Quick-Picto-Viewer/releases/latest"
   Try Run, % thisURL
   Catch wasError
-        msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the URL:`n" thisURL, 0, 0, "error")
+        msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred while opening the URL:`n" thisURL, 0, 0, "error")
 }
 
 MenuDrawViewportHelpMap() {
@@ -90688,11 +90688,11 @@ drawViewportHelpMap() {
        Gdip_Draw%thisu%(2NDglPG, Penuha, thisX, thisY, thisW, thisH)
        thisFntSize := "Bold Center vCenter cFFeeEEee s" Round(OSDfontSize*0.77)
        thisStylu := " x" thisX " y" thisY
-       thisString := (EllipseSelectMode=2) ? "Image selected area`nFreeform shape" : "Image selected area"
+       thisString := (EllipseSelectMode=2) ? "Selected image area`nFreeform shape" : "Selected image area"
        ERR := Gdip_TextToGraphics(2NDglPG, thisString, thisFntSize thisStylu , "Arial", thisW, thisH)
        thisFntSize := "Bold cFFeeEEee s" Round(OSDfontSize*0.77)
        thisStylu := " x" OSDfontSize*2 " y" OSDfontSize*2
-       ERR := Gdip_TextToGraphics(2NDglPG, "Current selection type: " DefineVPselAreaMode() ".`n `nDouble click on it to open a menu.`n `nDouble click outside to drop the selection.`n `nHold Space and click to pan image.`n `nCtrl + Wheel Up/Down to zoom in/out anywhere.", thisFntSize thisStylu , "Arial", mainWidth - OSDfontSize*2, mainHeight - OSDfontSize*2)
+       ERR := Gdip_TextToGraphics(2NDglPG, "Current selection type: " DefineVPselAreaMode() ".`n `nDouble click on it to open a menu.`n `nDouble click outside to drop the selection.`n `nHold Space and click to pan the image.`n `nCtrl + Wheel Up/Down to zoom in/out anywhere.", thisFntSize thisStylu , "Arial", mainWidth - OSDfontSize*2, mainHeight - OSDfontSize*2)
        Gdip_DeletePen(Penuha)
        Gdip_DeleteBrush(BrushAa)
        Gdip_DeleteBrush(BrushBb)
@@ -90731,7 +90731,7 @@ drawViewportHelpMap() {
 
        thisFntSize := "Bold Center vCenter cFFeeEEee s" Round(OSDfontSize*0.77)
        thisStylu := " x" thisX " y" thisY
-       ERR := Gdip_TextToGraphics(2NDglPG, "Image panning area.`n`nDouble click in this area to change how the image is adapted to the viewport.`n`nShift + Left-click to create a new selection area.`n`nOne-finger swipe gestures allowed when nothing to pan - outside this rectangle they are always allowed.`n`nCtrl + Wheel Up/Down to zoom in/out anywhere", thisFntSize thisStylu , "Arial", thisW, thisH)
+       ERR := Gdip_TextToGraphics(2NDglPG, "Image panning area.`n`nDouble click in this area to change how the image is adapted to the viewport.`n`nShift + Left-click to create a new selection area.`n`nOne-finger swipe gestures are allowed when there is nothing to pan - outside this rectangle they are always allowed.`n`nCtrl + Wheel Up/Down to zoom in/out anywhere", thisFntSize thisStylu , "Arial", thisW, thisH)
 
        thisFntSize := "Bold Center vCenter cFFeeEEee s" Round(OSDfontSize*0.9)
        thisStylu := " x" thisX " y1"
@@ -90860,7 +90860,7 @@ PanelAboutWindow() {
     Gui, Add, Text, y+10 wp, Dedicated to people with really large image collections and slideshow needs.
     Gui, Add, Text, y+10 wp, This application contains code from various entities. You can find more details in the source code.
     Gui, Add, Text, y+10 wp, QPV relies on two open source libraries, which in turn also contain additional open source libraries:
-    Gui, Add, Link, y+10 wp, - a forked edition of <a href="https://github.com/marius-sucan/FreeImage-library">FreeImage</a> (%thisVersion%) that I maintain, it is used for loading exotic image formats. FreeImage is licensed under the GNU GPL v2.0`, and the FreeImage Public License (FIPL).`n- for image processing`, some functions rely on the <a href="https://github.com/opencv/opencv">OpenCV library</a>, distributed under the Apache 2.0 license.
+    Gui, Add, Link, y+10 wp, - a forked edition of <a href="https://github.com/marius-sucan/FreeImage-library">FreeImage</a> (%thisVersion%) that I maintain, used for loading exotic image formats. FreeImage is licensed under the GNU GPL v2.0`, and the FreeImage Public License (FIPL).`n- for image processing`, some functions rely on the <a href="https://github.com/opencv/opencv">OpenCV library</a>, distributed under the Apache 2.0 license.
 
     Gui, Add, Link, y+10 wp, To keep the development going, <a href="https://www.paypal.me/MariusSucan/10">please donate</a> or <a href="mailto:marius.sucan@gmail.com?subject=%appTitle% v%appVersion%">send me feedback</a>.
     Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid% gBtnOpenHelpWin, &Help
@@ -90913,11 +90913,11 @@ PanelHelpWindow(dummy:=0) {
     Gui, Add, Combobox, xp yp wp gUIgenericComboAction hwndhEditField vlistViewFilteru, \Files list|\Image view|\Image selection area|\Live editing|\Folder tree|\Painting mode|\Vector drawing|\Anywhere|\Panel|\Menu
     Gui, Add, Text, xp y+5 wp, The listed keyboard shortcuts are the defaults. This list does not reflect user customized shortcuts.
 
-    cmdHelp := "QPV can be invoked with command line arguments. Examples:`n`n1. Open a folder:`nqpv.exe ""fd=C:\example folder\tempus""`n`nAdd a pipe ""|"" after equal ""="" to NOT have images loaded recursively."
-    cmdHelp .= "`n`n2. Call an internal function:`nqpv.exe call_ToggleThumbsMode() ""fd=C:\folder\tempus""`n`nThis will index all the images in the given folder and switch to thumbnails mode.`n`nOnly functions that need no parameters can be invoked. If multiple call_ are used, only the last valid one will be considered."
+    cmdHelp := "QPV can be invoked with command line arguments. Examples:`n`n1. Open a folder:`nqpv.exe ""fd=C:\example folder\tempus""`n`nAdd a pipe ""|"" after the equals sign ""="" to NOT have images loaded recursively."
+    cmdHelp .= "`n`n2. Call an internal function:`nqpv.exe call_ToggleThumbsMode() ""fd=C:\folder\tempus""`n`nThis will index all the images in the given folder and switch to thumbnails mode.`n`nOnly functions that need no parameters can be invoked. If multiple call_ arguments are used, only the last valid one will be considered."
     cmdHelp .= "`n`nTo learn what functions you can call, check the Journal window in QPV. It names functions when opening panels or when errors occur. You can also enable debug mode, to gather more intel, or study the source code."
     cmdHelp .= "`n`n3. Specify user settings:`n`nqpv.exe set_IMGresizingMode=3 set_vpIMGrotation=45 ""C:\folder\this-image.png""`n"
-    cmdHelp .= "`nYou can find available user settings in the quick-picto-viewer.ini file or by right-clicking on controls in the panels.`n`nYou can pass up to 950 arguments`n`nPass /qpv-debug argument to have QPV send debug information to a Win32 Debug Viewer.`n`nIf one .SLD file or one folder is passed as argument, any other image file passed as argument is ignored."
+    cmdHelp .= "`nYou can find available user settings in the quick-picto-viewer.ini file or by right-clicking on controls in the panels.`n`nYou can pass up to 950 arguments.`n`nPass the /qpv-debug argument to have QPV send debug information to a Win32 Debug Viewer.`n`nIf one .SLD file or one folder is passed as an argument, any other image file passed as an argument is ignored."
 
     Gui, Tab, 3 
     GuiAddEdit("x+15 y+15 w" lstWid " r" rz " ReadOnly", cmdHelp, "Command line options for QPV")
@@ -91015,7 +91015,7 @@ PanelsCheckFileExists() {
 PanelResolutionSorting() {
    If AnyWindowOpen
    {
-      addJournalEntry(A_ThisFunc "(): ERROR: cannot open panel. Another panel is opened: " AnyWindowOpen "=" prevOpenedWindow[2])
+      addJournalEntry(A_ThisFunc "(): ERROR: cannot open panel. Another panel is open: " AnyWindowOpen "=" prevOpenedWindow[2])
       Return
    }
 
@@ -91041,13 +91041,13 @@ PanelHistogramSorting() {
 
    widthu := (PrefsLargeFonts=1) ? 650 : 450
    fakeWinCreator(45, A_ThisFunc, 1)
-   msgResult := msgBoxWrapper("panelu|Choose image histogram sort mode: " appTitle, "Each image file will be read to extract its histogram data.`n`nThis operation can take a lot of time with many files.", "&Sort list|&Resolution|&Cancel", 1, "image-file", "&Reverse order", 0, "Average`f`fMedian`fPeak range`fMinimum range`f`Range`fMode`fMinimum`fStandard deviation", nullEdit, nullEdit, 2, widthu)
+   msgResult := msgBoxWrapper("panelu|Choose image histogram sort mode: " appTitle, "Each image file will be read to extract its histogram data.`n`nThis operation can take a lot of time with many files.", "&Sort list|&Resolution|&Cancel", 1, "image-file", "&Reverse order", 0, "Average`f`fMedian`fPeak range`fMinimum range`fRange`fMode`fMinimum`fStandard deviation", nullEdit, nullEdit, 2, widthu)
    If InStr(msgResult.btn, "sort")
    {
       good2go := 0
       If !hasAskedSort
       {
-         msgResultu := msgBoxWrapper(appTitle ": Sort list", "Each file will be read to determine its histogram main points.`n`nAre you sure you want to sort the list in this mode? It can take a lot of time...", 4, 0, "question")
+         msgResultu := msgBoxWrapper(appTitle ": Sort list", "Each file will be read to determine its main histogram points.`n`nAre you sure you want to sort the list in this mode? It can take a lot of time...", 4, 0, "question")
          If InStr(msgResultu, "yes")
             hasAskedSort := 1
       } Else good2go := 1
@@ -91282,7 +91282,7 @@ PanelFindDupes(dummy:=0) {
     fingEdt := (PrefsLargeFonts=1) ? 70 : 50
     thumbu := (PrefsLargeFonts=1) ? 90 : 70
     Gui, Tab, 2
-    Gui, Add, Text, x+15 y+15 w%txtWid% Section vbtnFldr6, Choose what image hashing algorithm to use to compare images and configure what sections of the hashes to compare.
+    Gui, Add, Text, x+15 y+15 w%txtWid% Section vbtnFldr6, Choose which image hashing algorithm to use to compare images and configure which sections of the hashes to compare.
     GuiAddDropDownList("xs y+10 w" fingWid " AltSubmit Section gupdateUIdupesPanel Choose" userFindDupesFilterHamDist " vuserFindDupesFilterHamDist", "Ignore|dHash 8x8|pHash DCT 32x32|lHash 8x8", "Image hash type")
     GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit1 veditF11", hamDistLBorderCrop, "Image hash crop left.")
     Gui, Add, UpDown, vhamDistLBorderCrop gupdateUIdupesPanel Range0-9, % hamDistLBorderCrop
@@ -91295,9 +91295,9 @@ PanelFindDupes(dummy:=0) {
     GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit2 veditF7", userFindDupesHamDistLvl, "Image hash difference threshold")
     Gui, Add, UpDown, vuserFindDupesHamDistLvl gupdateUIdupesPanel Range0-15, % userFindDupesHamDistLvl
     GuiAddButton("x+5 w" sml " hp gBtnHelpDupesHashes", " ?", "Help")
-    Gui, Add, Checkbox, xs y+15 Checked%findFlippedDupes% vfindFlippedDupes, Identify images horizontally flipped
+    Gui, Add, Checkbox, xs y+15 Checked%findFlippedDupes% vfindFlippedDupes, Identify horizontally flipped images
     Gui, Add, Checkbox, xp y+15 Checked%findInvertedDupes% vfindInvertedDupes, Attempt to identify color inverted images
-    Gui, Add, Checkbox, xs y+15 Checked%BreakDupesGroups%  vBreakDupesGroups, Break the groups based on hamming distance [similarity]
+    Gui, Add, Checkbox, xs y+15 Checked%BreakDupesGroups%  vBreakDupesGroups, Break the groups based on Hamming distance [similarity]
     Gui, Add, Checkbox, xp y+15 Checked%PerformMSDonDupes% gupdateUIdupesPanel vPerformMSDonDupes, Filter results using Mean-Squared Difference [32x32]
     GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit3 veditFr", userFindDupesMSElvl, "MSD hash threshold")
     Gui, Add, UpDown, vuserFindDupesMSElvl gupdateUIdupesPanel Range0-400, % userFindDupesMSElvl
@@ -91310,12 +91310,12 @@ PanelFindDupes(dummy:=0) {
     Gui, Add, Checkbox, xp y+15 Checked%dupesApplyBlur% vdupesApplyBlur, Blur images by 4x4 to weed out artefacts
 
     Gui, Add, Text, xs y+15, For these to take effect, refresh only the image hashes:
-    Gui, Add, Checkbox, xs+15 y+15 Checked%userpHashMode% vuserpHashMode, pHashes based on averages, instead of the median values
+    Gui, Add, Checkbox, xs+15 y+15 Checked%userpHashMode% vuserpHashMode, pHashes based on averages instead of medians
     Gui, Add, Text, xp y+20 hp +0x200, Compress gray levels by a factor of
     GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit1 veditFc", graylevelCompressor, "Gray levels compression factor")
     Gui, Add, UpDown, vgraylevelCompressor gupdateUIdupesPanel Range1-9, % graylevelCompressor
     Gui, Add, Button, xs y+15 h%thisBtnHeight% gBtnPurgeCachedSQLdata, Pur&ge cached data
-    Gui, Add, Button, x+5 hp gBtnCollectDupesData, Collect image pi&xels data
+    Gui, Add, Button, x+5 hp gBtnCollectDupesData, Collect image pi&xel data
     Gui, Add, Button, x+5 hp gPanelCachesOverview, &Overview
 
     Gui, Tab, 4
@@ -91529,7 +91529,7 @@ BTNfindDupesNow() {
    If (AnyWindowOpen!=49)
       Return
 
-   If askAboutFileSave(" and the identification of duplicated images will begin")
+   If askAboutFileSave(" and the identification of duplicate images will begin")
       Return
 
    columnus := ""
@@ -91667,7 +91667,7 @@ BTNfindDupesNow() {
    If (StrLen(theseCols)<3)
    {
       InitialFindDupesSettingsPanel(0)
-      Return msgBeepTimer("WARNING: Insufficient properties selected by which to identify duplicates.")
+      Return msgBeepTimer("WARNING: Insufficient properties are selected to identify duplicates.")
    }
 
    If (dupesPixInitGood!=1)
@@ -91676,7 +91676,7 @@ BTNfindDupesNow() {
    If (dupesPixInitGood!=1)
    {
       InitialFindDupesSettingsPanel(0)
-      msgBoxWrapper(appTitle ": ERROR", "Failed to initialize image duplicates detection system. Check the session journal under the Help menu.", 0, 0, "error")
+      msgBoxWrapper(appTitle ": ERROR", "Failed to initialize the image duplicates detection system. Check the session journal under the Help menu.", 0, 0, "error")
       Return
    }
 
@@ -91717,7 +91717,7 @@ BtnHelpDupesHashes() {
 }
 
 BTNhelpFindDupes() {
-   msgBoxWrapper(appTitle ": HELP", "This panel offers you the possibility to identify duplicate images based on the collected file and image properties, fingerprints and histogram data points.`n`nThe functionality provided in this panel relies on collected data, please ensure you allow " appTitle " to scan the image files.`n`nFor optimal results in «Custom mode», activate «Aspect ratio (W/H)», set «Matching precision» to «Close», and choose «dHash 8x8» with a threshold of 3 in the «Image hashes» tab.`n`nA low threshold for the hashes means stricter matching. Increase it for looser matches. The same applies for MSD.`n`nBefore hashing, images are normalized to 9x8 and 32x32 sizes, grayscale. Optionally, a 4x4 blurring filter can be applied as well, but it may lead to an increase in false positives.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "This panel lets you identify duplicate images based on the collected file and image properties, fingerprints and histogram data points.`n`nThe functionality provided in this panel relies on collected data; please ensure you allow " appTitle " to scan the image files.`n`nFor optimal results in «Custom mode», activate «Aspect ratio (W/H)», set «Matching precision» to «Close», and choose «dHash 8x8» with a threshold of 3 in the «Image hashes» tab.`n`nA low threshold for the hashes means stricter matching. Increase it for looser matches. The same applies to MSD.`n`nBefore hashing, images are normalized to 9x8 and 32x32 sizes, grayscale. Optionally, a 4x4 blurring filter can be applied as well, but it may lead to an increase in false positives.", -1, 0, 0)
 }
 
 GuiCtrlGet(varu) {
@@ -91745,10 +91745,10 @@ PanelPurgeCachedSQLdata(dummy:=0) {
    {
       extraFilter := extractSQLqueryFromFilter()
       If (extraFilter && msgResult.list!=8)
-         msgInfos := "`n`nThe purge will occur only for the files matching the current files list filter. To purge all the cached data, deactivate current filter."
+         msgInfos := "`n`nThe purge will occur only for the files matching the current files list filter. To purge all the cached data, deactivate the current filter."
  
-      dtl := (msgResult.list!=8) ? "`n`nThis data is used for sorting the files list much faster, identify image duplicates or to generate files list statistics." : ""
-      msgResultu := msgBoxWrapper(appTitle ": Purge cached data", "Please confirm you want to purge selected cached data from the database." dtl msgInfos, 4, 0, "question")
+      dtl := (msgResult.list!=8) ? "`n`nThis data is used to sort the files list much faster, to identify image duplicates or to generate files list statistics." : ""
+      msgResultu := msgBoxWrapper(appTitle ": Purge cached data", "Please confirm you want to purge the selected cached data from the database." dtl msgInfos, 4, 0, "question")
       If InStr(msgResultu, "yes")
       {
          If (msgResult.list=1)
@@ -91965,7 +91965,7 @@ PurgeCachedDataModifiedFiles() {
 PurgeCachedDataSelectedFiles() {
    getSelectedFiles(0, 1)
    If !markedSelectFile
-      Return msgBeepTimer("WARNING: No files are currently selected to perform given operation")
+      Return msgBeepTimer("WARNING: No files are currently selected to perform this operation")
 
    backCurrentSLD := CurrentSLD
    CurrentSLD := ""
@@ -92226,15 +92226,15 @@ BtnPerformJpegOp(modus:=0) {
           PopulateImagesIndexStatsInfos("kill")
        }
 
-       showTOOLtip("JPEG operation completed succesfully")
+       showTOOLtip("JPEG operation completed successfully")
        RefreshImageFile()
     } Else
     {
        SoundBeep, 300, 100
        If (modus!="extern")
-          msgBoxWrapper(appTitle ": ERROR", "The JPEG operation has failed. The file might not be a JPEG as the file extension suggests.", 0, 0, "error")
+          msgBoxWrapper(appTitle ": ERROR", "The JPEG operation has failed. The file might not be a JPEG, despite its file extension.", 0, 0, "error")
        Else
-          showTOOLtip("ERROR: The JPEG operation has failed. The file might not be a JPEG as the file extension suggests.")
+          showTOOLtip("ERROR: The JPEG operation has failed. The file might not be a JPEG, despite its file extension.")
     }
 
     lastInvoked := A_TickCount
@@ -92337,7 +92337,7 @@ batchJpegLLoperations() {
       someErrors .= "`nSkipped files: " groupDigits(skippedFiles)
 
    If (abandonAll=1)
-      msgBeepTimer("Operation aborted. " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files were processed until now" someErrors)
+      msgBeepTimer("Operation aborted. " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files were processed so far" someErrors)
    Else
       msgBeepTimer(groupDigits(countFilez) " out of " groupDigits(countTFilez) " selected JPEG files were processed" someErrors, 900)
 
@@ -92444,7 +92444,7 @@ coreColorsAdjusterWindow(modus:=0) {
        ToggleEditImgSelection()
 
     setImageLoading()
-    showTOOLtip("Opening colors adjustments panel, please wait")
+    showTOOLtip("Opening colour adjustments panel, please wait")
     RegAction(0, "imgColorsFXopacity",, 2, 3, 255)
     ForceNoColorMatrix := 0
     If !usrColorDepth
@@ -92488,7 +92488,7 @@ coreColorsAdjusterWindow(modus:=0) {
     thisW := (idu=10) ? txtWid : slide3wid
     Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Color matrix|More adjustments%moru%
     Gui, Tab, 1 ; general
-    GuiAddDropDownList("x+15 y+15 Section w" thisW " gUpdateUIadjustVPcolors AltSubmit Choose" UIimgFxMode " vUIimgFxMode", "Original image colors|Personalized colors|Grayscale|Red channel|Green channel|Blue channel|Alpha channel|Inverted colors|Sepia", "Colors mode")
+    GuiAddDropDownList("x+15 y+15 Section w" thisW " gUpdateUIadjustVPcolors AltSubmit Choose" UIimgFxMode " vUIimgFxMode", "Original image colors|Personalized colors|Grayscale|Red channel|Green channel|Blue channel|Alpha channel|Inverted colors|Sepia", "Colour mode")
     If (idu!=10)
        Gui, Add, Button, x+5 hp wp gPanelAutoColors vbtn1, A&uto-adjust panel
 
@@ -92514,7 +92514,7 @@ coreColorsAdjusterWindow(modus:=0) {
     }
 
     Gui, Tab, 2 ; more
-    GuiAddDropDownList("x+15 y+15 Section w" slide3Wid " gUpdateUIadjustVPcolors AltSubmit Choose" specialColorFXmode " vspecialColorFXmode", "None|Brightness / Contrast|Hue / Saturation / Lightness|Levels adjust|Color tint|Colors balance|Color curve per channel", "Additional colors adjustments")
+    GuiAddDropDownList("x+15 y+15 Section w" slide3Wid " gUpdateUIadjustVPcolors AltSubmit Choose" specialColorFXmode " vspecialColorFXmode", "None|Brightness / Contrast|Hue / Saturation / Lightness|Levels adjust|Color tint|Colour balance|Color curve per channel", "Additional colour adjustments")
     If (idu=10)
        GuiAddSlider("userImgChannelAlvl", 1.0,30.0, "1.0f", "Alpha multiplier: $€x", "UpdateUIadjustVPcolors", 1, "x+5 wp hp")
     Else
@@ -92720,7 +92720,7 @@ PanelAdjustColorsSimpleWindow() {
     GuiAddSlider("imgColorsFXopacity", 3,255, 255, "Effects opacity", "UpdateUIsimpleAdjustColors", 1, "xs y+10 w" slide3wid " hp")
     Gui, Add, Checkbox, x+5 hp -wrap gUpdateUIsimpleAdjustColors Checked%userImgAdjustInvertArea% vuserImgAdjustInvertArea, &Invert selection area
     Gui, Add, Checkbox, xs y+5 hp -wrap gUpdateUIsimpleAdjustColors Checked%userImgAdjustNoClamp% vuserImgAdjustNoClamp +hwndhTemp, &Avoid clamping (slower)
-    ToolTip2ctrl(hTemp, "When possible, the pixel values will not be clamped internally when calculating the different`ncolor filters. The final output will still be an RGB image with values between 0 to 255.`nThis mode is much more computationally intense.")
+    ToolTip2ctrl(hTemp, "When possible, the pixel values will not be clamped internally when calculating the different`ncolor filters. The final output will still be an RGB image with values between 0 and 255.`nThis mode is much more computationally intensive.")
 
     Gui, Tab, 2 ; colors
     Gui, Add, Text, x+15 y+15 Section h%thisBtnHeight%, Transform the colors of the image.
@@ -92737,7 +92737,7 @@ PanelAdjustColorsSimpleWindow() {
     GuiAddSlider("userImgAdjustOffA", -65535,65535, 0, "A offset", "UpdateUIsimpleAdjustColors", 2, "x+5 wp hp")
     Gui, Add, Checkbox, xs y+5 wp+5 hp -wrap gUpdateUIsimpleAdjustColors Checked%userImgAdjustInvertColors% vuserImgAdjustInvertColors, &Invert colors
     Gui, Tab, 3 ; threshold
-    Gui, Add, Text, x+15 y+15 Section w%slideWid%, Transform any image channel into two-tones based on the defined intensity thresholds.
+    Gui, Add, Text, x+15 y+15 Section w%slideWid%, Transform any image channel into two tones based on the defined intensity thresholds.
     GuiAddSlider("userImgAdjustThreR", -1,65535, -1, "Red", "UpdateUIsimpleAdjustColors", 1, "xs y+10 w" slideWid " h" thisBtnHeight)
     GuiAddSlider("userImgAdjustThreG", -1,65535, -1, "Green", "UpdateUIsimpleAdjustColors", 1, "xs y+5 wp hp")
     GuiAddSlider("userImgAdjustThreB", -1,65535, -1, "Blue", "UpdateUIsimpleAdjustColors", 1, "xs y+5 wp hp")
@@ -92751,14 +92751,14 @@ PanelAdjustColorsSimpleWindow() {
     } Else If (filesElected>1)
     {
        Gui, Tab, 4 ; threshold
-       msgFriendly := groupDigits(filesElected) " files are selected for processing. The entirety of the canvas of the selected images will be processed, without an alpha mask."
+       msgFriendly := groupDigits(filesElected) " files are selected for processing. The entire canvas of the selected images will be processed, without an alpha mask."
        Gui, Font, Bold
        Gui, Add, Text, x+15 y+15 w%slideWid%, % msgFriendly
        Gui, Font, Normal
        Gui, Add, Text, xs y+10 w%txtWid%, Files in unsupported write formats will be skipped.
 
-       Gui, Add, Checkbox, xs y+10 Checked%userImgAdjustConvertDepth% vuserImgAdjustConvertDepth +hwndhTemp, &Convert unsupported color depths to 24- or 32-bits
-       ToolTip2ctrl(hTemp, "This tool works only with 24 or 32 bits image color formats.")
+       Gui, Add, Checkbox, xs y+10 Checked%userImgAdjustConvertDepth% vuserImgAdjustConvertDepth +hwndhTemp, &Convert unsupported color depths to 24 or 32 bits
+       ToolTip2ctrl(hTemp, "This tool works only with 24- or 32-bit image colour formats.")
        Gui, Add, Checkbox, xs y+10 Checked%SimpleOperationsFlipV% vSimpleOperationsFlipV, Flip vertical
        Gui, Add, Checkbox, x+10 hp Checked%SimpleOperationsFlipH% vSimpleOperationsFlipH, Horizontal
 
@@ -92825,7 +92825,7 @@ BtnBatchSimpleColorAdjuster() {
 
    filesElected := getSelectedFiles(0, 1)
    If (filesElected<3)
-      Return msgBeepTimer("WARNING: Insufficient files selected to batch process.")
+      Return msgBeepTimer("WARNING: Insufficient files are selected for batch processing.")
 
    RegAction(1, "ResizeDestFolder",, 6)
    RegAction(1, "ResizeUseDestDir",, 1)
@@ -93369,7 +93369,7 @@ PanelFileFormatConverter() {
 }
 
 BTNhelpConvertImgFmt() {
-    msgBoxWrapper(appTitle ": HELP", "On file format conversion, QPV will attempt to preserve the color depth of the images. If it is not possible, the images will be converted to 24 bits or 32 bits or to the color depth supported by the destination format.`n`nFiles already in the destination format, as their content tells, are not converted again: they are skipped, or copied or moved unchanged to the destination folder when one is used.`n`nMultipage and animated files: with «Convert multipage files to the multipage file format selected», GIF, WEBP, JXL, TIF and PDF files get all their pages or frames, and the frames keep their delays. Otherwise, «Extract pages/frames on conversion» saves each page as a file of its own: «name_1», «name_2» and so on. Without these options, only the first page is converted. An original file is removed only when all its pages were converted.`n`nPDF files are made as «Convert active file to PDF» makes them: each page is the size of its image, JPEG files go in as they are, and the other images are stored as JPEG at the chosen quality. PDF and SVG files are rendered at the resolutions set above.`n`nFailures can occur if there is insufficient system memory or... if file access is denied when attempting to write files.`n`nThe image quality option applies only for the JPG, JNG, WEBP, JXL, JXR, JP2 and PDF file formats. The options of the destination format are shown under «Output image» and «Format options»; they also apply when images are saved from the «Save image» panel.`n`nSome file formats have image dimensions limited by design. WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. Therefore, on format conversions, the resulted image dimensions may reflect the format specific limits.`n`nThis feature relies on the FreeImage library.", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "On file format conversion, QPV will attempt to preserve the color depth of the images. If it is not possible, the images will be converted to 24 bits or 32 bits or to the color depth supported by the destination format.`n`nFiles already in the destination format, as their content tells, are not converted again: they are skipped, or copied or moved unchanged to the destination folder when one is used.`n`nMultipage and animated files: with «Convert multipage files to the multipage file format selected», GIF, WEBP, JXL, TIF and PDF files get all their pages or frames, and the frames keep their delays. Otherwise, «Extract pages/frames on conversion» saves each page as a file of its own: «name_1», «name_2» and so on. Without these options, only the first page is converted. An original file is removed only when all its pages were converted.`n`nPDF files are made as «Convert active file to PDF» makes them: each page is the size of its image, JPEG files go in as they are, and the other images are stored as JPEG at the chosen quality. PDF and SVG files are rendered at the resolutions set above.`n`nFailures can occur if there is insufficient system memory or... if file access is denied when attempting to write files.`n`nThe image quality option applies only to the JPG, JNG, WEBP, JXL, JXR, JP2 and PDF file formats. The options of the destination format are shown under «Output image» and «Format options»; they also apply when images are saved from the «Save image» panel.`n`nSome file formats have image dimensions limited by design. The WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. Therefore, on format conversions, the resulting image dimensions may reflect the format-specific limits.`n`nThis feature relies on the FreeImage library.", -1, 0, 0)
 }
 
 TglKeepOriginals() {
@@ -93470,9 +93470,9 @@ PanelAdjustImageCanvasSize() {
        If (mgpx>536.7)
        {
           If (editingSelectionNow=1)
-             msgResult := msgBoxWrapper(appTitle ": WARNING", "The image currently opened has " mgpx " megapixels. Image editing is limited to 536 megapixels. The image can be cropped based on the selection area.`n`nDo you want to crop the image to the selected area?", "&Crop to selection|&No", 1, "exclamation")
+             msgResult := msgBoxWrapper(appTitle ": WARNING", "The currently opened image has " mgpx " megapixels. Image editing is limited to 536 megapixels. The image can be cropped based on the selection area.`n`nDo you want to crop the image to the selected area?", "&Crop to selection|&No", 1, "exclamation")
           Else
-             msgResult := msgBoxWrapper(appTitle ": WARNING", "The image currently opened has " mgpx " megapixels. Image editing is limited to 536 megapixels. The image can be resized or cropped to a selection area.`n`nDo you want to create a selection area?", "&Create selection|&No", 1, "exclamation")
+             msgResult := msgBoxWrapper(appTitle ": WARNING", "The currently opened image has " mgpx " megapixels. Image editing is limited to 536 megapixels. The image can be resized or cropped to a selection area.`n`nDo you want to create a selection area?", "&Create selection|&No", 1, "exclamation")
 
           If InStr(msgResult, "crop")
           {
@@ -93510,7 +93510,7 @@ PanelAdjustImageCanvasSize() {
     Gui, Add, Checkbox, xs+15 y+5 hp gTglRszKeepAratio Checked%ResizeKeepAratio% vResizeKeepAratio, Keep aspect ratio
     Gui, Add, Checkbox, x+5 hp Checked%adjustCanvasCentered% vadjustCanvasCentered, Centered image
 
-    Gui, Add, Text, xs y+15, Resulted dimensions and background color:
+    Gui, Add, Text, xs y+15, Resulting dimensions and background color:
     GuiAddEdit("xs+15 y+5 w" editWid " r1 Disabled -wrap vResultEditWidth", oImgW, "Calculated width")
     GuiAddEdit("x+5 wp r1 Disabled -wrap vResultEditHeight", oImgH, "Calculated height")
     Gui, Add, Text, x+5 hp wp+45 +0x200 vinfoLine -wrap, -
@@ -93639,14 +93639,14 @@ BTNadjustCanvasAction() {
     If (ResultEditWidth=oImgW && ResultEditHeight=oImgH)
     {
        SoundBeep , 300, 100
-       msgBoxWrapper(appTitle ": WARNING", "The provided image dimensions are equal with the initial ones. No operation to perform.", 0, 0, "exclamation")
+       msgBoxWrapper(appTitle ": WARNING", "The provided image dimensions are equal to the initial ones. No operation to perform.", 0, 0, "exclamation")
        Return
     }
 
     If isImgSizeTooLarge(ResultEditWidth, ResultEditHeight)
     {
        SoundBeep, 300, 100
-       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image dimensions exceed the maximum limits. Width and height cannot exceed 199000 pixels, and total image size cannnot exceed 536 MPx.`n`nWould you like to adapt the dimensions and continue?", "&Yes|&No", 1, "exclamation")
+       msgResult := msgBoxWrapper(appTitle ": WARNING", "The image dimensions exceed the maximum limits. Width and height cannot exceed 199000 pixels, and total image size cannot exceed 536 MPx.`n`nWould you like to adapt the dimensions and continue?", "&Yes|&No", 1, "exclamation")
        If (msgResult="Yes")
           capIMGdimensionsGDIPlimits(ResultEditWidth, ResultEditHeight)
        Else
@@ -94022,7 +94022,7 @@ batchAdvIMGresizer(desiredW, desiredH, isPercntg, dontAsk:=0) {
    ForceRefreshNowThumbsList()
    dummyTimerDelayiedImageDisplay(100)
    If (abandonAll=1)
-      msgBeepTimer("Operation aborted. " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files were processed until now" someErrors)
+      msgBeepTimer("Operation aborted. " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files were processed so far" someErrors)
    Else
       msgBeepTimer("Finished processing " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files" someErrors, 900)
 
@@ -94079,14 +94079,14 @@ filesListApplyColors() {
        imgFxMode := prevFXmode
 
     If (imgFxMode=1)
-       Return msgBeepTimer("No viewport color adjustments to be applied on image`n`nPress F to cycle through mode")
+       Return msgBeepTimer("No viewport colour adjustments to apply to the image`n`nPress F to cycle through the modes")
 
    filesElected := getSelectedFiles(0, 1)
    If (filesElected>1 && imgFxMode>1)
    {
       If (filesElected>200)
       {
-         msgResult := msgBoxWrapper(appTitle ": Apply colors", "You have selected " groupDigits(filesElected) " images. The images in supported write formats will be processed accordingly to the color adjustments of the viewport. The original files will be OVERWRITTEN. Do you want to continue?", 4, 0, "question")
+         msgResult := msgBoxWrapper(appTitle ": Apply colors", "You have selected " groupDigits(filesElected) " images. The images in supported write formats will be processed according to the colour adjustments of the viewport. The original files will be OVERWRITTEN. Do you want to continue?", 4, 0, "question")
          If !InStr(msgResult, "yes")
             Return
       }
@@ -94132,7 +94132,7 @@ filesListApplyColors() {
                PopulateImagesIndexStatsInfos("kill")
             }
 
-            showTOOLtip("Viewport colour effects applied on the image:`n" OutFileName "`n" OutDir "\")
+            showTOOLtip("Viewport colour effects applied to the image:`n" OutFileName "`n" OutDir "\")
          }
       }
    }
@@ -94651,7 +94651,7 @@ TglRszApplyEffects() {
       If (usrColorDepth>1)
          infoColorDepth := "`nSimulated color depth: " defineColorDepth()
       If (imgFxMode>1)
-         infoColors := "`nColors display mode:`n" DefineFXmodes() " [" currIMGdetails.PixelFormat "]"
+         infoColors := "`nColor display mode:`n" DefineFXmodes() " [" currIMGdetails.PixelFormat "]"
  
       entireString := infoMirroring infoColors infoColorDepth
       entireString := (entireString) ?  "Effects currently activated:`n" entireString : "No effects currently activated."
@@ -94707,7 +94707,7 @@ invokePanelStaticFoldersContextMenu() {
    If (SLDtypeLoaded=3)
       kMenu("PanelStaticMenu", "Add", "&Count selected files", "SqlWrapPopulateStaticFolderzList")
    Else
-      kMenu("PanelStaticMenu", "Add", "&Count files per folders", "countAllFilesPerStaticFolders")
+      kMenu("PanelStaticMenu", "Add", "&Count files per folder", "countAllFilesPerStaticFolders")
 
    If total
    {
@@ -94893,15 +94893,15 @@ invokePanelReviewSelContextMenu() {
 }
 
 BtnHelpStaticFoldersPanel() {
-   msgBoxWrapper(appTitle ": HELP", "This panel lists the folders where the indexed files are located; selected and total files are counted per folder. It is useful to:`n `n- update / rescan folders selectively, in order to avoid entire rescans`n `n- facilitate management of large amounts of files`n `n- identify folders with few or many files`n `n- identify per folder missing files, already seen images or favourited images [if these were selected using the appropriate tools before opening this panel]`n `nFolders marked with (*) are changed since the last scan, based on folder modified date. Right-click on listed entries for more options.`n `nWhen you choose to «Erase files from the index», the files indexed pertaining to the selected folder will be removed ONLY from the index, NOT from the disk.`n`nThe folders can be filtered by selected files (:), percentage (*), files on disk (!), folder size ($), diff (#) or files indexed (?) by typing something like: *>200 or ?<300.`n`nWhen rescanning a missing or inaccessible folder, QPV will remove the image files from the list of that folder.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "This panel lists the folders where the indexed files are located; selected and total files are counted per folder. It is useful to:`n `n- update / rescan folders selectively, in order to avoid entire rescans`n `n- facilitate management of large amounts of files`n `n- identify folders with few or many files`n `n- identify missing files, already seen images or favourited images per folder [if these were selected using the appropriate tools before opening this panel]`n `nFolders marked with (*) have changed since the last scan, based on folder modified date. Right-click on listed entries for more options.`n `nWhen you choose to «Erase files from the index», the indexed files pertaining to the selected folder will be removed ONLY from the index, NOT from the disk.`n`nThe folders can be filtered by selected files (:), percentage (*), files on disk (!), folder size ($), diff (#) or files indexed (?) by typing something like: *>200 or ?<300.`n`nWhen rescanning a missing or inaccessible folder, QPV will remove the image files of that folder from the list.", -1, 0, 0)
 }
 
 BtnHelpDynaFoldersPanel() {
-   msgBoxWrapper(appTitle ": HELP", "This panel lists the seed folders: the folders from which the files list index is generated. An «R» in the (?) column marks a folder scanned with its subfolders; the others are scanned for the files placed directly in them. A seed folder placed inside one scanned with its subfolders is dropped from the list.`n `n- «Copy list» copies the seed folders as text to the clipboard. «Paste list» adds the folder paths found in the clipboard to the list; their files are indexed after a rescan. Dropping folders from Explorer on the list is also supported.`n `n- «Remove» takes the folder out of the list, this may also remove the files indexed from the files list.`n`nRight-click a folder for more options.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "This panel lists the seed folders: the folders from which the files list index is generated. An «R» in the (?) column marks a folder scanned with its subfolders; the others are scanned for the files placed directly in them. A seed folder placed inside one scanned with its subfolders is dropped from the list.`n `n- «Copy list» copies the seed folders as text to the clipboard. «Paste list» adds the folder paths found in the clipboard to the list; their files are indexed after a rescan. Dropping folders from Explorer onto the list is also supported.`n `n- «Remove» takes the folder out of the list; this may also remove its indexed files from the files list.`n`nRight-click a folder for more options.", -1, 0, 0)
 }
 
 BtnHelpReviewPanel() {
-   msgBoxWrapper(appTitle ": HELP", "This panel is meant to help in scenarios where automatically selected files must be filtered out, eg., select already seen images or favourited images. It offers options to help users manage and filter the selected files.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "This panel is meant to help in scenarios where automatically selected files must be filtered out, e.g., select already seen images or favourited images. It offers options to help users manage and filter the selected files.", -1, 0, 0)
 }
 
 UIlvFilterEraseStaticPanel() {
@@ -94937,7 +94937,7 @@ PanelKeywordsDetector() {
     btnWid3 := (PrefsLargeFonts=1) ? btnWid + 40 : btnWid + 30
     btnWid4 := (PrefsLargeFonts=1) ? 70 : 60
     sml := (PrefsLargeFonts=1) ? 120 : 90
-    Gui, Add, Text, x15 y15 Section, This panel can help identify most used keywords in the indexed files list.
+    Gui, Add, Text, x15 y15 Section, This panel can help identify the most used keywords in the indexed files list.
     sml := (PrefsLargeFonts=1) ? 70 : 55
     editWid := lstWid - sml - 53
     hLVmainu := GuiAddListView("xs y+5 w" lstWid " +LV0x10000 +LV0x400 r" uLVr " Grid +multi guiLVkeywordsListResponder vLViewOthers", "Keywords|Files|`%|#", "Identified keywords")
@@ -95285,7 +95285,7 @@ GenerateKeywordsListNow(modus, ByRef abandonAll) {
 
 PanelStaticFolderzManager() {
     Global LViewOthers, listViewFilteru
-    If askAboutFileSave(" if any action will be performed in the invoked panel")
+    If askAboutFileSave(" if any action is performed in the invoked panel")
        Return
 
     If (StrLen(mustOpenStartFolder)>1)
@@ -95476,7 +95476,7 @@ BtnDoMultiUndoFileActs() {
     Gui, SettingsGUIA: Submit, NoHide
     isOkay := (markedSelectFile>1) ? 1 : 0
     If (UserUndoMultiDesiredOperation=2 && isOkay=0)
-       Return msgBeepTimer("WARNING: There are no files selected. Use the other drop-down option`nor the «Undo for active file» button option.")
+       Return msgBeepTimer("WARNING: There are no files selected. Use the other drop-down option`nor the «Undo for active file only» button.")
 
     RegAction(1, "userUndoMustDoOverwrite")
     RegAction(1, "userUndoDeleteNonIdenticalCopy")
@@ -95521,7 +95521,7 @@ PanelFileUndoHistory() {
     listViewUndoActsFilteru := ""
     edithu := lstWid - btnWid - 35
     Gui, Add, Text, x15 y15 w%lstWid%, This panel lists the history of rename, move and/or copy file actions.
-    hLVmainu := GuiAddListView("+LV0x10000 +LV0x400 +ReadOnly -Multi -WantF2 y+10 w" lstWid " AltSubmit Count" p " guiLVundoFileActsResponder r" uLVr " Grid vLViewOthers", "Type|Initial full path|Resulted path|Date and time|File overwritten|Safe to undo|#", "File actions history")
+    hLVmainu := GuiAddListView("+LV0x10000 +LV0x400 +ReadOnly -Multi -WantF2 y+10 w" lstWid " AltSubmit Count" p " guiLVundoFileActsResponder r" uLVr " Grid vLViewOthers", "Type|Initial full path|Resulting path|Date and time|File overwritten|Safe to undo|#", "File actions history")
     hEditField := GuiAddEdit("xs y+10 w" edithu " -multi gUIeditsGenericAllowCtrlBksp vlistViewUndoActsFilteru", listViewUndoActsFilteru, "String filter")
     Gui, Add, Button, x+1 hp w%btnWid% gPopulateFileActsHistory, &Apply
     btnWid2 := (PrefsLargeFonts=1) ? 45 : 35
@@ -95533,7 +95533,7 @@ PanelFileUndoHistory() {
     Gui, Add, Button, x+5 hp w%btnWid% gBtnHelpUndoFiles, &Help
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, C&lose
     Gui, Add, Text, xs y+10 vinfoLine w%lstWid% +0x200, Listing items`, please wait . . .
-    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Files actions history: " appTitle)
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "File actions history: " appTitle)
     Sleep, 5
     SetTimer, PopulateFileActsHistory, -100
 }
@@ -95622,7 +95622,7 @@ BTNundoFileActu() {
    If !Value
    {
       If indexu
-         showTOOLtip("WARNING: This action is already undone.")
+         showTOOLtip("WARNING: This action has already been undone.")
       Return msgBeepTimer()
    }
    ; ToolTip, % indexu "|" value , , , 2
@@ -95631,11 +95631,11 @@ BTNundoFileActu() {
 }
 
 BtnHelpUndoFiles() {
-   msgBoxWrapper(appTitle ": HELP", "In this panel, users can see at a glance the history of file actions performed in QPV and what can be undone.`n`nFile overwritten column indicates if the action lead to a file being overwritten. For example, the user moved the file X.jpg from A to B. In folder B, a file with the same name already existed and it was overwritten. These files can be recovered upon undo by QPV.`n`nSafe to restore column indicates if the undo action can be performed and if it will somehow lead to file conflicts.`n`nThrough this panel only one action at a time can be performed. To undo in batch select the files in the main window and/or use «See all as a files list».", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "In this panel, users can see at a glance the history of file actions performed in QPV and what can be undone.`n`nThe «File overwritten» column indicates if the action led to a file being overwritten. For example, the user moved the file X.jpg from A to B. In folder B, a file with the same name already existed and it was overwritten. These files can be recovered upon undo by QPV.`n`nThe «Safe to undo» column indicates if the undo action can be performed and if it will somehow lead to file conflicts.`n`nThrough this panel only one action at a time can be performed. To undo in batch, select the files in the main window and/or use «See all as files list».", -1, 0, 0)
 }
 
 BtnHelpMultiUndoFiles() {
-   msgBoxWrapper(appTitle ": HELP", "When the option «Attempt to recover previously overwritten files» is activated, QPV will attempt to restore the original file from Recycle Bin. For example, the user moved the file X.jpg from A to B. In folder B, a file with the same name already existed and it was overwritten. This is the file that will be recovered if it is still available in the Recycle Bin.`n`nWhen QPV performs undo for copy, the copies are deleted. However, if the copies are no longer identical in size and/or modified date with the original files, QPV will not delete these. To ensure the copies are deleted even if they are not identical, activate «Delete non-identical copies».", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "When the option «Attempt to recover previously overwritten files» is activated, QPV will attempt to restore the original file from the Recycle Bin. For example, the user moved the file X.jpg from A to B. In folder B, a file with the same name already existed and it was overwritten. This is the file that will be recovered if it is still available in the Recycle Bin.`n`nWhen QPV performs undo for copy, the copies are deleted. However, if the copies are no longer identical in size and/or modified date to the original files, QPV will not delete these. To ensure the copies are deleted even if they are not identical, activate «Delete non-identical copies».", -1, 0, 0)
 }
 
 BTNclearFilesUndoHisto() {
@@ -95822,15 +95822,15 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
    {
       setImageLoading()
       zPlitPath(imgPath, 1, OutFileName, OutDir, extname)
-      showTOOLtip("Searching for the selected file in Recycle Bin, please wait...`n" OutFileName "`n" OutDir "\`nFile size: " fileSizeFriendly(obj.fsize))
+      showTOOLtip("Searching for the selected file in the Recycle Bin, please wait...`n" OutFileName "`n" OutDir "\`nFile size: " fileSizeFriendly(obj.fsize))
       r := restoreFileFromRecycleBin(imgPath, obj.fsize)
       ResetImgLoadStatus()
       If (r=1)
-         msgBeepTimer("Undo DELETE file action. File succesfully recovered:`n" OutFileName "`n" OutDir "\", 900)
+         msgBeepTimer("Undo DELETE file action. File successfully recovered:`n" OutFileName "`n" OutDir "\", 900)
       Else If (r=0)
-         msgBeepTimer("ERROR: Undo DELETE action failed. File not found in Recycle Bin.`nUnable to recover:`n" OutFileName "`n" OutDir "\")
+         msgBeepTimer("ERROR: Undo DELETE action failed. File not found in the Recycle Bin.`nUnable to recover:`n" OutFileName "`n" OutDir "\")
       Else If (r=-1)
-         msgBeepTimer("ERROR: Undo DELETE action failed. File found in Recycle Bin, but unable to restore.`n" OutFileName "`n" OutDir "\")
+         msgBeepTimer("ERROR: Undo DELETE action failed. File found in the Recycle Bin, but it could not be restored.`n" OutFileName "`n" OutDir "\")
       Else If (r=-2)
          msgBeepTimer("ERROR: Undo DELETE action failed. COM object error.")
       Else
@@ -95857,7 +95857,7 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
    {
       zPlitPath(otherFile, 1, OutFileName, OutDir, extname)
       zPlitPath(imgPath, 1, sOutFileName, sOutDir, extname)
-      msgResult := msgBoxWrapper(appTitle ": Undo confirmation", "The selected file was not found, but a possible copy seems to be found at:`n`n" OutFileName "`n" OutDir "\`n`nDo you want to restore it from there? It might not be the file you want. If you choose yes, a copy of the file will be made at:`n`n" sOutFileName "`n" sOutDir "\", 4, 0, "question")
+      msgResult := msgBoxWrapper(appTitle ": Undo confirmation", "The selected file was not found, but a possible copy was found at:`n`n" OutFileName "`n" OutDir "\`n`nDo you want to restore it from there? It might not be the file you want. If you choose yes, a copy of the file will be made at:`n`n" sOutFileName "`n" sOutDir "\", 4, 0, "question")
       If (msgResult="Yes")
       {
          FileCopy, % otherFile, % imgPath
@@ -95886,7 +95886,7 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
          isSame := (ksA.size!=ksB.size || ksA.wtime!=ksB.wtime) ? 0 : 1
          If !isSame
          {
-            msgResult := msgBoxWrapper(appTitle ": Undo confirmation", "The copy of the selected file is not identical with its source.`n`nAre you sure you want to undo the copy operation for the selected file? If you choose yes, the non-identical copy of the selected file will be deleted.`n`nFile to be deleted:`n" OutFileName "`n" OutDir "\", 4, 0, "question")
+            msgResult := msgBoxWrapper(appTitle ": Undo confirmation", "The copy of the selected file is not identical to its source.`n`nAre you sure you want to undo the copy operation for the selected file? If you choose yes, the non-identical copy of the selected file will be deleted.`n`nFile to be deleted:`n" OutFileName "`n" OutDir "\", 4, 0, "question")
             If (msgResult!="Yes")
                Return
          }
@@ -95902,9 +95902,9 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
                Sleep, 1
                If (obj.fsize>0)
                   rsz := restoreFileFromRecycleBin(otherFile, obj.fsize)
-               w := (rsz=1) ? "`nThe original file was restored succesfully." : "`nFailed to restore the original file."
+               w := (rsz=1) ? "`nThe original file was restored successfully." : "`nFailed to restore the original file."
             }
-            msgBeepTimer("Undo COPY succeded. The copy of the selected file was deleted." w "`n" OutFileName "`n" OutDir "\", 0)
+            msgBeepTimer("Undo COPY succeeded. The copy of the selected file was deleted." w "`n" OutFileName "`n" OutDir "\", 0)
             undoFileActUpdateIMGindex(imgPath)
          } Else
             msgBeepTimer("ERROR: Undo COPY failed. Unable to delete the copy of the selected file.`n" OutFileName "`n" OutDir "\")
@@ -95973,11 +95973,11 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
             {
                Sleep, 1
                rsz := restoreFileFromRecycleBin(imgPath, obj.fsize)
-               w := (rsz=1) ? "`nThe original file was restored succesfully." : "`nFailed to restore the original file."
+               w := (rsz=1) ? "`nThe original file was restored successfully." : "`nFailed to restore the original file."
             }
 
             zPlitPath(otherFile, 1, OutFileName, OutDir, extname)
-            msgBeepTimer("Undo " Format("{:U}", obj.typu) " succeded for the selected file:`n" OutFileName "`n" OutDir "\" w, 0)
+            msgBeepTimer("Undo " Format("{:U}", obj.typu) " succeeded for the selected file:`n" OutFileName "`n" OutDir "\" w, 0)
             undoFileActUpdateIMGindex(imgPath)
             currentFilesListModified := 1
             If (indexu>0)
@@ -96284,7 +96284,7 @@ batchUndoFileActs(modus) {
             If (obj.restora="conflict" && FileRexists(otherFile, 0))
             {
                If !FolderExist(otherFile)
-                  otherFile := askAboutFileCollision(imgPath, otherFile, 1, 0, userUndoMustDoOverwrite, performOverwrite, 1, "Undo delete: source file is the file from Recycle Bin, to be restored.`n")
+                  otherFile := askAboutFileCollision(imgPath, otherFile, 1, 0, userUndoMustDoOverwrite, performOverwrite, 1, "Undo delete: source file is the file from the Recycle Bin, to be restored.`n")
 
                thisFileExists := FileRexists(otherFile, 0)
                pzo := (performOverwrite=1 && thisFileExists=1) ? 1 : 0
@@ -96371,7 +96371,7 @@ batchUndoFileActs(modus) {
    SetTimer, ResetImgLoadStatus, -100
    dummyTimerDelayiedImageDisplay(100)
 
-   msgu := (abandonAll=1) ? "Undo file operations aborted. " groupDigits(thisIndex) " files processed until now." : "Finished performing undo on " groupDigits(totalu) " files."
+   msgu := (abandonAll=1) ? "Undo file operations aborted. " groupDigits(thisIndex) " files processed so far." : "Finished performing undo on " groupDigits(totalu) " files."
    If failedFiles
       msgu .= "`nFailed to perform UNDO for " groupDigits(failedFiles) " files"
    If failedRecoverFiles
@@ -96503,7 +96503,7 @@ PanelReviewSelectedFiles() {
     listViewReviewFilteru := ""
     edithu := lstWid - btnWid - 47
     addCol := testIsDupesList() ? "|Dupe ID" : ""
-    Gui, Add, Text, x15 y15 w%lstWid%, This list allows multiple items to be selected. The actions available in the context menu or below will be applied on the selected items.
+    Gui, Add, Text, x15 y15 w%lstWid%, This list allows multiple items to be selected. The actions available in the context menu or below will be applied to the selected items.
     hLVmainu := GuiAddListView("+LV0x10000 +LV0x400 +ReadOnly -WantF2 y+10 w" lstWid " AltSubmit Count" markedSelectFile " guiLVreviewSelFilesResponder r" uLVr " Grid vLViewOthers", "S|File name|Folder path|#" addCol, "Files to review")
     GuiAddListView("+LV0x10000 +LV0x400 +ReadOnly -WantF2 xp yp w" lstWid " AltSubmit Count" markedSelectFile " guiLVreviewSelFilesResponder r" uLVr " Grid vLViewFiltered", "S|*File name|*Folder path|#" addCol, "Filtered files to review")
     hEditField := GuiAddEdit("xs y+10 w" edithu " -multi gUIeditsGenericAllowCtrlBksp vlistViewReviewFilteru", listViewReviewFilteru, "String filter")
@@ -96767,7 +96767,7 @@ BTNreviewCopyPanel(modus:=0, extras:=0) {
        thisu := "file names"
 
     If !copyTextToClippy(listu)
-       msgBeepTimer("Failed to copy to clipboard as text the selected " thisu)
+       msgBeepTimer("Failed to copy the selected " thisu " to the clipboard as text")
     Else
        msgBeepTimer(groupDigits(counter) " selected " thisu " copied to clipboard as text", 0)
 
@@ -96872,7 +96872,7 @@ BTNreviewLVselAll() {
       whichLV := (OutputVar=1) ? "LViewFiltered" : "LViewOthers"
       Gui, SettingsGUIA: ListView, % whichLV
    }
-   ToolTip, Selecting all the items in list
+   ToolTip, Selecting all the items in the list
    loopsOccurred := RowNumber := 0
    LV_Modify(0, "+Select")
    ToolTip
@@ -96923,7 +96923,7 @@ uiLVreviewSelFilesResponder(a:=0, b:=0, c:=0) {
    If (whichLV="LViewOthers" && (topIndex + rowsInView + 8>totalListed) && totalIndex>LVitemsPerPage && isInputOkay=1 && reviewSelectedIndexes[1, 2]!=2)
    {
       SetTimer, dummyuiPopulateReviewSelectedFiles, -250
-      ToolTip, List view will further be populated
+      ToolTip, The list view will be populated further
       SetTimer, RemoveTooltip, -1000
       Return
    }
@@ -97155,7 +97155,7 @@ PanelDynamicFolderzWindow(dummy:=0) {
     If AnyWindowOpen
        Return
 
-    If askAboutFileSave(" if any action will be performed in the invoked panel")
+    If askAboutFileSave(" if any action is performed in the invoked panel")
        Return
 
     If (userPrivateMode=1 && hasWarned!=1)
@@ -97418,7 +97418,7 @@ BTNcopyAllStaticFolderPaths() {
     If !copyTextToClippy(finalListu)
        msgBeepTimer("Failed to copy the folder paths to clipboard as text")
     Else
-       msgBeepTimer(groupDigits(counter) " folder paths are copied to clipboard as text", 0)
+       msgBeepTimer(groupDigits(counter) " folder paths were copied to clipboard as text", 0)
 }
 
 BTNshowStaticFoldersInTreeView() {
@@ -97461,7 +97461,7 @@ BTNremFilesStaticFolder() {
     If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
        Return
 
-    msgResult := msgBoxWrapper(appTitle ": Remove files by folder", "Please confirm that you want to remove the files from the index pertaining to the selected folder(s).", 4, 0, "question")
+    msgResult := msgBoxWrapper(appTitle ": Remove files by folder", "Please confirm that you want to remove from the index the files pertaining to the selected folder(s).", 4, 0, "question")
     If (msgResult="yes")
     {
        Sleep, 10
@@ -98006,7 +98006,7 @@ BtnPanelStaticJumpFirst() {
       If (A_TickCount - prevMSGdisplay>2000)
       {
          etaTime := ETAinfos(A_Index, maxFilesIndex, startOperation)
-         showTOOLtip("Searching for the first file in index in`n:" folderPath "\" etaTime, 0, 0, A_Index/maxFilesIndex)
+         showTOOLtip("Searching for the first file in the index in:`n" folderPath "\" etaTime, 0, 0, A_Index/maxFilesIndex)
          prevMSGdisplay := A_TickCount
       }
 
@@ -98029,7 +98029,7 @@ BtnPanelStaticJumpFirst() {
       currentFileIndex := thisIndex
       dummyTimerDelayiedImageDisplay(100)
    } Else
-      msgBeepTimer("WARNING: No file found to be indexed from the selected folder:`n" folderPath "\")
+      msgBeepTimer("WARNING: No indexed file was found in the selected folder:`n" folderPath "\")
 }
 
 BtnPanelManageFoldersActus(modus:=0, g:=0) {
@@ -98065,9 +98065,9 @@ BtnPanelManageFoldersActus(modus:=0, g:=0) {
       Catch wasError
       {
          If AnyWindowOpen
-            msgBeepTimer("ERROR: An unknown error occurred opening the folder:`n" folderu "\")
+            msgBeepTimer("ERROR: An unknown error occurred while opening the folder:`n" folderu "\")
          Else
-            msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the folder:`n" folderu "\", 0, 0, "error")
+            msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred while opening the folder:`n" folderu "\", 0, 0, "error")
       }
    } Else If (z=2 && folderPath)
    {
@@ -98103,7 +98103,7 @@ invokeStandardFolderProperties(thisFolder) {
    {
       Try Run, Properties "%thisFolder%"
       Catch wasError
-            msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the system file properties.", 0, 0, "error")
+            msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred while opening the system file properties.", 0, 0, "error")
    } Else
       msgBeepTimer("WARNING: The folder seems to no longer exist`n" thisFolder "\")
 }
@@ -98291,7 +98291,7 @@ countAllFilesPerStaticFolders(dummy:=0) {
         If (A_TickCount - prevMSGdisplay>2000)
         {
            etaTime := ETAinfos(A_Index, maxFilesIndex, startOperation)
-           showTOOLtip("Counting files per folders, please wait`nTotal folders: " groupDigits(totalLoops) etaTime, 0, 0, A_Index/maxFilesIndex)
+           showTOOLtip("Counting files per folder, please wait`nTotal folders: " groupDigits(totalLoops) etaTime, 0, 0, A_Index/maxFilesIndex)
            prevMSGdisplay := A_TickCount
         }
 
@@ -98316,7 +98316,7 @@ countAllFilesPerStaticFolders(dummy:=0) {
         If (A_TickCount - prevMSGdisplay>1000)
         {
            etaTime := ETAinfos(A_Index, totalLoops, startOperation)
-           showTOOLtip("Consolidating data: count files per folders" etaTime, 0, 0, A_Index/totalLoops)
+           showTOOLtip("Consolidating data: count files per folder" etaTime, 0, 0, A_Index/totalLoops)
            prevMSGdisplay := A_TickCount
         }
 
@@ -98415,7 +98415,7 @@ MenuPreviewFramesFilterList() {
 
      frames := resultedFilesList[currentFileIndex, 9]
      If (frames<2)
-        Return msgBeepTimer("WARNING: The selected image does not seem to have any frame or pages:`n" OutFileName "`n" folderu "\")
+        Return msgBeepTimer("WARNING: The selected image does not seem to have any frames or pages:`n" OutFileName "`n" folderu "\")
 
      userFilterStringPos := userFilterWhat := 1
      UsrEditFilter := "QPV:PAGES:" imgPath
@@ -98460,7 +98460,7 @@ BtnToggleRecurseDynaFolder() {
        currentFilesListModified := 1
 
     ; ToolTip, % newFoldersList , , , 2
-    msgBeepTimer("You need to rescan the folder for the effect to take place", 0)
+    msgBeepTimer("You need to rescan the folder for the change to take effect", 0)
     uiPopulateDynamicFolderzList()
     Loop, % LV_GetCount()
     {
@@ -99396,13 +99396,13 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
     ; are left exactly as they are.
     initSeenImagesListDB()
     If (sqlFailedInit=1)
-       Return msgBeepTimer("Failed to initialize database of seen images")
+       Return msgBeepTimer("Failed to initialize the database of seen images")
 
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
     startOperation := A_TickCount
     modeInfo := (folderMode=1) ? "`nFolder paths only" : ""
-    showTOOLtip("Performing search and replace in the seen database list:`n" what "`n" replacer modeInfo)
+    showTOOLtip("Performing search and replace in the seen images database:`n" what "`n" replacer modeInfo)
     owle := setWhileLoopBusy()
     changeMcursor()
     seenImagesDB.Exec("BEGIN TRANSACTION;")
@@ -99427,7 +99427,7 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
            If (A_TickCount - prevMSGdisplay>1500)
            {
               etaTime := ETAinfos(A_Index, totalFiles, startOperation)
-              showTOOLtip("Performing search and replace in the seen database list" etaTime, 0, 0, A_Index/totalFiles)
+              showTOOLtip("Performing search and replace in the seen images database" etaTime, 0, 0, A_Index/totalFiles)
               prevMSGdisplay := A_TickCount
            }
 
@@ -100510,7 +100510,7 @@ PanelImgAutoCrop() {
     {
        Gui, Add, Text, xs y+%ty% hp +0x200 +hwndhTemp, Action on file name conflicts:
        GuiAddDropDownList("x+5 w" thisBW A_Space thisW A_Space thisH " AltSubmit gTglOverwriteFiles Choose" userActionConflictingFile " vuserActionConflictingFile", "Skip files|Auto-rename|Overwrite|Ask user", [hTemp])
-       Gui, Add, Checkbox, xs y+%ty% %thisW% %thisH2% Checked%PreserveDateTimeOnSave% vPreserveDateTimeOnSave, &Preserve files date/time
+       Gui, Add, Checkbox, xs y+%ty% %thisW% %thisH2% Checked%PreserveDateTimeOnSave% vPreserveDateTimeOnSave, &Preserve file date/time
        Gui, Add, Checkbox, xs y+%ty% %thisW% %thisH2% Checked%convertOnAutoCrop% vconvertOnAutoCrop, &Convert on save to:
        GuiAddDropDownList("x+5 " thisAW A_Space thisH " gTglDesiredSaveFormat AltSubmit Choose" getSharedWriteFmtIndex() " vuserDesireWriteFMT", userPossibleWriteFMTs, "Image file format")
     }
@@ -101182,7 +101182,7 @@ batchAutoCropFiles() {
    ForceRefreshNowThumbsList()
    dummyTimerDelayiedImageDisplay(100)
    If (abandonAll=1)
-      msgBeepTimer("Operation aborted. " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files were processed until now" someErrors)
+      msgBeepTimer("Operation aborted. " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files were processed so far" someErrors)
    Else
       msgBeepTimer(groupDigits(countFilez) " out of " groupDigits(countTFilez) " selected images were automatically cropped" someErrors, 900)
 
@@ -101205,7 +101205,7 @@ batchAutoColorsFiles() {
    Sleep, 25
    startOperation := A_TickCount
    prevMSGdisplay := A_TickCount
-   showTOOLtip("Performing auto-adjust colors for " groupDigits(filesElected) " files, please wait")
+   showTOOLtip("Auto-adjusting colours for " groupDigits(filesElected) " files, please wait")
    doStartLongOpDance()
    countFilez := countTFilez := skippedFiles := failedFiles := 0
    Loop, % maxFilesIndex
@@ -101257,7 +101257,7 @@ batchAutoColorsFiles() {
    ForceRefreshNowThumbsList()
    dummyTimerDelayiedImageDisplay(100)
    If (abandonAll=1)
-      msgBeepTimer("Operation aborted. " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files were processed until now" someErrors)
+      msgBeepTimer("Operation aborted. " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files were processed so far" someErrors)
    Else
       msgBeepTimer(groupDigits(countFilez) " out of " groupDigits(countTFilez) " selected images were processed" someErrors, 900)
 
@@ -101916,7 +101916,7 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="", losslessJpegs:=0) {
     {
        If (ResizeMustPerform=1 && ResizeInPercentage=1 && (SimpleOperationsScaleXimgFactor>950 || SimpleOperationsScaleYimgFactor>950))
        {
-          msgResult := msgBoxWrapper(appTitle ": WARNING", "You have selected to resize " groupDigits(filesElected) " images to " max(SimpleOperationsScaleXimgFactor, SimpleOperationsScaleYimgFactor) "%. This may cause QPV to crash or abnormal system behaviour, if the selected images are already large.`n`nAre you sure you want to proceed?", "&Yes|&Cancel", 2, "exclamation")
+          msgResult := msgBoxWrapper(appTitle ": WARNING", "You have selected to resize " groupDigits(filesElected) " images to " max(SimpleOperationsScaleXimgFactor, SimpleOperationsScaleYimgFactor) "%. This may crash QPV or cause abnormal system behaviour if the selected images are already large.`n`nAre you sure you want to proceed?", "&Yes|&Cancel", 2, "exclamation")
           If (msgResult!="Yes")
              Return
        }
@@ -102162,7 +102162,7 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor, losslessJpe
    ForceRefreshNowThumbsList()
    dummyTimerDelayiedImageDisplay(100)
    If (abandonAll=1)
-      msgBeepTimer("Operation aborted. " groupDigits(filesConverted) " out of " groupDigits(filesElected) " selected files were processed until now" someErrors)
+      msgBeepTimer("Operation aborted. " groupDigits(filesConverted) " out of " groupDigits(filesElected) " selected files were processed so far" someErrors)
    Else
       msgBeepTimer("Finished processing " groupDigits(filesConverted) " out of " groupDigits(filesElected) " selected files" someErrors, 900)
 
@@ -102275,7 +102275,7 @@ batchSimpleColorsAdjusts() {
    ForceRefreshNowThumbsList()
    dummyTimerDelayiedImageDisplay(100)
    If (abandonAll=1)
-      msgBeepTimer("Operation aborted. " groupDigits(filesConverted) " out of " groupDigits(filesElected) " selected files were processed until now" someErrors)
+      msgBeepTimer("Operation aborted. " groupDigits(filesConverted) " out of " groupDigits(filesElected) " selected files were processed so far" someErrors)
    Else
       msgBeepTimer("Finished processing " groupDigits(filesConverted) " out of " groupDigits(filesElected) " selected files" someErrors, 900)
 
@@ -102912,7 +102912,7 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
         FreeImage_GetImageDimensions(hFIFimgC, imgW, imgH)
      } Else If isImgSizeTooLarge(imgW, imgH)
      {
-        setWindowTitle("Rescaling image to fit the GDI+ maximum image dimensions limits")
+        setWindowTitle("Rescaling image to fit the GDI+ maximum image dimension limits")
         nImgW := imgW, nImgH:= imgH
         capIMGdimensionsGDIPlimits(nImgW, nImgH)
         changeMcursor()
@@ -103694,7 +103694,7 @@ AcquireWIAimage() {
        RemoveTooltip()
        ResetImgLoadStatus()
        deviceu := ""
-       infos := (obju=-1) ? "No device selected." : "No image was returned by scanner."
+       infos := (obju=-1) ? "No device selected." : "No image was returned by the scanner."
        msgBeepTimer("WARNING: No image acquired.`n" infos)
     } Else If (obju<0 && !IsObject(obju))
     {
@@ -103721,7 +103721,7 @@ friendlyPDFerrorCodes(errorType, pwd) {
     if (errorType=2)
        r := "PDF file not found or could not be opened"
     else if (errorType=3)
-       r := "File not in the PDF format or it is corrupted"
+       r := "File is not in the PDF format or is corrupted"
     else if (errorType=4)
        r := (pwd="") ? "Incorrect PDF password provided" : "A password is required to open the PDF"
     else If (errorType=-1)
@@ -103737,7 +103737,7 @@ friendlyPDFerrorCodes(errorType, pwd) {
     else If (errorType=-6)
        r := "Failed to retrieve PDF text page from PDF page"
     else If (errorType=-7)
-       r := "The characters on the page have invalid unicode mapping"
+       r := "The characters on the page have invalid Unicode mapping"
     else If (errorType=-8)
        r := "PDFium is busy with another document"
     else if (errorType=-100)
@@ -104549,7 +104549,7 @@ trGdip_CreateBitmap(funcu, Width, Height, PixelFormat:=0, Stride:=0, Scan0:=0) {
        gdipLastError := 3
 
     If (gdipLastError && r)
-       addJournalEntry(A_ThisFunc "() called by " funcu "() has created possibly a faulty object: " Gdip_ErrorHandler(gdipLastError, 0))
+       addJournalEntry(A_ThisFunc "() called by " funcu "() has possibly created a faulty object: " Gdip_ErrorHandler(gdipLastError, 0))
 
     If (StrLen(r)>2)
        recordGdipBitmaps(r, A_ThisFunc "<-" funcu)
@@ -104599,7 +104599,7 @@ trGdip_CreateBitmapFromHBITMAP(funcu, hBitmap, hPalette:=0) {
        gdipLastError := 3
 
     If (gdipLastError && r)
-       addJournalEntry(A_ThisFunc "() has created possibly a faulty object: " Gdip_ErrorHandler(gdipLastError, 0) ". Function invoked by " funcu "().")
+       addJournalEntry(A_ThisFunc "() has possibly created a faulty object: " Gdip_ErrorHandler(gdipLastError, 0) ". Function invoked by " funcu "().")
 
     If (StrLen(r)>2)
        recordGdipBitmaps(r, A_ThisFunc "<-" funcu)
@@ -104899,7 +104899,7 @@ gdipObjectsTerminator(filteru:=0, listBmps:=0) {
 
 giveWarningX64() {
    SoundBeep, 300, 100
-   msgResult := msgBoxWrapper(appTitle ": WARNING", "You are currently running a 64-bits operating system, but you are executing " appTitle " developed for 32-bits operating systems. Please exit and run the 64-bits edition of QPV, for an optimal experience. The 32-bits edition is severely limited and prone to crash at any moment.`n`nThank you for your inevitable cooperation.", "&Yes|&Exit|&Ask later|Continue...", 1, "error")
+   msgResult := msgBoxWrapper(appTitle ": WARNING", "You are currently running a 64-bit operating system, but you are executing " appTitle " developed for 32-bit operating systems. Please exit and run the 64-bit edition of QPV, for an optimal experience. The 32-bit edition is severely limited and prone to crashing at any moment.`n`nThank you for your inevitable cooperation.", "&Yes|&Exit|&Ask later|Continue...", 1, "error")
    If InStr(msgResult, "Continue")
    {
       SoundBeep , 300, 900
@@ -104930,7 +104930,7 @@ checkDLLfiles() {
       sqlMissin := 1
 
    If (sqlMissin=1 || freeIMGmissin=1)
-      msgResult := msgBoxWrapper(appTitle ": ERROR", "It seems " appTitle " DLL files are missing. Some features of the application will not work. Please download the QPV portable ZIP package.", "&Download|&Cancel", 1, "ERROR")
+      msgResult := msgBoxWrapper(appTitle ": ERROR", "It seems the " appTitle " DLL files are missing. Some features of the application will not work. Please download the QPV portable ZIP package.", "&Download|&Cancel", 1, "ERROR")
 
    If (msgResult="Download")
       Try Run, https://github.com/marius-sucan/Quick-Picto-Viewer
@@ -105139,9 +105139,9 @@ tlbrInvokeFunction(a, b, c) {
       r := func2Call[1]
 
    If (r=1)
-      simpleMsgBoxWrapper(appTitle ": ERROR", "An error occurred calling " fn "() for " btnID ". Too many parameters.")
+      simpleMsgBoxWrapper(appTitle ": ERROR", "An error occurred while calling " fn "() for " btnID ". Too many parameters.")
    Else If r
-      simpleMsgBoxWrapper(appTitle ": ERROR", "An error occurred calling " r "() function for " btnID ".")
+      simpleMsgBoxWrapper(appTitle ": ERROR", "An error occurred while calling " r "() function for " btnID ".")
 
    lastInvoked := A_TickCount
    MouseGetPos, OutputVarX, OutputVarY, OutputVarWin, OutputVarControl, 2
@@ -105426,7 +105426,7 @@ updateUIbrushSoloSlidersTool(ctrlu:=0,m:=0) {
 
 tlbrFloodFillSlidersInvoker(m) {
     If (m=2)
-       CreateSoloSliderWidgetWin(lastTlbrClicked, "@FloodFillOpacity", 3,255, 255, "Flooding opacity", "dummy", 1)
+       CreateSoloSliderWidgetWin(lastTlbrClicked, "@FloodFillOpacity", 3,255, 255, "Flood fill opacity", "dummy", 1)
     Else
        CreateSoloSliderWidgetWin(lastTlbrClicked, "@FloodFillTolerance", 0,255, 10, "Similarity", "dummy", 1)
 }
@@ -105471,7 +105471,7 @@ userChangeBrushSoft(modus, dir) {
       } Else If (BrushToolType=1)
          showTOOLtip("WARNING: The current brush type does not have the softness property.")
       Else If (BrushToolTexture>1)
-         showTOOLtip("WARNING: The current brush is based on a texture.`nSoftness does not apply for textures.")
+         showTOOLtip("WARNING: The current brush is based on a texture.`nSoftness does not apply to textures.")
 
       If !okayu
          SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -106695,7 +106695,7 @@ CoreGUItoolbar(scopul:=0, whichList:=0) {
          , BTNbrushMtool := ["brush-main", 0, "Brush tool", 0, "BTNbrushMtool"]
          , BTNFXbrush := ["brush-fx", 0, "Color effects soft brush", 0, "BTNFXbrush"]
          , BTNwetbrush := ["brush-wet", 0, "Soft wet brush", 0, "BTNwetbrush"]
-         , BTNdryout := ["brush-dry", 0, "Fry-out brush", 0, "BTNdryout"]
+         , BTNdryout := ["brush-dry", 0, "Dry-out brush", 0, "BTNdryout"]
          , BTNpenVector := ["pen-vector", 0, "Draw freeform shape", 0, "BTNpenVector"]
          , BTNpipette := ["pipette", 0, "Pick color from the viewport", 0, "BTNpipette"]
          , BTNcolorsSwatch := ["colorz-swatch", 0, "Primary / secondary colors", 0, "BTNcolorsSwatch"]
@@ -106718,7 +106718,7 @@ CoreGUItoolbar(scopul:=0, whichList:=0) {
          , BTNfillShape := ["fill-shape", 0, "Fill selection area", 0, "BTNfillShape"]
          , BTNoutlineShape := ["outline-shape", 0, "Draw shape contours", 0, "BTNoutlineShape"]
          , BTNselectShape := ["select-rect", 0, "Create or cycle selection area modes", 0, "BTNselectShape"]
-         , BTNselectFileu := ["select-rect", 0, "Select / deseleect file", 0, "BTNselectFileu", 0, 0, 1]
+         , BTNselectFileu := ["select-rect", 0, "Select / deselect file", 0, "BTNselectFileu", 0, 0, 1]
          , BTNselectFreeform := ["create-freeform", 0, "Create freeform selection", 0, "BTNselectFreeform"]
          , BTNloupe := ["loupe", 1, "Zoom in / out", 0, "BTNloupe", 0, 0, 1]
          , BTNpreviewBox := ["view", 0, "Toggle image preview", 0, "BTNpreviewBox", 0, 0, 1]
@@ -106746,7 +106746,7 @@ CoreGUItoolbar(scopul:=0, whichList:=0) {
          , BTNvectRemLast := ["vector-rem-last", 0, "Remove last point in path", 0, "BTNvectRemLast"]
          , BTNvectRemPoints := ["vector-rem-points", 0, "Remove selected points in path", 0, "BTNvectRemPoints"]
          , BTNvectSelInvert := ["vector-select-invert", 0, "Invert selected points in path", 0, "BTNvectSelInvert"]
-         , BTNvectOpenPath := ["vector-open-path", 0, "Toggle opened path", 0, "BTNvectOpenPath"]
+         , BTNvectOpenPath := ["vector-open-path", 0, "Toggle open path", 0, "BTNvectOpenPath"]
          , BTNvectSymAnchr := ["vector-symmetrical-anchors", 0, "Toggle symmetrical anchors", 0, "BTNvectSymAnchr"]
          , BTNvectTmodes := ["vector-mode-mixed", 0, "Cycle vector tool modes", 0, "BTNvectTmodes"]
          , BTNfloodFill := ["flood-fill", 0, "Flood fill", 0, "BTNfloodFill"]
@@ -106771,7 +106771,7 @@ CoreGUItoolbar(scopul:=0, whichList:=0) {
          , BTNannotate := ["annotate", 0, "Define image caption", 0, "BTNannotate", 0, 0, 1]
          , BTNprivatModa := ["private", 0, "Toggle private mode", 0, "BTNprivatModa", 0, 0, 1]
          , BTNsoundPlay := ["sound", 0, "Play associated sound file", 0, "BTNsoundPlay"]
-         , BTNjumpAtIndex := ["jump-to", 0, "Jump at given index", 0, "BTNjumpAtIndex", 0, 0, 1]
+         , BTNjumpAtIndex := ["jump-to", 0, "Jump to given index", 0, "BTNjumpAtIndex", 0, 0, 1]
          , BTNswitchThumbs := ["thumbs-mode", 0, "Toggle list / thumbnails mode", 0, "BTNswitchThumbs", 0, 0, 1]
          , BTNprintAcquire := ["print", 0, "Print/acquire image", 0, "BTNprintAcquire", 0, 0, 1]
          , BTNgoPrevPanel := ["go-back", 0, "Open previous panel", 0, "BTNgoPrevPanel", 0, 0, 1]
@@ -107957,7 +107957,7 @@ tlbrDecideTooltips(hwnd) {
       msgu := "L: Return to image view «Enter»`nR: Open previous panel" defineLastPanel() "`nTo return to the last image in view, press Escape"
    } Else If (btnID="BTNannotate")
    {
-      msgu := "L: Edit image caption «Shift + N»`nR: Toggle display image caption «N»"
+      msgu := "L: Edit image caption «Shift + N»`nR: Toggle image caption display «N»"
    } Else If (btnID="BTNrotateTlbr")
    {
       msgu := "Toggle toolbar orientation"
@@ -107982,7 +107982,7 @@ tlbrDecideTooltips(hwnd) {
       msgu := "L: Toggle private mode`nR: Toggle record seen images"
    } Else If (btnID="BTNjumpAtIndex")
    {
-      msgu := "Jump at user given file index"
+      msgu := "Jump to a given file index"
    } Else If (btnID="BTNswitchThumbs")
    {
       friendly := (thumbsDisplaying=1) ? "image view" : defineListViewModes() " list mode"
@@ -108015,7 +108015,7 @@ tlbrDecideTooltips(hwnd) {
       msgu := "Paint alpha mask «Ctrl + K»"
    } Else If InStr(icoFile, "alpha-mask-capture")
    {
-      msgu := "L: Capture image selected area as alpha mask`nR: Import clipboard as alpha mask"
+      msgu := "L: Capture selected image area as alpha mask`nR: Import clipboard as alpha mask"
    } Else If InStr(icoFile, "alpha-mask-pixelize")
    {
       msgu := "Rasterize the alpha mask"
@@ -108025,12 +108025,12 @@ tlbrDecideTooltips(hwnd) {
    } Else If InStr(icoFile, "new-image")
    {
       If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
-         msgu := "L: Import list or insert file(s) into list «Insert»`nR: Add folder(s) into current list «Shift + Insert»"
+         msgu := "L: Import list or insert file(s) into list «Insert»`nR: Add folder(s) to the current list «Shift + Insert»"
       Else
          msgu :="L: Create new image «Ctrl + N»`nR: Acquire image from scanner"
    } Else If InStr(icoFile, "paste-clip")
    {
-      msgu := (thumbsDisplaying=1) ? "Paste files from clipboard into current list «Ctrl + V»" : "L: Paste image from clipboard «Ctrl + V»`nR: Paste into selection area «Ctrl + Shift + V»"
+      msgu := (thumbsDisplaying=1) ? "Paste files from clipboard into the current list «Ctrl + V»" : "L: Paste image from clipboard «Ctrl + V»`nR: Paste into selection area «Ctrl + Shift + V»"
    } Else If InStr(icoFile, "undo")
    {
       If (isImgEditingNow()=1)
@@ -108071,7 +108071,7 @@ tlbrDecideTooltips(hwnd) {
       keyu := (AnyWindowOpen=64) ? " «R»" : ""
       msgu := "L: Eraser - soft brush" keyu
       If (isImgEditingNow()=1 && editingSelectionNow=1)
-         msgu .= "`nR: Erase or fade image selected area «Delete»"
+         msgu .= "`nR: Erase or fade selected image area «Delete»"
       If (isImgEditingNow()=1 && editingSelectionNow=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
          msgu := "Erase initially selected image area «Backspace»"
    } Else If InStr(icoFile, "brush-blur")
@@ -108114,7 +108114,7 @@ tlbrDecideTooltips(hwnd) {
    {
       msgu := "Symmetrical anchors «R»"
       If (bezierSplineCustomShape!=1)
-         msgu .= "`nThis option only applies for Bezier paths"
+         msgu .= "`nThis option only applies to Bézier paths"
    } Else If (btnID="BTNvectTmodes")
    {
       msgu := "Cycle tool modes: " Format("{:U}", defineVectToolMode()) " «Q»"
@@ -108190,7 +108190,7 @@ tlbrDecideTooltips(hwnd) {
       msgu := "L: Open image or folder dialog «Ctrl + O»`nR: Recents menu"
    } Else If InStr(icoFile, "cut")
    {
-      msgu := (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) ? "L: Cut file" f " (Explorer mode) «Ctrl + X»`nR: Move file" f " to.. «M»" : "L: Cut image selected area «Ctrl + X»`nR: Move file" f " to.. «M»"
+      msgu := (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) ? "L: Cut file" f " (Explorer mode) «Ctrl + X»`nR: Move file" f " to... «M»" : "L: Cut selected image area «Ctrl + X»`nR: Move file" f " to... «M»"
    } Else If InStr(icoFile, "adjust-colors")
    {
       If (isImgEditingNow()=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
@@ -108203,7 +108203,7 @@ tlbrDecideTooltips(hwnd) {
          msgu := "L: Adjust image colors «U»`nR: Reset viewport adjustments « \ »"
    } Else If InStr(icoFile, "transform-img")
    {
-      msgu := (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) ? "L: Import selected image into currently opened one" : "L: Transform image selected area «Ctrl + T»"
+      msgu := (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) ? "L: Import selected image into the currently opened one" : "L: Transform selected image area «Ctrl + T»"
       If (isImgEditingNow()=1 && editingSelectionNow=0)
          msgu := "L: Resize image «Ctrl + R»"
       Else If (isImgEditingNow()=1 && (AnyWindowOpen=31 || AnyWindowOpen=24))
@@ -108221,14 +108221,14 @@ tlbrDecideTooltips(hwnd) {
       Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
          msgu := "Image file - flip horizontally «Shift + H»"
       Else If (editing=1 && editingSelectionNow=1 && !AnyWindowOpen)
-         msgu := "Image selected area - flip horizontally «Shift + H»"
+         msgu := "Selected image area - flip horizontally «Shift + H»"
       Else If (editing=1)
          msgu := "Viewport - flip horizontally «H»"
       Else
          msgu := "Flip horizontally"
 
       If (editing=1 && editingSelectionNow=1 && AnyWindowOpen && !alph)
-         msgu2 := "Image selected area - flip horizontally «Shift + H»"
+         msgu2 := "Selected image area - flip horizontally «Shift + H»"
       Else If ( (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
       || (editing=1 && alph=1) )
          msgu2 := "Viewport - flip horizontally «H»"
@@ -108246,14 +108246,14 @@ tlbrDecideTooltips(hwnd) {
       Else If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
          msgu := "Image file - flip vertically «Shift + V»"
       Else If (editing=1 && editingSelectionNow=1 && !AnyWindowOpen)
-         msgu := "Image selected area - flip vertically «Shift + V»"
+         msgu := "Selected image area - flip vertically «Shift + V»"
       Else If (editing=1)
          msgu := "Viewport - flip vertically «V»"
       Else
          msgu := "Flip vertically"
 
       If (editing=1 && editingSelectionNow=1 && AnyWindowOpen && !alph)
-         msgu2 := "Image selected area - flip vertically «Shift + V»"
+         msgu2 := "Selected image area - flip vertically «Shift + V»"
       Else If ( (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen)
       || (editing=1 && alph=1) )
          msgu2 := "Viewport - flip vertically «V»"
@@ -108332,9 +108332,9 @@ tlbrDecideTooltips(hwnd) {
    } Else If InStr(icoFile, "brush-set-angle")
    {
       If (BrushToolAutoAngle=1)
-         msgu := "Deactivate mouse movements based angle for the brush"
+         msgu := "Deactivate the brush angle based on mouse movements"
       Else
-         msgu := "L: Brush angle: " BrushToolAngle "° «Ctrl + ]»`nR: Activate mouse movements based angle"
+         msgu := "L: Brush angle: " BrushToolAngle "° «Ctrl + ]»`nR: Activate angle based on mouse movements"
    } Else If InStr(icoFile, "brush-set-ratio")
    {
       msgu := "L: Brush aspect ratio: " BrushToolAspectRatio "% «Alt + ]»`nR: Reset brush aspect ratio"
@@ -108393,7 +108393,7 @@ tlbrDecideTooltips(hwnd) {
       msgu := "Recently opened folders"
    } Else If InStr(icoFile, "infos") 
    {
-      msgu := "L: Image and viewport details «I»`nR: Files information panel «Alt + Enter»"
+      msgu := "L: Image and viewport details «I»`nR: File information panel «Alt + Enter»"
    } Else If InStr(icoFile, "star") 
    {
       friendly := resultedFilesList[currentFileIndex, 5] ? "Remove from" : "Add to"
