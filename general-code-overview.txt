@@ -1241,5 +1241,5 @@ p) AHK_H remnants [before v6.3.5]
      - comments tagged [merge], [phase D], [phase E] or «pre-merge»,
        and debug messages prefixed «QPV: MERGE:» or naming a
        «Main thread» and a «Secondary thread»
-     - ahk_h-v1-1-33-10-h005.zip in the root of the repository, and
-       reports\interface-thread-merge-plan-2026-08-31.md
+     - reports\interface-thread-merge-plan-2026-08-31.md, the plan and
+       execution log of the merge
