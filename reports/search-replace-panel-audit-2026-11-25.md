@@ -15,7 +15,7 @@ The audit also covers what those controls run, and the routes that open the pane
 
 Line numbers are `quick-picto-viewer.ahk` on `development` at `bbc49e4`. The audit changed no code.
 
-Ten findings, a list of small things (row 11 of the summary) and two things seen in passing. Each one says how
+Ten findings, a list of small things (row 11 of the summary) and three things seen in passing. Each one says how
 it was checked: **run** means the real application did it under headless Wine, on the stock AutoHotkey
 1.1.37.02; **read** means it follows from the code and was not run. Nothing was run on Windows. Each run
 carries a tag such as A1 or H3: the letter names its batch (listed under «How this was checked»), and the tag
@@ -56,7 +56,7 @@ marks its lines in the kit's logs.
 | 5 | A new path that another entry holds: on a database list the record keeps its old path while the list shows the new one, twice; a plain list gets the duplicate silently | medium | run | open |
 | 6 | Database lists: the captions, the audio notes and the folders list stay at the old paths; the renamed images lose their captions | medium | run | open |
 | 7 | «Main seed folders list»: no message whatever happens; every network path in the list loses its leading backslash; a list of network paths alone counts as empty; the result is not cleaned | medium | run | open |
-| 8 | Private mode: the two fields hide their text, then the on-screen message prints both strings in full | low | run | open |
+| 8 | Private mode: the two fields hide their text, then the on-screen message prints both strings in full | low | run (the message) + read (the display) | open |
 | 9 | «Entire seen images database»: the progress and time-left display never appears | low | run | open |
 | 10 | The «identical strings» check compares numbers: «01» and «1», «1» and «1.0» are refused | low | run | open |
 | 11 | Small things: 11.1 to 11.6 | low | run / read | open |
@@ -236,10 +236,14 @@ strings in full: «Performing search and replace in the files list index:» with
 same for the seen images database (:99432). QPV's other messages leave paths out in private mode, for example
 :27746, :30613 and :41026.
 
-Run: **I1** (private mode, «Current files list»): both fields have `ES_PASSWORD`; the screen shows «Performing
-search and replace in the files list index: | Z:\…\work\pl\pics | Z:\…\work\pl\photos». The image loader's
-message right after it follows the convention: «ERROR: File not found or access denied |  | \». **I2**: the same
-for «Entire seen images database».
+Run: **I1** (private mode, «Current files list»): both fields have `ES_PASSWORD`; the message handed to the
+on-screen display is «Performing search and replace in the files list index: | Z:\…\work\pl\pics |
+Z:\…\work\pl\photos». The image loader's message right after it follows the convention: «ERROR: File not found or
+access denied |  | \». **I2**: the same for «Entire seen images database».
+
+Read: the display draws the message as it is given. `CreateOSDinfoLine()` (:100217-100340) has no private-mode
+branch and hands `msg` to `drawTextInBox()` (:100278). The kit logs the message handed over; it did not capture
+what was painted. The message stays on screen while the pass runs.
 
 ## 9. «Entire seen images database»: the progress display never appears
 
@@ -302,6 +306,11 @@ the user is not told which path is taken.
   with a drive letter, while `SaveFilesList()` writes every seed folder (:35439-35449). Read.
 - **B. The 350 ms throttle of `retrieveSeenImageDBentry()` never engages.** Its `lastInvoked := A_TickCount`
   (:76048) sits after the two branches that both return, so the static stays 1. Read.
+- **C. The on-screen display's own timing never acts.** `CreateOSDinfoLine()` sets `prevMsg := msg` and only then
+  tests `If (prevMsg!=msg)` before `lastInvoked := A_TickCount` (:100335-100337), so `lastInvoked` stays 1. Three
+  checks hang on it and never act: the hold that keeps an error message on screen when it is about to be removed
+  (:100229-100237), the 95 ms merge of messages in quick succession (:100247), and the box that shows an error a new
+  message would cover (:100254). The panel's own failure messages (E1, E2) get no hold either. Read.
 
 ## Checked and found correct
 
@@ -309,20 +318,22 @@ the user is not told which path is taken.
   Alt+P performs (M3).
 - «Selected files only» with nothing selected: «WARNING: There are no files selected in the QPV list», and the
   panel stays open (L2).
-- «Selected files only» on a database list writes each record from the list's new path, by its record number, so
-  the list and the database agree (L1); it shares the matching rule of finding 1.
+- «Selected files only» changes the selected entries only: with «old\a.png» and «x\d.png» selected, «old\b.png»
+  stays, on a plain list and on a database list (N1, N2). On a database list each record is written from the list's
+  new path, by its record number, so the list and the database agree (N1; L1, where the filled-in text also
+  reached «oldies», shares the matching rule of finding 1).
 - Whole-path mode on a database list: the database and the list agree (B3).
 - With both strings ending in a separator, folder mode moves exactly the folder and its subfolders (A3).
 - A folder-mode collision on a database list refuses the whole folder and says so; nothing changes (E2).
 
 ## Settled earlier, not reported again
 
-- `e5315dc` (2026-07-31, Marius): folder mode renames only the folders.
+- `e5315dc` (2026-07-31): folder mode renames only the folders.
 - 2026-08-27: «Selected files only» on database lists, which writes the records by their numbers; the folder renames
   no longer inherit the checkbox; folder mode reaching the seen images database. Left as they were then: entries
   marked `||` (files deleted from the disk) are rewritten in the list but not in the database by «Selected files
   only». Finding 3 takes in the unbalanced pair of separators noted then as left alone.
-- `9aecb75`, `8cacdee`, `cce29a6`, `ffccbb3` (2026-11-16, Marius): the search ignores the case of every letter in
+- `9aecb75`, `8cacdee`, `cce29a6`, `ffccbb3` (2026-11-16): the search ignores the case of every letter in
   the three passes; two records of one file in the seen images database merge, and a record waits its turn while
   another still holds its new path.
 - A selection of one file does not exist: `getSelectedFiles(0, 1)` clears it when the panel opens, so «Selected
@@ -377,12 +388,18 @@ the user is not told which path is taken.
   `updateSQLdbEntryCaption()` (finding 6).
 - **Batches**: A (plain list, folder mode, the filled-in text), B (database list, folder mode), C (one separator),
   D (filtered lists), E (taken paths), F (the identical check), G (the seen images database), H (the seed folders),
-  I (private mode), J (captions and the folders list), K (two files), L («Selected files only», a network path),
-  M (the buttons and keys).
-- **Read, not run**: an empty «Replace with» (finding 3), the folders list of an `.SLD` file (finding 6), 11.4 and
-  «Seen in passing».
+  I (private mode), J (captions and the folders list), K (two files), L («Selected files only» with the filled-in
+  text and with nothing selected, a network path), M (the buttons and keys), N («Selected files only» with one
+  matching entry left unselected).
+- **Read, not run**: an empty «Replace with» (finding 3), the folders list of an `.SLD` file (finding 6), what the
+  display paints (finding 8), 11.4 and «Seen in passing».
 - **Not run on Windows**, and not run at all: real network shares; Quick search actions or user-defined shortcuts
   fired while the panel is open; collisions inside the seen images database; very large plain lists.
+- **Every plain list run was a folder opened as a list.** No `.SLD` file was run, so the save question and
+  `currentFilesListModified` after a replace are read only. The seed folders target ran on a database list only.
+- **The network-path seed folders of H3 and H4 were written with SQL.** That the app's own «add seed folder»
+  (`addNewFolder2list()`) stores such a path is read only (:67078-67086).
+- **Not run either**: the panel under «Large UI fonts» or the dark mode; no screenshot was taken.
 - **The kit**: `.claude/scratch/search-replace-panel-2026-11-25/` (README.txt). `app/run-sr.sh <tag> <test
   function> [revision]` runs one batch, under a minute each, and writes `app/results/<tag>.txt`; the logs of this
   report are kept there. It reuses the files filter kit's `patch.py`, `patch-ff.py` and shared helpers, and adds
