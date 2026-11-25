@@ -78173,7 +78173,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
            convertBmpToCoreFormat(A_ThisFunc, rBitmap)
         currIMGdetails.HasAlpha := 0
      }
-  } Else If (usrColorDepth>1)
+  } Else If (canCancelImageLoad<3 && usrColorDepth>1)
   {
      infoColorDepth := defineColorDepth()
      setWindowTitle("Converting image to " infoColorDepth)
