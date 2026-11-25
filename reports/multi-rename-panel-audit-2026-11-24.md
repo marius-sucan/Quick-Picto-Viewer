@@ -33,6 +33,21 @@ Earlier work on this panel is not reported again: the 2026-11-08 menus, Status c
 «Settled earlier, not reported again». Finding 5 takes in the second of the two defects left open on
 2026-11-13; the first one no longer holds («Seen in passing» D).
 
+**Status, 2026-11-25.** Every batch was run again at `7ee44f5`, except E and E4. A new batch K replaces them:
+it runs finding 1 with each answer of the save question.
+
+- Finding 1 is fixed in `2663c62` («Rename files») and `1ce44b5` (the double-click and «Solo rename»), by
+  Marius.
+- Finding 2 is fixed in `0433cd3`, by Marius, for the batch, and in `7ee44f5` for the preview and «Check all
+  files».
+- Finding 8 is fixed in `2663c62`, by Marius.
+
+Findings 3 to 7, small things 9.1 to 9.7 and «Seen in passing» A give the same outcomes as at `468aef9`.
+Small things 9.8 and 9.9 and «Seen in passing» B and C were read again: their code is unchanged.
+
+Sections 1, 2 and 8 end with what was run again and a note on what the code does now. Those notes cite
+lines at `7ee44f5`; the other line numbers stay those of `468aef9`.
+
 ## Terms
 
 - **The panel**: panel 8, «Rename multiple files». It opens from `PanelRenameThisFile()` when two or more files
@@ -58,19 +73,22 @@ Earlier work on this panel is not reported again: the 2026-11-08 menus, Status c
 
 | # | Finding | Harm | Checked | Status |
 |---|---------|------|---------|--------|
-| 1 | An edited, unsaved image is discarded without the save question: by «Rename files» when it is among the renamed files, by a double-click on another row, by «Solo rename» on another row | high | run | open |
-| 2 | `case{U}`, `case{L}` and `case{T}` on a name with non-ASCII letters: the file collides with itself | medium | run (Wine) | open |
+| 1 | An edited, unsaved image is discarded without the save question: by «Rename files» when it is among the renamed files, by a double-click on another row, by «Solo rename» on another row | high | run | **fixed**: «Rename files» in `2663c62`, the double-click and «Solo rename» in `1ce44b5`, by Marius |
+| 2 | `case{U}`, `case{L}` and `case{T}` on a name with non-ASCII letters: the file collides with itself | medium | run (Wine) | **fixed**: the batch in `0433cd3`, by Marius; the preview and «Check all files» in `7ee44f5` |
 | 3 | On a database list, the parts of the old name that the new name keeps come out in lowercase on disk, the extension too | medium | run | open |
 | 4 | A plain name with «Overwrite», or «Ask user» answered «Overwrite», skips the file; the status and the summary say «overwrite» | medium | run | open |
 | 5 | The batch meets the names of the other selected files as they change, while the preview judges each file against the disk as it was: names freed earlier read «taken»; under «Overwrite» a selected file is recycled before its own turn | medium | run | open |
 | 6 | A renamed favourite keeps its mark on the new name, and the favourites keep the old path | low | run | open |
 | 7 | The «Invalid RegEx» row acts as a file: a double-click sets the current index to «-», «Solo rename» offers the list's first file | low | run | open |
-| 8 | A preview timer that fires after the panel closed re-creates a hidden panel window, and empties the list of a list panel opened meanwhile | low, narrow | run | open |
+| 8 | A preview timer that fires after the panel closed re-creates a hidden panel window, and empties the list of a list panel opened meanwhile | low, narrow | run | **fixed**, `2663c62`, by Marius |
 | 9 | Small things, numbered 9.1 to 9.9 | low | run and read | open |
+
+The rows give the status at `7ee44f5`.
 
 Finding 1 loses work for good. Findings 2 and 3 rename files to names the user did not ask for, and say
 nothing about it. Findings 4 and 5 do something else than the preview and the summary announce; in finding 5
-that can mean a selected file in the Recycle Bin. Findings 6 to 8 leave stale state behind.
+that can mean a selected file in the Recycle Bin. Findings 6 to 8 leave stale state behind. Findings 1, 2
+and 8 are fixed.
 
 ---
 
@@ -107,6 +125,22 @@ file #1 of three, the pattern `[this]-x`:
 So «Rename files» loses the edits only when the edited image is among the renamed files; the double-click and
 «Solo rename» lose them whenever the row is another file's.
 
+Run again at `7ee44f5` (batch K, every answer of the save question): fixed.
+
+- **«Rename files»**, #1 among the renamed files: «Cancel» (K1) renames nothing and keeps the edits, the current
+  file and the open panel. «Discard» (K2) renames the three files and ends the editing. «Save» (K3) closes the
+  panel, calls the save panel (a log line in the kit) and renames nothing.
+- **A double-click on row 2**: «Cancel» (K4) keeps a.png and its edits on screen; «Discard» (K5) shows b.png.
+- **«Solo rename»** with row 3 highlighted: «Cancel» (K7) keeps a.png, its edits and the panel; «Discard» (K8)
+  shows c.png, and the rename box offers c.png.
+
+**Fixed in `2663c62` and `1ce44b5`**, by Marius. `coreBatchMultiRenameFiles()` asks after the pattern checks,
+before the panel closes (:41978). The double-click asks before it sets `currentFileIndex` (:41775), and
+`BTNdoSoloRename()` before it reads the highlighted row (:41152). The question comes whenever the image is
+modified, so it also comes where nothing would be lost: when the edited file is not among the renamed files
+(K9, the layout of E4), and on a double-click on the edited file's own row (K6). There «Discard» leaves the
+edits in place, because the image on screen does not change.
+
 ---
 
 ## 2. `case{…}` on a name with non-ASCII letters: the file collides with itself
@@ -137,6 +171,16 @@ run shows `FileExist(ÉTÉ.png)=A`, `isSameFileOtherCase()=0` and `"été"="ÉT�
 character); `mapListPaths()` and `scanListPath()` compare paths that way. The single file rename
 (`BTNrenameSoloFileAct()` :48328) and the undo of file actions (`corefileUndoAction()` :95966) call
 `isSameFileOtherCase()` too, so they likely share this finding (read).
+
+Run again at `7ee44f5` (C1-C4): fixed. Every row reads «OK», and «Check all files» says «Will be renamed: 3».
+Under each collision action, été.png and ăîșț.png go through `renameFileCaseOnly()` and become ÉTÉ.png and
+ĂÎȘȚ.png: «Finished renaming 3 out of 3 selected files», with nothing skipped, overwritten or recycled.
+
+**Fixed in `0433cd3`**, by Marius, **and `7ee44f5`**. `isSameFileOtherCase()` compares the two paths lowered
+by `Format("{:L}", …)` and asks `isSameIdentityFile()` whether they name one file (:63556). The status
+compares the lowered new path with the lowered source path (:41265). The single file rename
+(`BTNrenameSoloFileAct()` :48335) and the undo of file actions (`corefileUndoAction()` :95950) call the same
+helper, so they are fixed with it (read, not run).
 
 ---
 
@@ -276,6 +320,14 @@ Runs:
 
 The hidden window did no visible harm in G1 and G2. G3 needs another panel opened within half a second.
 
+Run again at `7ee44f5` (G0 to G3): fixed. The late timer still runs, and the function returns at once.
+No SettingsGUIA window is there afterwards, after «Cancel» (G0, G1) or after «Rename files» (G2), and the
+file actions history keeps its 3 rows (G3). The kit's line «CALL uiPopulateLVmultiRename() with
+AnyWindowOpen=…» still shows, because the kit logs the call before the function's own check.
+
+**Fixed in `2663c62`**, by Marius: `uiPopulateLVmultiRename()` returns when panel 8 is not open
+(:41790-41792).
+
 ---
 
 ## 9. Small things
@@ -347,7 +399,8 @@ The hidden window did no visible harm in G1 and G2. G3 needs another panel opene
   «Overwritten files: 1» (A3) (run).
 - **ASCII case changes** go through `renameFileCaseOnly()` and a temporary name under every collision action
   (abc.png in C1-C4) (run).
-- **The edited image when it is not renamed** keeps its edits through the redisplay (E4) (run).
+- **The edited image when it is not renamed** keeps its edits through the redisplay (E4) (run). At `7ee44f5`
+  the save question comes first, and the edits survive its «Discard» (K9).
 - **«Check all files»** gives the same counts as the preview's statuses in every case run (A1, A4, A5, C1),
   so its numbers inherit findings 4 and 5, nothing more (run).
 - **The page buttons** carry the texts «First», «Previous», «Next» and «Last», which
@@ -378,11 +431,18 @@ The hidden window did no visible harm in G1 and G2. G3 needs another panel opene
 
 ## Decisions to make before fixing
 
+Decisions 1, 2 and 8 are settled, with one question left under 1; the others are open.
+
 1. Finding 1: should «Rename files» ask the save question when the edited image is among the selected files?
    Should the double-click and «Solo rename» ask before they change the image, or should «Solo rename» rename
    the highlighted file without showing it first?
+   **Settled in `2663c62` and `1ce44b5`**, by Marius: the three routes ask before they change the image, and
+   «Solo rename» still shows the highlighted file before the rename box. Open: the question also comes where
+   nothing would be lost (finding 1, K6 and K9).
 2. Finding 2: should `isSameFileOtherCase()` and the status compare with `Format("{:L}", …)`, as
    `mapListPaths()` does? The single file rename and the undo of file actions would change with it.
+   **Settled in `0433cd3`**, by Marius, **and `7ee44f5`**: yes, and the single file rename and the undo of file
+   actions changed with it.
 3. Finding 3: should the batch take each name's spelling from the disk (as `isSameFileOtherCase()` reads it with
    `Loop, Files`) before it builds the new name? Or should database lists keep the spelling (a schema change)?
 4. Finding 4: should a plain name overwrite under «Overwrite», as other patterns do? Or should the rule stay,
@@ -394,6 +454,7 @@ The hidden window did no visible harm in G1 and G2. G3 needs another panel opene
 7. Finding 7: should the «Invalid RegEx» row leave «#» empty, as the other placeholder row does?
 8. Finding 8: should closing the panel stop the timer, or should `uiPopulateLVmultiRename()` return at once when
    panel 8 is not open?
+   **Settled in `2663c62`**, by Marius: the function returns at once when panel 8 is not open.
 9. The 5-second cut of the preview (`selCounter>A_Year`, :41857, `428fcca`): it applies only past file 2,026
    of the selection, a number that grows each year. Is a fixed count meant there?
 10. Small things 9.1 to 9.9 and «Seen in passing» A to C: which to fix.
@@ -427,15 +488,16 @@ The hidden window did no visible harm in G1 and G2. G3 needs another panel opene
 - **Batches**: A (collisions against the preview), B (database lists), C (non-ASCII case), D (the «Invalid RegEx»
   row), E and E4 (an edited image), F (favourites), G and G0 (the late timer), H (the defects left open on
   2026-11-13),
-  I (the font toggle, the page buttons, the history, a network path), J (a swap, an empty file).
+  I (the font toggle, the page buttons, the history, a network path), J (a swap, an empty file), and K
+  (finding 1 run again at `7ee44f5`, with each answer of the save question).
 - **Read, not run, at this revision**: «Insert», «Examples», «Erase history», «Help», «<<», «<», «>>», «Preserve
   original file date and time» and «Dark mode UI». The 2026-11-08 kits ran the menus, «Erase history» and the
   paging at earlier revisions; no finding about them here means none was found by reading.
-- **Not run on Windows**: how NTFS and the Recycle Bin handle the «Overwrite» case of finding 2; what Alt+M does
-  in 9.7; a rename on a network share (A).
+- **Not run on Windows**: how NTFS and the Recycle Bin handle the «Overwrite» case of finding 2, which the
+  batch no longer reaches since its fix; what Alt+M does in 9.7; a rename on a network share (A).
 - **Not run at all**: Escape during «Check all files»; private mode; multi-page preview mode; a selection
   longer than one page; Quick search actions or user-defined shortcuts fired while the panel is open.
 - **The kit**: `.claude/scratch/multi-rename-panel-2026-11-24/` (README.txt). `app/run-mr.sh <tag> <test
   function> [revision]` runs one batch, about a minute each, and writes `app/results/<tag>.txt`; the logs of
-  this report are kept there. It reuses the files filter kit's `patch.py`, `patch-ff.py` and helpers, and adds
-  `patch-mr.py` and `test-mr.ahk`.
+  this report are kept there, those of the runs at `7ee44f5` under the tags `<batch>-7ee44f5`. It reuses the
+  files filter kit's `patch.py`, `patch-ff.py` and helpers, and adds `patch-mr.py` and `test-mr.ahk`.
