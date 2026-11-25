@@ -63,6 +63,7 @@ slice gdip_loader.part    ../lib/thumbs-pool.h '^\/\/ qpv-gdip-loader-begin' '^\
 slice fim_defs.part       ../lib/thumbs-pool.h '^#define TP_JOB_THUMB'      '^#define TP_ERR_PDFLOCKED' 8 || exit 1
 slice fim_config.part     ../lib/thumbs-pool.h '^struct ThumbsConfig {'  '^};' 20 || exit 1
 slice fim_loader.part     ../lib/thumbs-pool.h '^\/\/ qpv-fim-loader-begin' '^\/\/ qpv-fim-loader-end' 250 || exit 1
+slice run_job.part        ../lib/thumbs-pool.h '^static void tpRunJob' '^}' 150 || exit 1
 slice wic_loader.part     ../lib/thumbs-pool.h '^\/\/ qpv-wic-loader-begin' '^\/\/ qpv-wic-loader-end' 250 || exit 1
 slice wic_guards.part     ../lib/wic-loader.h '^static int WICcodecCrashFilter(DWORD code) {' '^\/\/ applyColorManagement() parses the ICC profile' 250 || exit 1
 slice adapt_size.part     ../lib/pdfium-reader.h '^auto adaptImageGivenSize' '^}' 50 || exit 1
@@ -319,9 +320,12 @@ if [ -n "$fimSo" ] && [ -x fim_thumb ]; then
     #       tone map it before the display's colours;
     #   I - a linear RAW colour managed on load, so never tone mapped;
     #   J - a tone mapped thumbnail left in sRGB's colours on a wide gamut display;
-    #   K - a linear RAW that is not tone mapped left without the display's colours.
+    #   K - a linear RAW that is not tone mapped left without the display's colours;
+    #   L - the pages left uncounted: a multi-page file is recorded as one page;
+    #   M - APNG left out of the multi-page formats;
+    #   N - a JPEG turned by its Exif orientation.
     cp fim_loader.part fim_loader.orig
-    for mutant in A B C D E F G H I J K; do
+    for mutant in A B C D E F G H I J K L M N; do
         cp fim_loader.orig fim_loader.part
         extra=""
         case $mutant in
@@ -347,6 +351,12 @@ if [ -n "$fimSo" ] && [ -x fim_thumb ]; then
              label="tone mapped thumbnails left in sRGB's colours" ;;
           K) sed -i 's|    if (displayICC==2 \&\& !toneMap)|    if (false)|' fim_loader.part
              label="an untone mapped linear RAW left without the display's colours" ;;
+          L) sed -i 's|       meta->frames = tpFIMpageCount(GFT, path);|       meta->frames = 1;|' fim_loader.part
+             label="the pages left uncounted" ;;
+          M) sed -i 's/ \&\& GFT!=FIF_APNG//' fim_loader.part
+             label="APNG left out of the multi-page formats" ;;
+          N) sed -i 's|    // a JPEG loads as stored: no loader of QPV turns it by its Exif orientation|    else if (GFT==FIF_JPEG) loadArgs = 0x0008;|' fim_loader.part
+             label="a JPEG turned by its Exif orientation" ;;
         esac
 
         if cmp -s fim_loader.part fim_loader.orig; then

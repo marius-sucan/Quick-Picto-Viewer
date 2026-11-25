@@ -19,12 +19,14 @@
 
 // ---- FreeImage public constants (subset) --------------------------------------------
 
-typedef void* FIBITMAPptr;   // opaque FIBITMAP*
+typedef void* FIBITMAPptr;        // opaque FIBITMAP*
+typedef void* FIMULTIBITMAPptr;   // opaque FIMULTIBITMAP*
 
 // FREE_IMAGE_FORMAT
 #define FIF_UNKNOWN  (-1)
 #define FIF_BMP        0
 #define FIF_JPEG       2
+#define FIF_MNG        6
 #define FIF_PNG       13
 #define FIF_TIFF      18
 #define FIF_PSD       20
@@ -33,7 +35,12 @@ typedef void* FIBITMAPptr;   // opaque FIBITMAP*
 #define FIF_EXR       29
 #define FIF_PFM       32
 #define FIF_RAW       34
+#define FIF_WEBP      35
 #define FIF_JXR       36
+#define FIF_AVIF      37
+#define FIF_HEIF      38
+#define FIF_APNG      39
+#define FIF_JXL       40
 
 // FREE_IMAGE_TYPE
 #define FIT_UNKNOWN    0
@@ -66,12 +73,12 @@ typedef void* FIBITMAPptr;   // opaque FIBITMAP*
 #define FILTER_CATMULLROM 4
 #define FILTER_LANCZOS3   5
 
-// load flags used by MonoGenerateThumb()
-#define JPEG_EXIFROTATE   0x0008
+// load flags used by tpFIMthumb()
 #define RAW_DEFAULT       0
 #define RAW_PREVIEW       1
 #define RAW_DISPLAY       2
 #define FIF_LOAD_DISPLAY_ICC 0x4000   // the pixels converted to the display's ICC profile
+#define FIF_LOAD_NOPIXELS    0x8000   // the header only
 
 // FreeImage_MustTonemap() verdicts
 #define FITM_ERROR       (-1)
@@ -120,6 +127,10 @@ struct FreeImageAPI {
     FIBITMAPptr (__stdcall *ConvertToLinear)(FIBITMAPptr, int) = NULL;
     FIBITMAPptr (__stdcall *ConvertToStandardType)(FIBITMAPptr, BOOL) = NULL;
     BOOL        (__stdcall *ApplyDisplayICCProfile)(FIBITMAPptr) = NULL;
+
+    FIMULTIBITMAPptr (__stdcall *OpenMultiBitmapU)(int, const wchar_t*, BOOL, BOOL, BOOL, int) = NULL;
+    int              (__stdcall *GetPageCount)(FIMULTIBITMAPptr) = NULL;
+    BOOL             (__stdcall *CloseMultiBitmap)(FIMULTIBITMAPptr, int) = NULL;
 };
 
 static FreeImageAPI FIM;
@@ -185,6 +196,9 @@ static void bindFreeImageOnce() {
         BINDFIM(ConvertToLinear, 8);
         BINDFIM(ConvertToStandardType, 8);
         BINDFIM(ApplyDisplayICCProfile, 4);
+        BINDFIM(OpenMultiBitmapU, 24);
+        BINDFIM(GetPageCount, 4);
+        BINDFIM(CloseMultiBitmap, 8);
         #undef BINDFIM
 
         // GetDotsPerMeterX/Y are deliberately not in this list: they only fill in the
@@ -193,6 +207,7 @@ static void bindFreeImageOnce() {
         // So are MustTonemap and ConvertToLinear, which older FreeImage.dll builds do not
         // export; tpFIMthumb() falls back to the bit depth rule without them. Without
         // ApplyDisplayICCProfile it leaves the display's colours to FIF_LOAD_DISPLAY_ICC.
+        // Without the three multi-page entry points every image counts one page.
         FIM.ok = (FIM.GetFileTypeU && FIM.LoadU && FIM.Unload && FIM.GetWidth && FIM.GetHeight
                && FIM.GetBPP && FIM.GetPitch && FIM.GetBits && FIM.GetInfo && FIM.GetImageType
                && FIM.GetColorType && FIM.Rescale && FIM.ConvertTo24Bits && FIM.FlipVertical);

@@ -17,7 +17,7 @@ Table of contents:
    p) AHK_H remnants [before v6.3.5]
 
 
-Dernière mise à jour: mardi 24 novembre 2026.
+Dernière mise à jour: mercredi 25 novembre 2026.
 =====================================================================
 
 -) Introduction
@@ -349,6 +349,13 @@ d) How an image is loaded and displayed on screen
    invoked only if the image does not exceed the GDI+ limit of 536 mgpx.
    When the image exceeds 536 megapixels, it is transferred to FreeImage
    using teleportWICtoFIM().
+
+   WICpreLoadImage() hands high bit depth TIFFs over to FreeImage. When
+   FreeImage cannot read one, LoadBitmapForScreen() calls
+   LoadWICscreenImage() again with fimNext=0, and WIC decodes it.
+
+   No loader turns a JPEG by its Exif orientation: QPV shows and
+   processes JPEGs as they are stored.
 
    LoadWICscreenImage() and LoadFimFile() can return to LoadBitmapForScreen()
    the string "very-large", when an image over 536 megapixels was loaded.

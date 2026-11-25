@@ -146,6 +146,10 @@ around the compile cover everything that is not an image decoder:
   handed to a decoder, a file every loader refuses is a decode failure, and the blur is
   applied as the two passes `Gdip_GaussianBlur()` applied. Which loader a file reaches
   decides what its fingerprints are measured on, so this is where a reordering shows up.
+- **a high bit depth TIFF FreeImage cannot read**, in both pools: `tpRunJob()` is sliced out
+  of `thumbs-pool.h` and runs on the same stand-ins. FreeImage first, WIC is told FreeImage
+  had its turn and keeps the file; WIC first, it hands the file over, FreeImage fails, and WIC
+  decodes it after all.
 - **the properties of the original file** — `imgwidth`, `imgheight`, `imgframes`, `imgdpi`
   and `imgpixfmt` — taken before anything is scaled or converted, and named with the tables
   the interpreter sends through `qpvSetPixelFormatNames()`. The stubbed loaders report a
@@ -270,6 +274,13 @@ linearise in BT.2020's primaries, hand float images on unconverted, mark by form
 depth, leave a colour managed low quality RAW unmarked, colour manage a linear RAW on load,
 leave tone mapped thumbnails in sRGB's colours, and leave a linear RAW that is not tone mapped
 without the display's colours.
+
+It also counts the pages of the eight formats `LoadFimFile()` opens as multi-page: a TIFF, a
+GIF, a WebP, an MNG, an AVIF sequence, a HEIF collection, a JPEG XL animation and an APNG it
+writes, with a still JPEG XL and a single HEIF image as controls. A JPEG is never opened as
+multi-page, and a failed load is not counted. A JPEG of Exif orientation 6 keeps its stored
+600x400, loaded without `JPEG_EXIFROTATE`. Three more mutants leave the pages uncounted,
+leave APNG out of the multi-page formats, and turn a JPEG by its Exif orientation.
 
 **`wic_icm.cpp`** — the colour transform `tpWICload()` builds when colour management is on,
 sliced out of `thumbs-pool.h` together with the WIC guards of `wic-loader.h` and

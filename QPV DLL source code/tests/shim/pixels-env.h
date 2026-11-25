@@ -461,10 +461,33 @@ static Gdiplus::GpBitmap *shimMakeBitmap(int w, int h, unsigned char seed) {
     return b;
 }
 
-static inline Gdiplus::GpBitmap* tpWICload(IWICImagingFactory*, const wchar_t *path, int, int, int, int, int,
-                                           int &srcW, int &srcH, TpSrcMeta *meta = NULL) {
+// the isFIMokay of each WIC call, oldest first: '1' while FreeImage would still come after it.
+// The pool tests call the loaders from several workers at once.
+static std::string gShimWicFimOkay;
+static std::mutex  gShimWicFimOkayLock;
+
+static inline Gdiplus::GpBitmap* tpWICload(IWICImagingFactory*, const wchar_t *path, int, int, int, int, int isFIMokay,
+                                           int &srcW, int &srcH, TpSrcMeta *meta = NULL, int = 0) {
     gShimWicCalls++;
+    {
+       std::lock_guard<std::mutex> lk(gShimWicFimOkayLock);
+       gShimWicFimOkay += (isFIMokay==1) ? '1' : '0';
+    }
     shimFakeDiskDelay(path);
+    // "hdr.tif" is a high bit depth TIFF: the real loader reads its header, then hands it over
+    // to FreeImage when FreeImage comes next
+    if (isFIMokay==1 && path!=NULL && shimPathHas(path, L"hdr.tif"))
+    {
+       srcW = gShimDecodeW*4;
+       srcH = gShimDecodeH*4;
+       if (meta!=NULL)
+       {
+          meta->frames = 3;
+          meta->wicFmt = 15;
+       }
+       return NULL;
+    }
+
     if (gShimWicFails)
     {
        // a failed WIC attempt still touches the record, which is what dpDecodeFile() has
@@ -588,7 +611,7 @@ static inline Gdiplus::GpBitmap* coreRenderPdfPageAsBitmap(const wchar_t *path, 
 }
 
 static inline Gdiplus::GpBitmap* tpGDIPload(const std::wstring &path, int, int, int, int,
-                                            int &srcW, int &srcH, TpSrcMeta *meta = NULL) {
+                                            int &srcW, int &srcH, TpSrcMeta *meta = NULL, int = 0) {
     gShimGdipCalls++;
     if (gShimGdipFails)
        return NULL;

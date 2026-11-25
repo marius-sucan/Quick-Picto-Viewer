@@ -1370,6 +1370,25 @@ static int tpFIMtoneMapVerdict(FIBITMAPptr dib, int GFT) {
     return (GFT==FIF_PFM || GFT==FIF_HDR || GFT==FIF_EXR) ? FITM_REQUIRED : FITM_OPTIONAL;
 }
 
+// The pages of the eight formats LoadFimFile() opens as multi-page; any other file counts one.
+// The plugins count them without the open flags, which only reach the pages a lock loads.
+static int tpFIMpageCount(int GFT, const std::wstring &path) {
+    if (FIM.OpenMultiBitmapU==NULL || FIM.GetPageCount==NULL || FIM.CloseMultiBitmap==NULL)
+       return 1;
+
+    if (GFT!=FIF_MNG && GFT!=FIF_TIFF && GFT!=FIF_GIF && GFT!=FIF_WEBP && GFT!=FIF_AVIF
+     && GFT!=FIF_HEIF && GFT!=FIF_APNG && GFT!=FIF_JXL)
+       return 1;
+
+    FIMULTIBITMAPptr multi = FIM.OpenMultiBitmapU(GFT, path.c_str(), FALSE, TRUE, FALSE, FIF_LOAD_NOPIXELS);
+    if (multi==NULL)
+       return 1;
+
+    const int pages = FIM.GetPageCount(multi);
+    FIM.CloseMultiBitmap(multi, 0);
+    return (pages>1) ? pages : 1;
+}
+
 static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring &path, const std::wstring &dst,
                                      DWORD startTick, int &srcW, int &srcH, int &status, int &savedToFile,
                                      TpSrcMeta *meta = NULL) {
@@ -1388,8 +1407,7 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
        loadArgs = (cfg->userHQraw==1) ? RAW_DEFAULT : RAW_DISPLAY;
     else if (GFT==FIF_RAW)
        loadArgs = (cfg->userHQraw==1) ? RAW_DEFAULT : RAW_PREVIEW;
-    else if (GFT==FIF_JPEG)
-       loadArgs = JPEG_EXIFROTATE;   // as FIMdecideLoadArgs() loads them
+    // a JPEG loads as stored: no loader of QPV turns it by its Exif orientation
 
     // as FIMdisplayICCmode() decides: a camera RAW decoded at high quality is linear light, tone
     // mapped before FreeImage_ApplyDisplayICCProfile() gives it the display's colours (2); the
@@ -1432,11 +1450,6 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
        fimSrcColor = FIM.GetColorType(dib);
        meta->fimBPP   = fimSrcBPP;
        meta->fimColor = fimSrcColor;
-       // A page count needs the file reopened as a multi-bitmap, which this loader never
-       // does - and neither does FreeImage_SimpleGetPageCount(), whose DllCall names an
-       // entry point that does not exist and which therefore always answers 1. The formats
-       // that really carry pages, GIF and TIFF, are WIC's here.
-       meta->frames = 1;
        if (FIM.GetDotsPerMeterX!=NULL && FIM.GetDotsPerMeterY!=NULL)
        {
           const double dpmX = (double)FIM.GetDotsPerMeterX(dib);
@@ -1615,6 +1628,10 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
        return NULL;
     }
 
+    // counted once the full size bitmap is gone: WebP and JPEG XL read the whole file again
+    if (meta!=NULL)
+       meta->frames = tpFIMpageCount(GFT, path);
+
     status = TP_OK;
     return result;
 }
@@ -1659,7 +1676,7 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
         } else
         {
            const std::wstring ext = tpFileExtension(job.src);
-           const bool fimHandles  = (FIM.ok && (cfg->allowFIM==1 && tpFimExts.count(ext)>0 || cfg->firstFIM==1));
+           const bool fimHandles  = (FIM.ok && ((cfg->allowFIM==1 && tpFimExts.count(ext)>0) || cfg->firstFIM==1));
            if (ext==L"svg")
            {
               // a factory of this worker's own, made on first use so a session that never opens

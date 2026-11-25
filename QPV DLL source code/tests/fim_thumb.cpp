@@ -73,9 +73,12 @@ static struct {
     BYTE*       (*GetScanLine)(FIBITMAPptr, int);
     const void* (*GetBuiltInICCProfile)(int, DWORD*);
     BOOL        (*SetDisplayICCProfile)(const void*, DWORD, int);
+    FIMULTIBITMAPptr (*OpenMultiBitmap)(int, const char*, BOOL, BOOL, BOOL, int);
+    void        (*AppendPage)(FIMULTIBITMAPptr, FIBITMAPptr);
 } X;
 
 static int gLastLoadFlags = -1;
+static int gMultiOpens = 0;
 
 static std::string narrow(const wchar_t *w) {
     std::string s;
@@ -90,6 +93,10 @@ static FIBITMAPptr shimLoadU(int fif, const wchar_t *p, int flags) {
 }
 static BOOL shimSaveU(int fif, FIBITMAPptr dib, const wchar_t *p, int flags) {
     return X.Save(fif, dib, narrow(p).c_str(), flags);
+}
+static FIMULTIBITMAPptr shimOpenMultiBitmapU(int fif, const wchar_t *p, BOOL createNew, BOOL readOnly, BOOL keepCache, int flags) {
+    gMultiOpens++;
+    return X.OpenMultiBitmap(fif, narrow(p).c_str(), createNew, readOnly, keepCache, flags);
 }
 
 // ---- running the loader ---------------------------------------------------------------------
@@ -297,6 +304,67 @@ static std::string makeWidenedTiff(const std::string &jpeg, const std::string &s
     return ok ? out : "";
 }
 
+// test.jpg made into an animated PNG of three frames
+static std::string makeApng(const std::string &jpeg, const std::string &scratch) {
+    FIBITMAPptr src = X.Load(2, jpeg.c_str(), 0);
+    FIBITMAPptr page = (src!=NULL) ? FIM.ConvertTo32Bits(src) : NULL;
+    if (src!=NULL)
+       FIM.Unload(src);
+    if (page==NULL)
+       return "";
+
+    const std::string out = scratch + "/fim_thumb_anim.png";
+    remove(out.c_str());
+    FIMULTIBITMAPptr multi = X.OpenMultiBitmap(FIF_APNG, out.c_str(), TRUE, FALSE, TRUE, 0);
+    if (multi!=NULL)
+    {
+       for (int i = 0; i < 3; i++)
+           X.AppendPage(multi, page);
+       FIM.CloseMultiBitmap(multi, 0);
+    }
+    FIM.Unload(page);
+    return (multi!=NULL) ? out : "";
+}
+
+// a copy of a JPEG whose one Exif block holds nothing but Orientation, right after the SOI marker
+static std::string jpegWithOrientation(const std::string &jpeg, const std::string &out, int orientation) {
+    std::vector<unsigned char> b;
+    FILE *f = fopen(jpeg.c_str(), "rb");
+    if (f==NULL)
+       return "";
+    for (int c = fgetc(f); c!=EOF; c = fgetc(f))
+        b.push_back((unsigned char)c);
+    fclose(f);
+    if (b.size()<4 || b[0]!=0xFF || b[1]!=0xD8)
+       return "";
+
+    // APP1: "Exif\0\0", a little-endian TIFF header, IFD0 with one SHORT entry, no next IFD
+    const unsigned char app1[36] = { 0xFF, 0xE1, 0x00, 0x22, 'E', 'x', 'i', 'f', 0, 0,
+                                     'I', 'I', 0x2A, 0, 0x08, 0, 0, 0,
+                                     0x01, 0, 0x12, 0x01, 0x03, 0, 0x01, 0, 0, 0, (unsigned char)orientation, 0, 0, 0,
+                                     0, 0, 0, 0 };
+    std::vector<unsigned char> o(b.begin(), b.begin() + 2);
+    o.insert(o.end(), app1, app1 + sizeof(app1));
+    // the segments before the scan, less the file's own Exif blocks
+    size_t i = 2;
+    while (i + 4<=b.size() && b[i]==0xFF && b[i + 1]!=0xDA)
+    {
+        const size_t end = min(i + 2 + ((size_t)b[i + 2]<<8 | b[i + 3]), b.size());
+        const bool exif = b[i + 1]==0xE1 && i + 10<=b.size() && memcmp(&b[i + 4], "Exif\0\0", 6)==0;
+        if (!exif)
+           o.insert(o.end(), b.begin() + i, b.begin() + end);
+        i = end;
+    }
+    o.insert(o.end(), b.begin() + i, b.end());
+
+    f = fopen(out.c_str(), "wb");
+    if (f==NULL)
+       return "";
+    const bool ok = fwrite(o.data(), 1, o.size(), f)==o.size();
+    fclose(f);
+    return ok ? out : "";
+}
+
 int main(int argc, char **argv) {
     printf("thumbs-pool.h FreeImage loader, against the real FreeImage\n");
     if (argc<3)
@@ -322,6 +390,8 @@ int main(int argc, char **argv) {
     BINDX(GetScanLine, "FreeImage_GetScanLine");
     BINDX(GetBuiltInICCProfile, "FreeImage_GetBuiltInICCProfile");
     BINDX(SetDisplayICCProfile, "FreeImage_SetDisplayICCProfile");
+    BINDX(OpenMultiBitmap, "FreeImage_OpenMultiBitmap");
+    BINDX(AppendPage, "FreeImage_AppendPage");
     #undef BINDX
 
     check(FIM.MustTonemap!=NULL && FIM.ConvertToLinear!=NULL,
@@ -333,10 +403,19 @@ int main(int argc, char **argv) {
        return 2;
     }
 
+    check(FIM.OpenMultiBitmapU!=NULL && FIM.GetPageCount!=NULL && FIM.CloseMultiBitmap!=NULL,
+          "freeimage-dynamic.h binds the three multi-page entry points");
+    if (!X.OpenMultiBitmap || !X.AppendPage)
+    {
+       printf("  ERROR: this FreeImage build has no FreeImage_OpenMultiBitmap()\n");
+       return 2;
+    }
+
     FIM.GetFileTypeU = shimGetFileTypeU;
     FIM.GetFIFFromFilenameU = shimGetFIFFromFilenameU;
     FIM.LoadU = shimLoadU;
     FIM.SaveU = shimSaveU;
+    FIM.OpenMultiBitmapU = shimOpenMultiBitmapU;
 
     const std::string root = argv[1], scratch = argv[2];
     const std::string pq    = root + "/TestAPI/AVIF/data/seine_hdr_rec2020.avif";
@@ -578,11 +657,68 @@ int main(int argc, char **argv) {
         FIM.ConvertToLinear = keepLin;
     }
 
+    // ---- pages ------------------------------------------------------------------------------
+    printf("  the pages of the eight multi-page formats, counted as LoadFimFile() counts them\n");
+    {
+        const std::string apng = makeApng(jpeg, scratch);
+        const struct { std::string file; int pages; const char *what; } cases[] = {
+            { root + "/TestAPI/mpages.tif",                         16, "a TIFF of 16 pages counts 16" },
+            { root + "/TestAPI/sample.gif",                          3, "a GIF of 3 frames counts 3" },
+            { root + "/TestAPI/AVIF/fi_avif_anim.webp",              5, "a WebP of 5 frames counts 5" },
+            { root + "/TestAPI/MNG/mng_anim.mng",                    4, "an MNG of 4 frames counts 4" },
+            { root + "/TestAPI/AVIF/data/colors-animated-8bpc.avif", 5, "an AVIF sequence of 5 frames counts 5" },
+            { root + "/TestAPI/HEIF/samples/nokia/random_collection_1440x960.heic", 4,
+                                                                         "a HEIF collection of 4 images counts 4" },
+            { root + "/TestAPI/JXL/fi_jxl_anim.jxl",                 7, "a JPEG XL animation of 7 frames counts 7" },
+            { apng,                                                  3, "an APNG of 3 frames counts 3" },
+            { root + "/TestAPI/JXL/fi_jxl_one.jxl",                  1, "a still JPEG XL counts 1" },
+            { heif,                                                  1, "a single HEIF image counts 1" },
+        };
+        for (const auto &c : cases)
+        {
+            if (c.file.empty() || !have(c.file))
+               continue;
+            Thumb t = thumb(c.file, baseConfig());
+            check(t.status==TP_OK && t.meta.frames==c.pages, c.what);
+        }
+
+        gMultiOpens = 0;
+        Thumb t = thumb(jpeg, baseConfig());
+        check(t.status==TP_OK && t.meta.frames==1 && gMultiOpens==0, "a JPEG counts 1, never opened as multi-page");
+        if (!apng.empty())
+           remove(apng.c_str());
+    }
+
+    // ---- Exif orientation -------------------------------------------------------------------
+    printf("  a JPEG turned by its Exif orientation is loaded as stored\n");
+    {
+        const std::string turned = jpegWithOrientation(jpeg, scratch + "/fim_thumb_orientation6.jpg", 6);
+        if (turned.empty())
+           check(false, "test.jpg is given an Exif orientation of 6");
+        else
+        {
+           FIBITMAPptr control = X.Load(2, turned.c_str(), 0x0008);   // JPEG_EXIFROTATE
+           check(control!=NULL && FIM.GetWidth(control)==400 && FIM.GetHeight(control)==600,
+                 "the 600x400 file turns to 400x600 when FreeImage is asked to turn it");
+           if (control!=NULL)
+              FIM.Unload(control);
+
+           Thumb t = thumb(turned, baseConfig());
+           check(t.status==TP_OK && t.srcW==600 && t.srcH==400 && t.outW>t.outH,
+                 "tpFIMthumb() keeps it 600x400, as stored");
+           check((gLastLoadFlags & 0x0008)==0, "it loads it without JPEG_EXIFROTATE");
+           remove(turned.c_str());
+        }
+    }
+
     // ---- what is refused -------------------------------------------------------------------
     printf("  the files it refuses\n");
     {
+        gMultiOpens = 0;
         Thumb t = thumb(scratch + "/no such file.png", baseConfig());
         check(t.status==TP_ERR_LOAD && t.mean<0, "a file that is not there fails the load");
+        t = thumb(scratch + "/no such file.tif", baseConfig());
+        check(t.status==TP_ERR_LOAD && gMultiOpens==0, "a TIFF that fails the load is not counted");
     }
 
     check(gShimLiveBitmaps==0, "every GDI+ bitmap handed back was disposed");

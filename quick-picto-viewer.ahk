@@ -45052,8 +45052,6 @@ pdfJoinerGetPdfUserOptions(asConvertToPDF:=0) {
    }
 
    pdf := {dpi: clampInRange(userCombinePDFdpi, 50, 1200), quality: clampInRange(userJpegQuality, 1, 100), bgColor: "0x" UserCombinePDFbgrColor}
-   ; of the loaders, only FreeImage turns JPEGs by their EXIF orientation [FIMdecideLoadArgs]
-   pdf.exifTurns := (alwaysOpenWithFIM=1 && allowFIMloader=1 && wasInitFIMlib=1) ? 1 : 0
    If (asConvertToPDF=1)
    {
       pdf.pageSize := 9,      pdf.frames := 1
@@ -45301,18 +45299,13 @@ pdfJoinerAddOriginalJpeg(hPdf, imgPath, pdfOptions) {
 
    imgW := NumGet(info, 0, "UInt")
    imgH := NumGet(info, 4, "UInt")
-   If (pdfOptions.exifTurns=1 && NumGet(info, 12, "UInt")>4)   ; EXIF orientations 5 to 8 turn the image by 90°
-   {
-      imgW := NumGet(info, 4, "UInt")
-      imgH := NumGet(info, 0, "UInt")
-   }
-
    L := pdfJoinerPlaceImageOnPage(imgW, imgH, pdfOptions)
    ; a file more than 1.5 times as dense as the chosen DPI is resampled instead
    If (L.scale*1.5<1)
       Return 1
 
-   Return DllCall("qpvmain.dll\PdfWriterAddJpegFile", "UPtr", hPdf, "WStr", imgPath, "Int", pdfOptions.exifTurns, "Double", L.pw, "Double", L.ph, "Double", L.x, "Double", L.y, "Double", L.w, "Double", L.h, "UInt", pdfOptions.bgColor, "Int")
+   ; useOrientation=0: the page shows the JPEG as stored, as QPV does
+   Return DllCall("qpvmain.dll\PdfWriterAddJpegFile", "UPtr", hPdf, "WStr", imgPath, "Int", 0, "Double", L.pw, "Double", L.ph, "Double", L.x, "Double", L.y, "Double", L.w, "Double", L.h, "UInt", pdfOptions.bgColor, "Int")
 }
 
 pdfJoinerAddBitmapPage(hPdf, pBitmap, pdfOptions, hasAlpha) {
@@ -62913,8 +62906,7 @@ FIMdecideLoadArgs(imgPath, qualityRaw, ByRef GFT, cmykInks:=0) {
       loadArgs := (qualityRaw=1) ? 0 : 2
    Else If (GFT=34)
       loadArgs := (qualityRaw=1) ? 0 : 2
-   Else If (GFT=2)
-      loadArgs := 8
+   ; a JPEG loads as stored: no loader of QPV turns it by its Exif orientation
 
    If (cmykInks=1 && userPerformColorManagement=1)
       loadArgs |= (GFT=2) ? 4 : (GFT=18) ? 1 : 0   ; JPEG_CMYK, TIFF_CMYK
@@ -64947,8 +64939,9 @@ combineImagesFimMultiPage(modus, userFmt, destFilePath, setW, setH, setRes) {
 }
 
 loadWICasFreeImage(imgPath, frameu, useICM) {
+; the fallback for a file FreeImage failed to load: WIC keeps the high bit depth TIFFs [isFIMokay=0]
    VarSetCapacity(resultsArray, 8 * 9, 0)
-   cBPP := DllCall("qpvmain.dll\WICpreLoadImage", "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "int", wasInitFIMlib, "Int")
+   cBPP := DllCall("qpvmain.dll\WICpreLoadImage", "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "int", 0, "Int")
    If (cBPP>1 && cBPP<=64)
    {
       Width := NumGet(resultsArray, 4 * 0, "uInt")
@@ -64962,38 +64955,10 @@ loadWICasFreeImage(imgPath, frameu, useICM) {
          z := teleportWICtoFIM(Width, Height, cBPP, useICM, 1)
       ; fnOutputDebug(A_ThisFunc ": wicca " hFIFimgA)
       ; ToolTip, % z[1] "|" pBitmap "|" cBPP "|" Gdip_GetImagePixelFormat(pBitmap, 2) , , , 2
-      ; the Exif orientation, applied for the JPEG [4] and TIFF [5] decoders of WIC, which never turn the pixels
-      If isVarEqualTo(NumGet(resultsArray, 4 * 5, "uInt"), 4, 5)
-         orientation := NumGet(resultsArray, 4 * 9, "uInt")
    }
    DllCall("qpvmain.dll\WICdestroyPreloadedImage", "Int", 12, "Int")
    resultsArray := ""
-   If (z[1] && orientation>=2 && orientation<=8)
-   {
-      hTurned := FIMturnByExifOrientation(z[1], orientation)
-      If (hTurned!=z[1])
-      {
-         ; a turned copy owns its pixels: the WIC buffer goes
-         FreeImage_UnLoad(z[1])
-         DestroyMemoryBuffer(z[2])
-         z := hTurned ? [hTurned, 0] : ""
-      }
-   }
    return z
-}
-
-FIMturnByExifOrientation(hImage, orientation) {
-; turns the pixels as an Exif Orientation of 2 to 8 asks, as FreeImage's JPEG_EXIFROTATE does: flips are made
-; in place, turns return a new bitmap, or 0 when that fails
-   Static angles := {3:180, 5:90, 6:-90, 7:-90, 8:90}
-   If angles.HasKey(orientation)
-      hImage := FreeImage_Rotate(hImage, angles[orientation])
-
-   If (hImage && orientation=2)
-      FreeImage_FlipHorizontal(hImage)
-   Else If (hImage && isVarEqualTo(orientation, 4, 5, 7))
-      FreeImage_FlipVertical(hImage)
-   Return hImage
 }
 
 loadRenderedFileAsFIM(imgPath, page:=0, maxSide:=0) {
@@ -65024,7 +64989,7 @@ LoadBitmapAsFreeImage(imgPath, allowHDR, allowFallback, ByRef oImgW, ByRef oImgH
    {
       If (RegExMatch(imgPath, RegExWICfmtPtrn) && allowWICloader=1)
       {
-         oBitmap := LoadWICimage(imgPath, 0, 0, userPerformColorManagement)
+         oBitmap := LoadWICimage(imgPath, 0, 0, userPerformColorManagement,,, 0)
          If validBMP(oBitmap)
          {
             hFIFimgA := ConvertPBITMAPtoFIM(oBitmap)
@@ -77578,7 +77543,12 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
      ; fnOutputDebug(A_ThisFunc ": load time with WIC: " A_TickCount - tt)
      tt := A_TickCount
      If (!validBMP(oBitmap) && wasInitFIMlib=1 && allowFIMloader=1 && oBitmap!="very-large")
+     {
         oBitmap := LoadFimFile(imgPath, 0, 0, frameu, 0, n, 1, 1)
+        ; a high bit depth TIFF WIC handed over to FreeImage, which cannot read it
+        If (!validBMP(oBitmap) && oBitmap!="very-large" && RegExMatch(imgPath, "i)\.tiff?$"))
+           oBitmap := LoadWICscreenImage(imgPath, 0, frameu, userPerformColorManagement, pwd, 0)
+     }
      ; fnOutputDebug(A_ThisFunc ": load time with FIM: " A_TickCount - tt)
      totalFramesIndex := mainLoadedIMGdetails.Frames
      desiredFrameIndex := clampInRange(frameu, 0, totalFramesIndex)
@@ -77760,7 +77730,7 @@ LoadFileWithGDIp(imgPath, noBPPconv:=0, frameu:=0, useICM:=0, sizesDesired:=0, B
 
 LoadBitmapFromFileu(imgPath, noBPPconv:=0, forceGDIp:=0, frameu:=0, sizesDesired:=0, ByRef newSizedImage:=0) {
 ; LoadFimFile() on fail, falls back to LoadWICimage()
-; LoadWICimage() on fail, falls back to LoadFimFile()
+; LoadWICimage() on fail, falls back to LoadFimFile(), and a TIFF then to LoadWICimage() again
 ; LoadFileWithGDIp() on fail, falls back to LoadWICimage(), and if needed to LoadFimFile()
   mainLoadedIMGdetails := []
   If ((RegExMatch(imgPath, RegExFIMformPtrn) || (alwaysOpenWithFIM=1 && forceGDIp=0)) && allowFIMloader=1)
@@ -77774,7 +77744,13 @@ LoadBitmapFromFileu(imgPath, noBPPconv:=0, forceGDIp:=0, frameu:=0, sizesDesired
      oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, userPerformColorManagement, sizesDesired, newBitmap)
      isValid := (noBPPconv=1 && oBitmap=1 || validBMP(oBitmap)) ? 1 : 0
      If (isValid!=1 && allowFIMloader=1 && wasInitFIMlib=1)
+     {
         oBitmap := LoadFimFile(imgPath, noBPPconv, noBPPconv, frameu, sizesDesired, newBitmap, 1)
+        isValid := (noBPPconv=1 && oBitmap=1 || validBMP(oBitmap)) ? 1 : 0
+        ; a high bit depth TIFF WIC handed over to FreeImage, which cannot read it
+        If (isValid!=1 && RegExMatch(imgPath, "i)\.tiff?$"))
+           oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, userPerformColorManagement, sizesDesired, newBitmap, 0)
+     }
      newSizedImage := newBitmap
   } Else 
   {
@@ -102865,7 +102841,7 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
      addJournalEntry("Failed to load image file using FreeImage library:`n" imgPath)
      If (RegExMatch(imgPath, RegExWICfmtPtrn) && allowWICloader=1 && nofall=0)
      {
-        oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, userPerformColorManagement, sizesDesired, gBitmap)
+        oBitmap := LoadWICimage(imgPath, noBPPconv, frameu, userPerformColorManagement, sizesDesired, gBitmap, 0)
         newBitmap := gBitmap
         Return oBitmap
      }
@@ -102940,7 +102916,15 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
   mainLoadedIMGdetails.DPI := Round((dpix + dpiy)/2)
   mainLoadedIMGdetails.Width := imgW
   mainLoadedIMGdetails.Height := imgH
-  mainLoadedIMGdetails.Frames := (hasOpenedMulti!=1) ? 0 : tFrames - 1
+  If (noBPPconv=1 || noBMP=1)
+  {
+     ; the details alone: the pages counted as the pools of qpvmain.dll count them
+     hMultiBMP := combineFimOpenPages(imgPath, GFT, tFrames)
+     If hMultiBMP
+        FreeImage_CloseMultiBitmap(hMultiBMP, 0)
+     mainLoadedIMGdetails.Frames := (tFrames>1) ? tFrames - 1 : 0
+  } Else
+     mainLoadedIMGdetails.Frames := (hasOpenedMulti!=1) ? 0 : tFrames - 1
   mainLoadedIMGdetails.HasAlpha := (InStr(ColorsType, "rgba") || hasMultiTrans) ? 1 : 0
   mainLoadedIMGdetails.RawFormat := fileType " | " imgType
   mainLoadedIMGdetails.PixelFormat := StrReplace(oimgBPP, "-", "+") "-" ColorsType toneMapped
@@ -104227,7 +104211,8 @@ generateViewPortPDFbookmarks(imgPath, pwd) {
   }
 }
 
-LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM, ByRef pwd) {
+LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM, ByRef pwd, fimNext:=1) {
+; fimNext=0 - FreeImage failed already: WIC keeps the high bit depth TIFFs it hands over to FreeImage
    ; pBitmap := ""
    ; loop, 125
    ; {
@@ -104252,7 +104237,7 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM, ByRef pwd) {
    tt := startZeit := A_TickCount
    VarSetCapacity(resultsArray, 8 * 9, 0)
    ; fnOutputDebug(A_ThisFunc ": to load = " imgPath)
-   fimu := (wasInitFIMlib=1 && allowFIMloader=1) ? 1 : 0
+   fimu := (fimNext=1 && wasInitFIMlib=1 && allowFIMloader=1) ? 1 : 0
    r := DllCall("qpvmain.dll\WICpreLoadImage", "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "int", fimu, "Int")
    ; fnOutputDebug(A_ThisFunc ": load time with WIC: " A_TickCount - tt)
    If r
@@ -104411,7 +104396,8 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM, simpleMode) {
    Return 0
 }
 
-LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitmap:=0) {
+LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitmap:=0, fimNext:=1) {
+; fimNext=0 - FreeImage failed already: WIC keeps the high bit depth TIFFs it hands over to FreeImage
    If (WICmoduleHasInit!=1)
       Return addJournalEntry("Failed to load image. WIC failed to initialize. " imgPath)
 
@@ -104441,7 +104427,7 @@ LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitma
    }
 
    VarSetCapacity(resultsArray, 8 * 9, 0)
-   fimu := (wasInitFIMlib=1 && allowFIMloader=1) ? 1 : 0
+   fimu := (fimNext=1 && wasInitFIMlib=1 && allowFIMloader=1) ? 1 : 0
    r := DllCall("qpvmain.dll\LoadWICimage", "Int", 0 ,"Int", noBPPconv, "Int", thisImgQuality, "Int", w, "Int", h, "int", keepAratio, "int", ScaleAnySize, "int", frameu, "int", doFlipu, "int", useICM, "Str", imgPath, "UPtr*", &resultsArray, "int", fimu, "UPtr")
    z := NumGet(resultsArray, 4 * 6, "uInt")
    ; fnOutputDebug(A_ThisFunc ": " r " | " z)

@@ -35,6 +35,32 @@ static INT64 qpvFileTimeToLocalStamp(INT64 ft) {
     return (ft > 0) ? (INT64)20260101120000ll : 0;
 }
 
+// tpRunJob(), the job of the thumbnails pool, sliced out of thumbs-pool.h by run-tests.sh:
+// it runs on the same loader stand-ins as dpDecodeFile(). ThumbJob and ThumbResult mirror
+// thumbs-pool.h, the way the shim mirrors ThumbsConfig and TpSrcMeta.
+#define TP_OK              0
+#define TP_JOB_THUMB       0
+#define TP_JOB_LOADCACHE   1
+#define TP_ERR_PDFLOCKED  20
+struct ThumbJob {
+    INT64        jobId      = 0;
+    int          kind       = TP_JOB_THUMB;
+    int          frameIndex = 0;
+    LONG         generation = 0;
+    std::wstring src;
+    std::wstring dst;
+    std::shared_ptr<const ThumbsConfig> cfg;
+};
+struct ThumbResult {
+    INT64 jobId;
+    void* pBitmap;
+    int   status, savedToFile, srcW, srcH, outW, outH, elapsedMs, loaderUsed;
+    TpSrcMeta meta;
+};
+static std::atomic<LONG> tpGeneration{1};
+static int tpSavePngGdip(Gdiplus::GpBitmap*, const std::wstring&) { return 0; }
+#include "run_job.part"
+
 static std::wstring widenA(const char *s) {
     std::wstring w;
     for (; s && *s; s++) w.push_back((wchar_t)(unsigned char)*s);
@@ -514,6 +540,27 @@ static void jobPipeline() {
         check(resFb.status==DP_OK && resFb.loaderUsed==1 && gShimFimCalls==1 && gShimWicCalls==1 && gShimGdipCalls==0,
               "FreeImage decode failure falls back to WIC before GDI+");
         gShimFimFails = 0;
+    }
+
+    // a high bit depth TIFF FreeImage cannot read: «hdr.tif» is one WIC hands over while
+    // FreeImage comes next, «nofim» one FreeImage refuses
+    {
+        tpFimExts.insert(L"tif");
+        tpWicExts.insert(L"tif");
+        gShimFimCalls = gShimWicCalls = gShimGdipCalls = 0;
+        gShimWicFimOkay.clear();
+        DupePixResult resT;
+        runOne(L"nofim-hdr.tif", cfg, resT);
+        check(resT.status==DP_OK && resT.loaderUsed==1 && gShimFimCalls==1 && gShimWicFimOkay=="0" && gShimGdipCalls==0,
+              "FreeImage first: WIC keeps the TIFF FreeImage failed on");
+
+        tpFimExts.erase(L"tif");
+        gShimFimCalls = gShimWicCalls = gShimGdipCalls = 0;
+        gShimWicFimOkay.clear();
+        runOne(L"nofim-hdr.tif", cfg, resT);
+        check(resT.status==DP_OK && resT.loaderUsed==1 && gShimFimCalls==1 && gShimWicFimOkay=="10" && gShimGdipCalls==0,
+              "WIC first: handed over, FreeImage fails, WIC decodes it after all");
+        tpWicExts.erase(L"tif");
     }
 
     // a FreeImage resize, convert or tone-map failure is a failed loader like a load failure:
@@ -1512,12 +1559,58 @@ static void pdfLockWaitAndPoolIsolation() {
 
 // ---------------------------------------------------------------------------------------
 
+// the same TIFF through tpRunJob(): the thumbnails pool runs the loaders in the same order
+static void thumbsJobRetriesTiffWithWic() {
+    printf("  the thumbnails pool's job, on a high bit depth TIFF FreeImage cannot read\n");
+    tpWicExts.clear();
+    tpFimExts.clear();
+    tpWicExts.insert(L"tif");
+    tpFimExts.insert(L"tif");
+    FIM.ok = true;
+    gShimWicFails = gShimFimFails = gShimGdipFails = 0;
+
+    std::shared_ptr<ThumbsConfig> cfg = std::make_shared<ThumbsConfig>();
+    cfg->enableCaching = 0;
+    ThumbJob job;
+    job.cfg = cfg;
+    job.generation = tpGeneration.load();
+    ID2D1Factory *d2dFac = NULL;
+    ThumbResult res;
+    auto run = [&](const wchar_t *file) {
+        job.src = file;
+        gShimFimCalls = gShimWicCalls = gShimGdipCalls = 0;
+        gShimWicFimOkay.clear();
+        tpRunJob(NULL, d2dFac, job, res);
+        if (res.pBitmap!=NULL)
+           Gdiplus::DllExports::GdipDisposeImage((Gdiplus::GpBitmap*)res.pBitmap);
+    };
+
+    run(L"nofim-hdr.tif");
+    check(res.status==TP_OK && res.loaderUsed==1 && gShimFimCalls==1 && gShimWicFimOkay=="0" && gShimGdipCalls==0,
+          "FreeImage first: WIC keeps the TIFF FreeImage failed on");
+
+    tpFimExts.erase(L"tif");
+    run(L"nofim-hdr.tif");
+    check(res.status==TP_OK && res.loaderUsed==1 && gShimFimCalls==1 && gShimWicFimOkay=="10" && gShimGdipCalls==0,
+          "WIC first: handed over, FreeImage fails, WIC decodes it after all");
+
+    tpFimExts.insert(L"tif");
+    run(L"hdr.tif");
+    check(res.status==TP_OK && res.loaderUsed==2 && gShimWicCalls==0, "a TIFF FreeImage reads never reaches WIC");
+
+    if (d2dFac!=NULL)
+       delete d2dFac;
+    tpWicExts.clear();
+    tpFimExts.clear();
+}
+
 int main() {
     printf("dupes-pixels.h\n");
     histogramMatchesTheAHK();
     dumpReadsTheBlueChannel();
     resizeAsksForTheRightModes();
     jobPipeline();
+    thumbsJobRetriesTiffWithWic();
     poolPlumbing();
     collectionAgainstRealSQLite();
     processFailureIsNotMarkedDead();
