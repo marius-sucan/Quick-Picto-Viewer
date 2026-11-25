@@ -38870,7 +38870,7 @@ multiCoreThreadFormatConvert(coreThread, filesList, frameDelay:="") {
       If isSameImageFormat(imgPath, rDesireWriteFMT)
       {
          ; a file already in the format is not converted again: it only goes to the destination folder
-         If (ResizeUseDestDir=1 && !isSameFilePath(imgPath, file2save))
+         If (ResizeUseDestDir=1 && !isSameIdentityFile(imgPath, file2save))
          {
             If (FileExist(file2save) && !FolderExist(file2save))
                file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
@@ -38909,7 +38909,7 @@ multiCoreThreadFormatConvert(coreThread, filesList, frameDelay:="") {
       If (mode!="extract")
       {
          ; a file whose name gives another format than it holds would be converted onto itself
-         If isSameFilePath(imgPath, file2save)
+         If isSameIdentityFile(imgPath, file2save)
             file2save := ""
          Else If (FileExist(file2save) && !FolderExist(file2save))
             file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
@@ -62688,7 +62688,7 @@ batchConvert2format() {
       If isSameImageFormat(imgPath, rDesireWriteFMT)
       {
          ; a file already in the format is not converted again: it only goes to the destination folder
-         If (ResizeUseDestDir=1 && !isSameFilePath(imgPath, file2save))
+         If (ResizeUseDestDir=1 && !isSameIdentityFile(imgPath, file2save))
          {
             If (FileExist(file2save) && !FolderExist(file2save))
                file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
@@ -62734,7 +62734,7 @@ batchConvert2format() {
       If (mode!="extract")
       {
          ; a file whose name gives another format than it holds would be converted onto itself
-         If isSameFilePath(imgPath, file2save)
+         If isSameIdentityFile(imgPath, file2save)
          {
             skippedFiles++
             Continue
@@ -63537,31 +63537,19 @@ isSameIdentityFile(fileA, fileB) {
       Return 0
 
    fileID := getFileIdentity(fileA)
-   Return (fileID!="" && fileID=getFileIdentity(fileB))
-}
+   If (fileID!="")
+      Return (fileID=getFileIdentity(fileB))
 
-isSameFilePath(pathA, pathB) {
-; the paths name one file whatever their case, or the doubled backslash of a folder spelled with a trailing one
-   Return (RegExReplace(pathA, "(?<=.)\\{2,}", "\")=RegExReplace(pathB, "(?<=.)\\{2,}", "\")) ? 1 : 0
+   fullA := resolveFullPath(fileA)
+   Return (fullA!="" && fullA==resolveFullPath(fileB))
 }
 
 isSameFileOtherCase(fileA, fileB) {
-; tells whether two spellings of one path, equal but for the case of their letters, name the
-; same file. That is the rule on Windows, its volumes ignore the case, and there a rename from
-; one spelling to the other only changes the case of the name. A directory can be made case
-; sensitive [fsutil, Windows 10 and later], and there the two spellings can be two files, or the
-; second one can be free; FindFirstFile answers with the name as it is stored on the disk, and
-; only the same file answers with the same stored name for both spellings
-   If (fileA==fileB || !(fileA=fileB))
+; two spellings of one path, equal but for letter case, naming the same file on disk
+   If (fileA==fileB || !(Format("{:L}", fileA)==Format("{:L}", fileB)))
       Return 0
 
-   nameA := nameB := ""
-   Loop, Files, %fileA%
-      nameA := A_LoopFileName
-   Loop, Files, %fileB%
-      nameB := A_LoopFileName
-
-   Return (nameA!="" && nameA==nameB) ? 1 : 0
+   Return isSameIdentityFile(fileA, fileB)
 }
 
 countImageFilePages(imgPath) {
@@ -63714,7 +63702,7 @@ convert2format(givenIndex) {
   mode := converterPagesMode(file2rem, rDesireWriteFMT, pages)
   If (mode!="extract")
   {
-     If isSameFilePath(file2rem, file2save)
+     If isSameIdentityFile(file2rem, file2save)
      {
         SoundBeep, 300, 100
         msgBoxWrapper(appTitle ": WARNING", "The image file holds another format than its ." fileEXT " name says, so it cannot be converted onto itself. Please choose a destination folder.", 0, 0, "exclamation")
