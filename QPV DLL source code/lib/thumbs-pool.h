@@ -1030,7 +1030,7 @@ static Gdiplus::GpBitmap* tpGDIPload(const std::wstring &path, int targetW, int 
 
     // the same floor tpWICload() applies: a 1x1 is what a decoder hands back when it gave up
     if (facts.width<1 || facts.height<1 || (facts.width==1 && facts.height==1)
-     || facts.width>0x7FFFFFFFu || facts.height>0x7FFFFFFFu)
+    || facts.width>0x7FFFFFFFu || facts.height>0x7FFFFFFFu)
     {
        Gdiplus::DllExports::GdipDisposeImage(loaded);
        return NULL;
@@ -1461,6 +1461,7 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
     // at full size, while it still has the ICC profile the rescale drops
     if (displayICC==2 && !toneMap)
        FIM.ApplyDisplayICCProfile(dib);
+
     if (toneMap && verdict==FITM_PQ && FIM.ConvertToLinear!=NULL)
     {
        // full size, for the same reason, and in sRGB's primaries, which the tone mapped
@@ -1501,8 +1502,8 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
        QPV_DBG("thumbsPool: failed to rescale " + WideCharToString(path.c_str()));
        return NULL;
     }
-    dib = tmp;
 
+    dib = tmp;
     int imageType = FIM.GetImageType(dib);
     if (imageType==FIT_UINT16)
     {
@@ -1514,9 +1515,9 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
           QPV_DBG("thumbsPool: failed to convert an UINT16 bitmap to greyscale");
           return NULL;
        }
+
        FIM.Unload(dib);
        dib = tmp;
-
        tmp = FIM.ConvertTo24Bits(dib);
        if (tmp==NULL)
        {
@@ -1708,8 +1709,8 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
 
            int hasFIMtried = 0;
            // no other loader reads a PDF
-           const bool isPdf = (ext==L"pdf");
-           if (bmp==NULL && !isPdf && FIM.ok && fimHandles && (cfg->allowFIM==1 || cfg->firstFIM==1))
+           const bool isPdfSvg = (ext==L"pdf" || ext==L"svg");
+           if (bmp==NULL && !isPdfSvg && FIM.ok && fimHandles && (cfg->allowFIM==1 || cfg->firstFIM==1))
            {
               int status = TP_ERR_LOAD, saved = 0;
               int fw = 0, fh = 0;
@@ -1727,8 +1728,11 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
            }
 
            // with no bitmap wanted back, FreeImage hands over none once it wrote the cache file
-           auto fimSavedOnly = [&]() { return bmp==NULL && cfg->wantBitmap!=1 && res.status==TP_OK && res.savedToFile==1; };
-           if (bmp==NULL && !fimSavedOnly() && (tpWicExts.count(ext)>0 || hasFIMtried==1) && !isPdf)
+           auto fimSavedOnly = [&]() {
+                return bmp==NULL && cfg->wantBitmap!=1 && res.status==TP_OK && res.savedToFile==1;
+           };
+
+           if (bmp==NULL && !fimSavedOnly() && (tpWicExts.count(ext)>0 || hasFIMtried==1) && !isPdfSvg)
            {
               // if FreeImage failed, try with WIC; WIC is NOT entirely multi-thread ready.
               // WIC always serializes image processing operations. Unless the user
@@ -1775,7 +1779,7 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
            // FreeImage plugin nor a WIC codec, and the GIFs those two refuse are read here
            // as well - LoadFileWithGDIp() is what draws them in the viewport. A file this
            // cannot open either is unreadable in every sense the product has.
-           if (bmp==NULL && !fimSavedOnly() && !isPdf)
+           if (bmp==NULL && !fimSavedOnly() && !isPdfSvg)
            {
               res.meta = TpSrcMeta();
               bmp = tpGDIPload(job.src, cfg->thumbSize, cfg->thumbSize, job.frameIndex, cfg->imgQuality,

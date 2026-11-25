@@ -418,7 +418,7 @@ uiMenuLoopExit() {
 }
 
 uiRefreshBarAttachments() {
-; [phase D] safety net for the shared attached menus: if anything recreated one
+; safety net for the shared attached menus: if anything recreated one
 ; of them under a NEW HMENU [historically: a popup parent's whole-delete
 ; recursively destroying attached submenus - fixed at the source in deleteMenus],
 ; the bar item would silently point at a dead handle and the JIT map would miss.

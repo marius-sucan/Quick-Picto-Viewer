@@ -4591,7 +4591,9 @@ sendPoolFormatLists() {
       Return
 
    sent := 1
-   DllCall("qpvmain.dll\thumbsPoolSetFormats", "Str", extractFmtsFromRegEx(StrReplace(RegExWICfmtPtrn, "|svg|pdf")), "Str", extractFmtsFromRegEx(RegExFIMformPtrn), "Int")
+   wicu := StrReplace(RegExWICfmtPtrn, "|svg|pdf")
+   fimu := StrReplace(RegExFIMformPtrn, "|sti|x3f", "|sti|x3f|tiff|tif|jpeg|jpg")
+   DllCall("qpvmain.dll\thumbsPoolSetFormats", "Str", extractFmtsFromRegEx(wicu), "Str", extractFmtsFromRegEx(fimu), "Int")
 }
 
 initThumbsPool() {
@@ -41778,8 +41780,10 @@ UIlvMultiRenameResponder(a, b, c) {
       highlightActiveCtrl()
    }
 }
-
 uiPopulateLVmultiRename() {
+  If (AnyWindowOpen!=8)
+     Return
+
   Gui, SettingsGUIA: Default
   Gui, SettingsGUIA: ListView, LViewOthers
   Static actWords := ["skip", "auto-rename", "overwrite", "ask"]
@@ -41964,6 +41968,9 @@ coreBatchMultiRenameFiles() {
   If (objuTemp.regExRemplaceMode=1 && !isValidRegEx(objuTemp.strArrA))
      Return msgBeepTimer("WARNING: The regular expression in the rename pattern is invalid.`nPlease correct the pattern before renaming.")
 
+  If askAboutFileSave(" and the files will be renamed")
+     Return
+
   If (StrLen(OriginalNewFileName)>1)
   {
      filesElected := getSelectedFiles(0, 1)
@@ -41988,7 +41995,7 @@ coreBatchMultiRenameFiles() {
      filezRenamed := countFilez := 0
      nullvara := askAboutFileCollision(0, 0, 1, 3, 0, nullvar)
      countTFilez := skippedFiles := failedFiles := overwrittenFiles := deletedFiles := failedDBfiles := 0
-     if (objuTemp.IndexModeCount=1)
+     If (objuTemp.IndexModeCount=1)
         OutDirAsc := "a"
 
      doStartLongOpDance()
@@ -61567,7 +61574,6 @@ PanelStructuredCopyMoveWindow() {
        Gui, Font, s%LargeUIfontValue%
 
     EditWid := (PrefsLargeFonts=1) ? 455 : 290
-
     ToolTip, Please wait...,,, 2
     UsrCopyMoveOperation := 1
     pk := (uiUseDarkMode=1) ? "" : "-dark"
@@ -68401,7 +68407,7 @@ createMenuImageEditSubMenus(modus:=0) {
 
 InvokeMenuBarVectorFile(manuID:=0, justBuild:=0) {
    deleteMenus()
-   Try Menu, pvMenuBarFile, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
+   Try Menu, pvMenuBarFile, DeleteAll
 
    kMenu("pvMenuBarFile", "Add", "Vector drawing mode", "dummy")
    kMenu("pvMenuBarFile", "Disable", "Vector drawing mode")
@@ -68430,7 +68436,7 @@ InvokeMenuBarVectorInterface(manuID:=0, justBuild:=0) {
 InvokeMenuBarVectorView(manuID:=0, modus:=0, justBuild:=0) {
    If (modus!="extern")
       deleteMenus()
-   Try Menu, pvMenuBarView, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
+   Try Menu, pvMenuBarView, DeleteAll
 
    createMenuImgSizeAdapt()
    kMenu("pvMenuBarView", "Add", "Zoom adapt modes", ":PvImgAdapt")
@@ -68467,7 +68473,7 @@ InvokeMenuBarVectorView(manuID:=0, modus:=0, justBuild:=0) {
 
 InvokeMenuBarVectorSelection(manuID:=0, justBuild:=0) {
    deleteMenus()
-   Try Menu, pvMenuBarSelection, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
+   Try Menu, pvMenuBarSelection, DeleteAll
 
    kMenu("pvMenuBarSelection", "Add", "Select all points`tCtrl+A", "MenuSelAllVectorPoints")
    kMenu("pvMenuBarSelection", "Add", "Total points: " groupDigits(customShapePoints.count()), "dummy")
@@ -68494,7 +68500,7 @@ InvokeMenuBarVectorSelection(manuID:=0, justBuild:=0) {
 
 InvokeMenuBarVectorEdit(manuID:=0, justBuild:=0) {
    deleteMenus()
-   Try Menu, pvMenuBarEdit, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
+   Try Menu, pvMenuBarEdit, DeleteAll
 
    undos := undoVectorShapesLevelsArray.Count()
    If (currentVectorUndoLevel>1 || undos>1)
@@ -68534,7 +68540,7 @@ InvokeMenuBarVectorEdit(manuID:=0, justBuild:=0) {
 
 InvokeMenuBarEditorFile(manuID:=0, justBuild:=0) {
    deleteMenus()
-   Try Menu, pvMenuBarFile, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
+   Try Menu, pvMenuBarFile, DeleteAll
 
    kMenu("pvMenuBarFile", "Add", "Live tool mode", "dummy")
    kMenu("pvMenuBarFile", "Disable", "Live tool mode")
@@ -68573,7 +68579,7 @@ InvokeMenuBarEditorFile(manuID:=0, justBuild:=0) {
 
 InvokeMenuBarFile(manuID:=0, justBuild:=0) {
    deleteMenus()
-   Try Menu, pvMenuBarFile, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
+   Try Menu, pvMenuBarFile, DeleteAll
    createMenuOpenRecents("simple")
    createMenuFavourites()
    If (thumbsDisplaying!=1)
@@ -68681,7 +68687,7 @@ InvokeMenuBarFile(manuID:=0, justBuild:=0) {
 
 InvokeMenuBarEdit(manuID:=0, justBuild:=0) {
    deleteMenus()
-   Try Menu, pvMenuBarEdit, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
+   Try Menu, pvMenuBarEdit, DeleteAll
 
    infoImgEditingNow := isImgEditingNow()
    If (thumbsDisplaying!=1)
@@ -68957,7 +68963,7 @@ InvokeMenuBarEditorSelection(manuID:=0, justBuild:=0) {
 
 InvokeMenuBarSelection(manuID:=0, justBuild:=0) {
    deleteMenus()
-   Try Menu, pvMenuBarSelection, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
+   Try Menu, pvMenuBarSelection, DeleteAll
 
    If (thumbsDisplaying=1)
    {
@@ -69055,7 +69061,7 @@ InvokeMenuBarSelection(manuID:=0, justBuild:=0) {
 
 InvokeMenuBarImage(manuID:=0, justBuild:=0) {
   deleteMenus()
-  Try Menu, pvMenuBarImage, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
+  Try Menu, pvMenuBarImage, DeleteAll
   infoImgEditingNow := isImgEditingNow()
   If (infoImgEditingNow=1)
   {
@@ -69187,7 +69193,7 @@ InvokeMenuBarImage(manuID:=0, justBuild:=0) {
 
 InvokeMenuBarFind(manuID:=0, justBuild:=0) {
   deleteMenus()
-  Try Menu, pvMenuBarFind, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
+  Try Menu, pvMenuBarFind, DeleteAll
   If (maxFilesIndex>1)
   {
      kMenu("pvMenuBarFind", "Add", "Searc&h index`tCtrl+F3", "PanelSearchIndex", "files list")
@@ -69239,7 +69245,7 @@ InvokeMenuBarFind(manuID:=0, justBuild:=0) {
 
 InvokeMenuBarList(manuID:=0, justBuild:=0) {
   deleteMenus()
-  Try Menu, pvMenuBarList, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
+  Try Menu, pvMenuBarList, DeleteAll
   showThese := (StrLen(mustOpenStartFolder)>1 || maxFilesIndex>1) ? 1 : 0
   If (showThese!=1)
   {
@@ -72141,6 +72147,7 @@ kMenu(mena, actu, labelu, funcu:=0, keywords:="", altLabel:="", keepUp:=0, ownKe
    ; funcListu is used to determine if the function is allowed to execute or not, in KeyboardResponder()
    If (ownKeys="")
       ownKeys := InStr(ownKeysMenus, "|" mena "|") ? 1 : 0
+
    If (!InStr(funcu, ":") && simulateMenusMode!=1 && ownKeys!=1)
    {
       ; rename the menus to reflect the custom shortcut[s]
@@ -72352,7 +72359,6 @@ deleteMenus() {
        Return
 
     ; fnOutputDebug("menus deleted")
-    ; [phase D] menus attached to the menu bar as submenus must KEEP their HMENU
     ; [DeleteAll empties them in place] - a whole-menu Delete would orphan the bar
     ; attachment and the WM_INITMENUPOPUP JIT map; the rest still fully delete
     Static menusKeepHandle := "PValpha|PVslide|PVnav|PVview|PVprefs|PvUIprefs|PVsort|PVselv|PVsounds|PVlTools|PVhelp"
@@ -103438,6 +103444,7 @@ initExternalCoreMode(coreThread) {
    }
  
    Try FileRead, filesList, %thumbsCacheFolder%\tempFilesList%coreThread%.txt
+   Sleep, 1
    Try FileDelete, %thumbsCacheFolder%\tempFilesList%coreThread%.txt
    If !filesList
    {

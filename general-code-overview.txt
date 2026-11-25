@@ -31,12 +31,12 @@ Dernière mise à jour: mardi 24 novembre 2026.
    image», et cetera, and have constructors for the different kinds of
    tools. This document is meant to help people get their mittens into
    the code of Quick Picto Viewer by offering pointers to the main
-   functions and how things connect / work.
+   functions and how things connect and work.
 
    Another big problem of the project is the reliance on GDI+. This 
    hinders the performance of the application. I should have used 
    Direct2D and shaders. In addition to this, I find it likely there
-   are better image libraries than FreeImage, eg. OpenCV perhaps.
+   are better image libraries than FreeImage.
 
    And finally, AHK v1.1 is fundamentally not a wise choice for
    coding such a big application, even had I used classes 
@@ -48,20 +48,24 @@ Dernière mise à jour: mardi 24 novembre 2026.
    In 2024, QPV v6.0 was a major development push. This version brought
    full support for images above 536 megapixels (the limit of GDI+),
    through FreeImage. Most of the image editing tools work with such
-   images - through my own DLL: qpvmain.dll. In 2026, another major
-   development drive was possible with AI. Using Gemini and Claude,
-   I optimized and overhauled various parts of QPV. Multi-threaded 
-   thumbnail generation and image duplicates detection were
-   reimplemented in C++. Many image editing tools are now much
-   more efficient.
+   images - through my own DLL: qpvmain.dll.
+
+   In 2026, another major development drive was possible with AI.
+   Using Gemini and Claude, I optimized and overhauled various parts
+   of QPV. Multi-threaded thumbnail generation and image duplicates
+   detection were reimplemented in C++. Many image editing tools are
+   now much more efficient. In v6.3.5, I also eliminated the reliance 
+   on AutoHotkey_H [AHK_H], see section p).
 
    I use a custom build of the FreeImage.DLL. Because the developer 
-   behind FreeImage rarely updates the library, I decided to make my 
-   own version. It has multiple fixes and improvements. It can be 
-   found on GitHub:
+   behind FreeImage ceased to update the library since 2024, I decided
+   to make my own version. It has multiple fixes and improvements.
+   It can be found on GitHub:
    https://github.com/marius-sucan/FreeImage-library/tree/qpv
 
-   In v6.3.5, I eliminated AutoHotkey_H [AHK_H]; see section p).
+   In 2026, with the help of LLMs, I also extended the amount of 
+   changes to FreeImage. I updated the bundled libraries, added a few 
+   more for new image formats, and many other things.
 
 
 a) How Quick Picto Viewer initializes
@@ -72,18 +76,19 @@ a) How Quick Picto Viewer initializes
   instance starts one such QPV process for each core in use, through
   launchExternalCoreThread(). initExternalCoreMode() reads the job
   from the registry and the list of files from a text file, processes
-  the files and exits, without going through the steps below.
+  the files and exits, without going through the steps below. The files 
+  are temporarily stored in \thumbs-cache\tempFilesList%coreThread%.txt.
 
   QPV checks in the registry whether another instance started before;
   if it did less than 600 milliseconds ago, it exits. This is meant
   to prevent a profusion of instances.
 
-  It then loads settings or stores default settings [on first start].
-   - readMainSettingsApp() or writeMainSettingsApp(). These two functions
+  It then loads settings or stores default settings, on first start, via
+  readMainSettingsApp() or writeMainSettingsApp(). These two functions
   load and write only the core settings in an INI: quick-picto-viewer.ini.
-  Each panel [or tool] within QPV loads and stores settings that
-  pertain only to it, in the registry. Such functions are
-  named using this pattern: "ReadSettings*Panel".
+  Each panel (or tool) within QPV loads and stores settings that pertain
+  only to it, in the registry. Such functions are named using this
+  pattern: "ReadSettings*Panel".
 
   initInterfaceModule() registers the input handlers and BuildGUI()
   creates the main window and the viewport windows. If BuildGUI()
@@ -206,9 +211,9 @@ b) How a files list index is created
   RandyIMGids[] array is used whenever the user navigates randomly
   through the indexed files.
 
-  The current position within the index list is held by
-  "currentFileIndex" and the number of indexed files in "maxFilesIndex".
-  The current «random» position is "RandyIMGnow".
+  The current position within the index list is held by "currentFileIndex"
+  and the number of indexed files in "maxFilesIndex". The current «random»
+  position is "RandyIMGnow".
 
   Internally, "CurrentSLD" holds what folder or slideshow file 
   the user has opened, while "SLDtypeLoaded" indicates the type:
@@ -270,9 +275,6 @@ c) Files index filtering
    details. The collected data is cached in memory for subsequent
    queries or index sort operations. If an SQL database is open, 
    the data will be stored in the database as well.
-   
-   The function FilterFilesListuIndex() ends by invoking
-   GenerateRandyList().
 
 
 d) How an image is loaded and displayed on screen
@@ -311,11 +313,6 @@ d) How an image is loaded and displayed on screen
    currently loaded image file and previous one, to help decide 
    if cached GDI bitmaps must be used or not. They can discard
    all cached image data.
-
-   Images are cached as GDI+ bitmap objects by Quick Picto Viewer.
-   This occurs at different levels or stages. This enables users
-   to delete an image file, go to the next one and, if they choose,
-   return to the deleted one and find the cached image, and resave it.
 
    If no cached GDI bitmaps are available or a different image
    file is loaded, ResizeImageGDIwin() will call CloneScreenMainBMP().
@@ -369,9 +366,9 @@ d) How an image is loaded and displayed on screen
    holds various details of the image about to be displayed.
 
    When CloneScreenMainBMP() finishes loading and processing the image,
-   in ResizeImageGDIwin() the GDI+ bitmap dimensions and user 
-   viewing options are used to calculate the dimensions of the image
-   in the viewport and the selection area, if present.
+   in ResizeImageGDIwin() the GDI+ bitmap dimensions and user viewing
+   options are used to calculate the dimensions of the image in the
+   viewport and the selection area, if present.
 
    QPV_ShowImgonGui() is then invoked with multiple parameters.
    This is the function that will render the image on screen.
@@ -437,13 +434,14 @@ d) How an image is loaded and displayed on screen
    by editedImageToCoreFormat(): UserMemBMP is always 32-ARGB.
 
    There are four EX_LAYERED windows: "hGDIthumbsWin", "hGDIwin",
-   "hGDIselectWin", "hGDIinfosWin". There are two global GDI+
-   Graphics, with their own HDCs and GDI hBitmaps: glPG / glHDC
-   and 2NDglPG / 2NDHDC. These are recreated upon window resize
-   events. These windows are created by BuildGUI() found in
-   "module-interface.ahk". The GDI+ canvases are created by
-   createGDIPcanvas() found in the main QPV.ahk file. Auxiliary
-   GDI+ objects are created in initGDIPstuff().
+   "hGDIselectWin", "hGDIinfosWin".
+
+   There are two global GDI+ Graphics, with their own HDCs and
+   GDI hBitmaps: glPG / glHDC and 2NDglPG / 2NDHDC. These are
+   recreated upon window resize events. These windows are created
+   by BuildGUI() found in "module-interface.ahk". The GDI+ canvases
+   are created by createGDIPcanvas() found in the main QPV ahk file.
+   Auxiliary GDI+ objects are created in initGDIPstuff().
 
    See section g) for more details on what windows are created.
 
@@ -523,10 +521,9 @@ f) How slideshows happen
    the same delay, or the length of the audio file associated with
    the image, when that is longer. "slideShowRunning" is a boolean.
 
-   Things get even uglier with GIF animations...
-   autoChangeDesiredFrame() is used for animated GIFs and it is 
-   run with the first parameter set to "start" only from 
-   QPV_ShowImgonGui() and restartGIFplayback(). It is also invoked as a timer.
+   autoChangeDesiredFrame() is used for animated GIFs and it is run
+   with the first parameter set to "start" only from QPV_ShowImgonGui()
+   and restartGIFplayback(). It is also invoked as a timer.
 
    Because I wanted users to have the option to allow GIFs to 
    play entirely before going to the next slide,
@@ -545,10 +542,15 @@ g) Windows, AHK GUIs, Menus, Toolbar
    and of the viewport. The processing and the drawing happen in
    the main file, "quick-picto-viewer.ahk", and in qpvmain.dll.
 
-   The following is a list, a summary, of which functions draw
-   what and on which window(s).
-   All the windows are owned by the "PVhwnd" window.
-   These are created by BuildGUI(), found in "module-interface.ahk".
+   In the past, module-interface.ahk was ran as a different AHK_H
+   thread. But since v6.3.5, I abandoned AHK_H and I made all
+   the necessary changes to make it all work in AHK_L. See section
+   p) for more details.
+
+   The following is a list, a summary, of which functions draw what
+   and on which window[s]. Most windows are owned by the "PVhwnd", main
+   window. Most windows are created by BuildGUI(), found in 
+   "module-interface.ahk".
 
    0. PVhwnd - the variable holding the handle of the main window of QPV
       where various text controls are added
@@ -579,12 +581,12 @@ g) Windows, AHK GUIs, Menus, Toolbar
                               various UI markers [frames counter, scrollbars]
 
    3. hGDIselectWin - 2NDglPG - layered window
-      QPV_ListViewGridHUDoverlay() - thumbnails grid overlay, scrollbar and status bar
-      additionalHUDelements()      - wrapper for the following functions
-         drawImgSelectionOnWindow() - selection area [image view only]
-         drawinfoBox()              - infos box
-         VPnavBoxWrapper()          - image navigation/preview box
-         drawAnnotationBox()        - image captions box [image view only]
+      QPV_ListViewGridHUDoverlay()   - thumbnails grid overlay, scrollbar and status bar
+      additionalHUDelements()        - wrapper for the following functions
+         drawImgSelectionOnWindow()  - selection area [image view only]
+         drawinfoBox()               - infos box
+         VPnavBoxWrapper()           - image navigation/preview box
+         drawAnnotationBox()         - image captions box [image view only]
          drawLiveCreateCustomShape() - live shape drawing [image view only]
 
    4. hGDIinfosWin - 2NDglPG - layered window
@@ -702,27 +704,29 @@ g) Windows, AHK GUIs, Menus, Toolbar
    these menus are in the main file: their names begin with
    "InvokeMenuBar*". Just before a menu of the bar is displayed,
    uiMenuBarJITrebuild() calls its InvokeMenuBar*() function, which
-   rebuilds the menu in place [uiInstallSentMsgHook() installs the
-   hook that catches WM_INITMENUPOPUP for it]. Called with
-   "justBuild" set to 0, the same functions display their menu with
-   showThisMenu(), eg. for the buttons created by CreateTempGuiButton().
-   Why did I do it like this? I hate
-   when apps display all kinds of pointless options that are not
-   relevant to the current context, e.g., the Text menu in Affinity Photo
-   when no text object is manipulated. It is all clutter. As such,
-   I find it imperative to generate the list of menus and sub-menus
-   dynamically, to only display what is relevant. For the same
-   reason, BuildMenuBar() picks the menus of the bar based on the
-   app mode.
+   rebuilds the menu in place. uiInstallSentMsgHook() installs the
+   hook that catches WM_INITMENUPOPUP for it. Called with "justBuild"
+   set to 0, the same functions display their menu with showThisMenu(),
+   e.g., for the buttons created by CreateTempGuiButton().
+
+   Why did I do it like this? I dislike it when applications display
+   pointless options that are not relevant to the current context, 
+   e.g., the Text menu in Affinity Photo when no text object is even 
+   created. It is all clutter. As such, I find it imperative to
+   generate the list of menus and sub-menus dynamically, to only 
+   display what is relevant.
 
    All the menus, and the context menus, are created with the standard 
-   Menu command of AHK; however, I created a wrapper function for it.
+   Menu command of AHK. However, I created a wrapper function for it.
    The list of menus is generated on the go, on demand, based on 
    app/user context[s]. The wrapper helps keep track of the menus
    generated: kMenu(). It records menu names, states and keywords.
-      objuA - menu items by index with properties objuA[menuIndex] := [prop1, prop2,... etc]
-      objuB - maps menu-name and menu-item pairs to indexes of objuA; objuB[menu "-" label] := menuIndex
-      objuC - menu-names and their properties objuC[menu] := [menu-name, container-menu, accelerator-key]
+      - objuA[menuIndex] := [prop1, prop2,... etc]
+             - menu items by index with properties
+      - objuB[menu "-" label] := menuIndex
+             - maps menu-name and menu-item pairs to indexes of objuA
+      - objuC[menu] := [menu-name, container-menu, accelerator-key]
+             - menu-names and their properties
 
    The menus are searchable via PanelQuickSearchMenuOptions() -->
    uiPopulateQuickMenuSearch() --> buildQuickSearchMenus(). The global
@@ -781,18 +785,18 @@ h) Input responses
    Messages to dispatchKeyDown(), which passes them on based on the
    window that receives them: uiWM_KEYDOWN() handles the main window
    and the viewport, while WM_KEYDOWN() handles all the other windows,
-   eg. the panels and the toolbar. Both functions are meant to
+   e.g., the panels and the toolbar. Both functions are meant to
    finish execution as soon as possible. constructKbdKey() is called to
    convert the virtual keys into a readable form. uiWM_KEYDOWN()
    opens the menu bar on Alt+letter and passes the other keys to
    ProcessCriticalKeys(), which acts at once on the keys that cannot
-   wait, eg. Escape or the keys that stop a slideshow. The remaining
+   wait, e.g., Escape or the keys that stop a slideshow. The remaining
    keys reach KeyboardResponder() through PreProcessKbdKey(), which
-   both handlers run from a short timer. KeyboardResponder()
-   is where each keyboard shortcut is actually registered,
-   where the code decides what functions to call based on the keyboard
-   input, and the user context, in-app conditions. QPV allows
-   custom-defined keyboard shortcuts. These are stored as an object:
+   both handlers run from a short timer. KeyboardResponder() is where
+   each keyboard shortcut is actually registered, where the code
+   decides what functions to call based on the keyboard input, and
+   the user context, in-app conditions. QPV allows custom-defined 
+   keyboard shortcuts. These are stored as an object:
    "userCustomKeysDefined". The object is initialized by
    loadCustomUserKbds(). In KeyboardResponder(), if the user-pressed
    key is not customized [or defined] in the aforementioned object,
@@ -807,9 +811,9 @@ h) Input responses
    The mouse clicks on the main window and the viewport are
    handled in "module-interface.ahk": uiWM_LBUTTONDOWN(),
    WM_LBUTTON_DBL() and WM_MBUTTONDOWN() invoke WinClickAction(),
-   found in the main file. The function handles most of the envisaged
-   responses to mouse clicks, based on user context. Several
-   examples:
+   found in the main ahk file. The function handles most of the
+   envisaged responses to mouse clicks, based on user context.
+   Several examples:
      - thumbsListClickResponder()
      - ActPaintBrushNow()
      - ActDrawAlphaMaskBrushNow()
@@ -844,9 +848,9 @@ i) Image live editing
    on the active tool, via createGUItoolbar() and CoreGUItoolbar(). 
 
    Such panels have their controls attached via g-labels to a
-   function prefixed with "updateUI*", eg. updateUIfillPanel(). Such
-   functions update the status of the different available controls: they hide,
-   show, disable or enable controls.
+   function prefixed with "updateUI*", e.g., updateUIfillPanel(). Such
+   functions update the status of the different available controls:
+   they hide, show, disable or enable controls.
 
    The Apply button in these panels is usually attached to
    applyIMGeditFunction(). The function is just a wrapper which invokes 
@@ -865,10 +869,10 @@ i) Image live editing
    Dedicated efforts have been put into generating live previews that do
    not exceed the viewport area, to keep the performance acceptable 
    while staying as faithful as possible to the final output users 
-   get when they press Apply. Many 
-   functions cache generated bitmaps to avoid re-rendering everything, 
-   e.g., generateAlphaMaskBitmap() will reuse the cached bitmap when the
-   preview relies on the same alpha mask options.
+   get when they press Apply. Many  functions cache generated bitmaps
+   to avoid re-rendering everything, e.g., generateAlphaMaskBitmap()
+   will reuse the cached bitmap when the preview relies on the same
+   alpha mask options.
 
    When viewport colour adjustments are active, 
    mergeViewPortEffectsImgEditing() is called first, before the actual 
@@ -878,7 +882,7 @@ i) Image live editing
    not have live preview functions. The actions are live themselves.
    The functions are: ActFloodFillNow() and ActPaintBrushNow().
 
-   Some tools allow users to paint in the alpha mask, eg., fill selected
+   Some tools allow users to paint in the alpha mask, e.g., fill selected
    area. When the user activates this option, toggleAlphaPaintingMode()
    is called. The live brush response during painting is handled by
    ActDrawAlphaMaskBrushNow() together with the specific live preview
@@ -891,7 +895,7 @@ i) Image live editing
    on the canvas.
 
    When images are edited, two images are continually updated:
-   "UserMemBMP" and gdiBitmap. "gdiBitmap" is used for the viewport.
+   "UserMemBMP" and "gdiBitmap". "gdiBitmap" is used for the viewport.
    "UserMemBMP" is the edited bitmap.
 
    When editing images under 536 megapixels, 100 levels are recorded,
@@ -1027,8 +1031,9 @@ l) List view and thumbnails list (soon)
    QPV_listThumbnailsGridMode()
    QPV_ShowThumbnails()
 
-   Thumbnails are generated by a pool of worker threads living inside qpvmain.dll;
-   see thumbs-pool.h and freeimage-dynamic.h in the DLL sources.
+   Thumbnails are generated by a pool of worker threads living inside qpvmain.dll.
+   See thumbs-pool.h and freeimage-dynamic.h in the DLL sources: tpRunJob() is 
+   the image loader.
 
    initThumbsPool()         starts the workers once per process
    QPV_ThumbsPoolBegin()    configures them for one QPV_ShowThumbnails() run
@@ -1038,32 +1043,22 @@ l) List view and thumbnails list (soon)
    QPV_ThumbsPoolEnd()      cancels the leftovers of a run
    QPV_ThumbsPoolShutdown() joins the workers; called from TrueCleanup()
 
-   What actually runs in parallel, and what does not. WIC has no global engine lock, so the image
-   decoding and the Fant scaling run concurrently, one decoder chain per worker; a single
-   image is still decoded by one thread. FreeImage is likewise safe for distinct FIBITMAPs.
-   GDI+ does hold process-wide locks. SVG rendering uses a Direct2D factory per worker,
-   created SINGLE_THREADED on first use, because the shared pD2D1Factory is MULTI_THREADED
-   and that flag means "locked", not "parallel". PDFium has global state and no thread
-   safety at all; it stays serialized behind tpPdfMutex, so PDF thumbnails are built
-   one at a time.
+   PDFium, Direct2D for SVGs, and the Windows Imaging Component (WIC) are executed
+   single threaded. More precisely, only one PDF or SVG at a time is decoded and 
+   rendered. Image formats loaded through WIC are also loaded one at a time, because
+   the computations such as image resize, are not parallelized, even if the execution 
+   is thread-safe. This is why, the primary image loader is FreeImage.
 
-   Both pools try the loaders in one order: SVG and PDF to their own renderers,
-   then FreeImage for the extensions it claims [RegExFIMformPtrn], then WIC for the ones
-   it declares [RegExWICfmtPtrn, minus svg and pdf], then GDI+ [tpGDIPload()] for what is
-   left over - EMF, WMF and the GIFs FreeImage refuses and WIC cannot decode, which is
-   what LoadFileWithGDIp() ends up drawing in the viewport - and for anything the loader
-   that did claim the file failed to open. That last one inherits the process-wide GDI+
-   locks, so a folder full of them decodes with far less overlap than a folder of JPEGs;
-   it is also the loader that hands back a copy and disposes the file-backed bitmap,
-   because GDI+ keeps the file mapped until it goes.
+   SVG rendering uses a Direct2D factory per worker. PDFium has a global state and
+   no thread safety at all. It stays serialized behind "tpPdfMutex".
 
-   The drawing loop of QPV_ShowThumbnails() waits on the workers instead of doing the
-   decoding itself, so it needs its own ways out: it stops when everything is painted,
-   when the user aborts or scrolls, when the workers report nothing pending while some
-   images are still expected, and when nothing at all was delivered for 69.5 seconds
-   [lastPoolProgress]. That last one covers a decoder that never returns. For the same
-   reason thumbsPoolShutdown() waits at most 5 seconds for the workers to report
-   themselves out and abandons the ones that did not, rather than blocking app exit.
+   The drawing loop of QPV_ShowThumbnails() waits on the workers instead of doing
+   the decoding itself. It stops when everything is painted, when the user aborts,
+   when the workers report nothing pending while some images are still expected, 
+   and when nothing at all was delivered for 69.5 seconds: "lastPoolProgress".
+   thumbsPoolShutdown() waits at most 5 seconds for the workers to report
+   themselves out and abandons the ones that did not, rather than blocking
+   application exit.
 
 
 m) Image duplicates identification (soon)
@@ -1072,6 +1067,12 @@ m) Image duplicates identification (soon)
    QPV can identify identical or similar images by comparing file properties, aspect
    ratios, histogram data, or perceptual content hashes (dHash, pHash, lHash). It
    requires saving the current files list as an SQLite database, an SLDB file.
+
+   Since QPV v6.3.0 duplicates detection is fully multi-threaded: image data
+   collection, hashing and hash comparisions. See dupes-pixels.h and dupes-search.h.
+   It was successfully tested on a library of 1.6 million images. Once the data is 
+   collected, hashes are generated in under less than 30 secods on a Core i7 11700,
+   and comparisions take less than 5 seconds.
 
    PanelFindDupes() creates and displays the panel for managing duplicate detection.
    It lets users configure detection presets, hashing precision, threshold distances,
@@ -1224,22 +1225,26 @@ p) AHK_H remnants [before v6.3.5]
    that can run several scripts as threads of one process. The user
    interface lived in its own thread, built from module-interface.ahk;
    the thumbnails, too, were made by such threads until v6.3.00, when
-   the worker pool of qpvmain.dll replaced them. In v6.3.5, I eliminated
-   AHK_H: QPV runs on the standard AHK v1.1 and the main file includes
-   module-interface.ahk like any other library. Remnants of the
-   two-thread design can still be identified:
+   the worker pool of qpvmain.dll replaced them.
+
+   Since v6.3.5, QPV no longer relies on AHK_H. It now runs on the
+   standard AHK v1.1 and the main file includes module-interface.ahk
+   like any other library.
+
+   Remnants of the two-thread design can still be identified:
      - seven functions of module-interface.ahk carry a "ui" prefix,
        because the main file has one of the same name: uiWM_KEYDOWN(),
        uiWM_MOUSEMOVE(), uiWM_LBUTTONDOWN(), uiWM_LBUTTONUP(),
        uiChangeMcursor(), uiKmenu() and uiUpdateUIctrl(); see section h)
+
      - the dispatch*() functions route the mouse and keyboard messages
        by window: the main window and the viewport go to the module's
        handlers, the panels and the toolbar to the main file's, as each
        thread once received messages only for its own windows
+
      - QPV_post() queues a call on a one-shot timer, as
        ahkPostFunction() once did across the threads
-     - comments tagged [merge], [phase D], [phase E] or «pre-merge»,
-       and debug messages prefixed «QPV: MERGE:» or naming a
-       «Main thread» and a «Secondary thread»
-     - reports\interface-thread-merge-plan-2026-08-31.md, the plan and
-       execution log of the merge
+
+     - comments tagged [merge] or «pre-merge», and debug messages
+       prefixed «QPV: MERGE:» or naming a «Main thread» and
+       a «Secondary thread»
