@@ -41149,6 +41149,9 @@ PanelMultiRenameFiles() {
 }
 
 BTNdoSoloRename() {
+   If askAboutFileSave(" and the panel to rename a single file will open")
+      Return
+
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: ListView, LViewOthers
    RowNumber := LV_GetNext(0, "F")
@@ -41769,6 +41772,9 @@ UIlvMultiRenameResponder(a, b, c) {
       UImultiRenameChangeLVoffset("last")
    } Else If (b="DoubleClick")
    {
+      If askAboutFileSave(" and the selected file will be focused")
+         Return
+ 
       currentFileIndex := indexu
       dummyTimerDelayiedImageDisplay(50)
    } Else If (b="RightClick")
@@ -41780,6 +41786,7 @@ UIlvMultiRenameResponder(a, b, c) {
       highlightActiveCtrl()
    }
 }
+
 uiPopulateLVmultiRename() {
   If (AnyWindowOpen!=8)
      Return
@@ -72358,21 +72365,19 @@ deleteMenus() {
     If (mustPreventMenus=1)
        Return
 
-    ; fnOutputDebug("menus deleted")
-    ; [DeleteAll empties them in place] - a whole-menu Delete would orphan the bar
-    ; attachment and the WM_INITMENUPOPUP JIT map; the rest still fully delete
+    ; DeleteAll empties menus in place, without destroying them.
+    ; A whole-menu Delete would orphan the bar attachment and the WM_INITMENUPOPUP JIT map;
     Static menusKeepHandle := "PValpha|PVslide|PVnav|PVview|PVprefs|PvUIprefs|PVsort|PVselv|PVsounds|PVlTools|PVhelp"
          , menusDeleteWhole := "PVmenu|PVtFileOpen|PVtFileImgAct|PVselSize|PVselRatio|PVimgTransform|PVimgCreate|PVimgFilters|PVimgDraw|PVperfs|PVfileSel|PVfList|PVtActFile|PVfilesActs|PVfaves|PVopenF|PVedit|PvImgAdapt|PVimgColorsFX|PVimgSdepth|PVimgVProt|PVimgHistos|PVstats|PvUItoolbarMenu|PVshapeTension|PVselAlign"
     menuCustomNames := []
     kMenu(0, "Reset", 0)
     Loop, Parse, menusKeepHandle, |
         Try Menu, % A_LoopField, DeleteAll
+
     Loop, Parse, menusDeleteWhole, |
     {
         ; empty the parent BEFORE whole-deleting it: Win32 DestroyMenu recursively
-        ; destroys every ATTACHED submenu, so whole-deleting PVmenu while it still
-        ; linked PVview/PVnav/PVslide/... killed the shared HMENUs the menu-bar
-        ; attachments point at - the bar menus silently stopped opening
+        ; destroys every ATTACHED submenu
         Try Menu, % A_LoopField, DeleteAll
         Try Menu, % A_LoopField, Delete
     }

@@ -916,8 +916,6 @@ ShellFileAssociate(Label,Ext,Cmd,batchMode,storePath, bonusArg:=0) {
   Return 1
 }
 
-; [phase E] GetRes() deleted: it existed to read the module-interface.ahk source
-; from the compiled exe resources for ahkThread; the merge made it a plain #Include.
 FormatMessage(ctx, msg, arg="") {
   Global
   Local txt, buf

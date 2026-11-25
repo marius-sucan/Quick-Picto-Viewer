@@ -57,10 +57,9 @@ Dernière mise à jour: mardi 24 novembre 2026.
    now much more efficient. In v6.3.5, I also eliminated the reliance 
    on AutoHotkey_H [AHK_H], see section p).
 
-   I use a custom build of the FreeImage.DLL. Because the developer 
-   behind FreeImage ceased to update the library since 2024, I decided
-   to make my own version. It has multiple fixes and improvements.
-   It can be found on GitHub:
+   I use a custom build of the FreeImage.DLL. Because FreeImage has
+   not been updated since 2024, I decided to make my own version.
+   It has multiple fixes and improvements. It can be found on GitHub:
    https://github.com/marius-sucan/FreeImage-library/tree/qpv
 
    In 2026, with the help of LLMs, I also extended the amount of 
@@ -542,10 +541,9 @@ g) Windows, AHK GUIs, Menus, Toolbar
    and of the viewport. The processing and the drawing happen in
    the main file, "quick-picto-viewer.ahk", and in qpvmain.dll.
 
-   In the past, module-interface.ahk was ran as a different AHK_H
-   thread. But since v6.3.5, I abandoned AHK_H and I made all
-   the necessary changes to make it all work in AHK_L. See section
-   p) for more details.
+   In the past, module-interface.ahk ran as a different AHK_H thread.
+   But since v6.3.5, I abandoned AHK_H and I made all the necessary
+   changes to make it all work in AHK_L. See section p) for more details.
 
    The following is a list, a summary, of which functions draw what
    and on which window[s]. Most windows are owned by the "PVhwnd", main
@@ -1044,13 +1042,13 @@ l) List view and thumbnails list (soon)
    QPV_ThumbsPoolShutdown() joins the workers; called from TrueCleanup()
 
    PDFium, Direct2D for SVGs, and the Windows Imaging Component (WIC) are executed
-   single threaded. More precisely, only one PDF or SVG at a time is decoded and 
-   rendered. Image formats loaded through WIC are also loaded one at a time, because
-   the computations such as image resize, are not parallelized, even if the execution 
-   is thread-safe. This is why, the primary image loader is FreeImage.
+   single threaded. More precisely, only one PDF at a time is decoded and rendered. 
+   Image formats loaded through WIC are also loaded one at a time, because the
+   computations such as image resize, are not parallelized, even if the execution 
+   is thread-safe. This is why the primary image loader is FreeImage.
 
    SVG rendering uses a Direct2D factory per worker. PDFium has a global state and
-   no thread safety at all. It stays serialized behind "tpPdfMutex".
+   no thread safety at all. It stays serialized behind "pdfiumMutex".
 
    The drawing loop of QPV_ShowThumbnails() waits on the workers instead of doing
    the decoding itself. It stops when everything is painted, when the user aborts,
@@ -1069,10 +1067,10 @@ m) Image duplicates identification (soon)
    requires saving the current files list as an SQLite database, an SLDB file.
 
    Since QPV v6.3.0 duplicates detection is fully multi-threaded: image data
-   collection, hashing and hash comparisions. See dupes-pixels.h and dupes-search.h.
+   collection, hashing and hash comparisons. See dupes-pixels.h and dupes-search.h.
    It was successfully tested on a library of 1.6 million images. Once the data is 
-   collected, hashes are generated in under less than 30 secods on a Core i7 11700,
-   and comparisions take less than 5 seconds.
+   collected, hashes are generated in under 30 seconds on a Core i7 11700, and
+   comparisons take less than 5 seconds.
 
    PanelFindDupes() creates and displays the panel for managing duplicate detection.
    It lets users configure detection presets, hashing precision, threshold distances,
