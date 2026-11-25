@@ -34,7 +34,7 @@ Earlier work on this panel is not reported again: the 2026-11-08 menus, Status c
 2026-11-13; the first one no longer holds («Seen in passing» D).
 
 **Status, 2026-11-25.** Every batch was run again at `7ee44f5`, except E and E4. A new batch K replaces them:
-it runs finding 1 with each answer of the save question.
+it runs finding 1 with «Cancel» and «Discard» on each route, and «Save» on «Rename files».
 
 - Finding 1 is fixed in `2663c62` («Rename files») and `1ce44b5` (the double-click and «Solo rename»), by
   Marius.
@@ -125,7 +125,7 @@ file #1 of three, the pattern `[this]-x`:
 So «Rename files» loses the edits only when the edited image is among the renamed files; the double-click and
 «Solo rename» lose them whenever the row is another file's.
 
-Run again at `7ee44f5` (batch K, every answer of the save question): fixed.
+Run again at `7ee44f5` (batch K: «Cancel» and «Discard» on each route, «Save» on «Rename files»): fixed.
 
 - **«Rename files»**, #1 among the renamed files: «Cancel» (K1) renames nothing and keeps the edits, the current
   file and the open panel. «Discard» (K2) renames the three files and ends the editing. «Save» (K3) closes the
@@ -489,7 +489,8 @@ Decisions 1, 2 and 8 are settled, with one question left under 1; the others are
   row), E and E4 (an edited image), F (favourites), G and G0 (the late timer), H (the defects left open on
   2026-11-13),
   I (the font toggle, the page buttons, the history, a network path), J (a swap, an empty file), and K
-  (finding 1 run again at `7ee44f5`, with each answer of the save question).
+  (finding 1 run again at `7ee44f5`: the save question answered «Cancel» and «Discard» on each route, «Save»
+  on «Rename files»).
 - **Read, not run, at this revision**: «Insert», «Examples», «Erase history», «Help», «<<», «<», «>>», «Preserve
   original file date and time» and «Dark mode UI». The 2026-11-08 kits ran the menus, «Erase history» and the
   paging at earlier revisions; no finding about them here means none was found by reading.
