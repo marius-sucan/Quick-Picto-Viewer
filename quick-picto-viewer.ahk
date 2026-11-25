@@ -41262,7 +41262,7 @@ multiRenameFileStatus(srcPath, srcAttr, newFileName, newPath, ByRef seenNames, t
       Return InStr(FileExist(newPath), "D") ? 6 : 4
 
    seenNames[keyu] := thisIndex
-   If (newPath=srcPath)   ; only the letter case changes
+   If (keyu==Format("{:L}", srcPath))   ; only the letter case changes
       Return 1
 
    attribs := FileExist(newPath)
@@ -63532,16 +63532,25 @@ isSameImageFormat(imgPath, fmt) {
 }
 
 isSameIdentityFile(fileA, fileB) {
-; both paths name one existing file, in any spelling [letter case, links, junctions, SUBST drives, short names]
-   If !FileExist(fileB)
+; both paths name one existing file or folder, in any spelling [letter case, links, junctions, SUBST drives, short names]
+   idB := getFileIdentity(fileB)
+   If (idB!="")
+   {
+      idA := getFileIdentity(fileA)
+      If (idA!="")
+         Return (idA==idB)
+   } Else If !FileExist(fileB)
+   {
       Return 0
+   }
 
-   fileID := getFileIdentity(fileA)
-   If (fileID!="")
-      Return (fileID=getFileIdentity(fileB))
-
-   fullA := resolveFullPath(fileA)
-   Return (fullA!="" && fullA==resolveFullPath(fileB))
+   ; a file that cannot be opened: the paths in the letter case stored on the disk
+   longA := longB := ""
+   Loop, Files, %fileA%, FD
+      longA := A_LoopFileLongPath
+   Loop, Files, %fileB%, FD
+      longB := A_LoopFileLongPath
+   Return (longA!="" && longA==longB)
 }
 
 isSameFileOtherCase(fileA, fileB) {
