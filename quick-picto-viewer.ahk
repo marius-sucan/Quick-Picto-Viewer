@@ -12576,25 +12576,37 @@ infoShowCurrentFrameIndex() {
 }
 
 VPflipImgV() {
-   Static lastInvoked := 1
-   If (A_TickCount - lastInvoked < 50)
+   VPflipImage("V", A_ThisFunc)
+}
+
+VPflipImgH() {
+   VPflipImage("H", A_ThisFunc)
+}
+
+VPflipImage(axis, funcu) {
+   Static lastInvoked := {"V": 1, "H": 1}
+   If (A_TickCount - lastInvoked[axis] < 50)
       Return
 
    If blockBrokenIMGrefresh(1)
       Return
 
-   lastInvoked := A_TickCount
+   lastInvoked[axis] := A_TickCount
    resetSlideshowTimer()
    ForceRefreshNowThumbsList()
-   FlipImgV := !FlipImgV
-   friendly := (FlipImgV=1) ? "ON" : "off"
-   showTOOLtip("Vertical mirroring: " friendly, A_ThisFunc, 1)
+   If (axis="V")
+      varName := "FlipImgV", newState := FlipImgV := !FlipImgV
+   Else
+      varName := "FlipImgH", newState := FlipImgH := !FlipImgH
+
+   friendly := (newState=1) ? "ON" : "off"
+   showTOOLtip(((axis="V") ? "Vertical" : "Horizontal") " mirroring: " friendly, funcu, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
-   INIaction(1, "FlipImgV", "General")
+   INIaction(1, varName, "General")
    dummyTimerDelayiedImageDisplay(50)
    If (AnyWindowOpen=10 && imgEditPanelOpened=1)
    {
-      GuiControl, SettingsGUIA:, FlipImgV, % FlipImgV
+      GuiControl, SettingsGUIA:, %varName%, % newState
       updatePanelColorsInfo()
       updatePanelColorSliderz()
    }
@@ -12618,31 +12630,6 @@ setMainCanvasTransform(W, H, G:=0, forceH:=0, forceV:=0) {
        Gdip_ScaleWorldTransform(G, 1, -1)
        Gdip_TranslateWorldTransform(G, 0, -H)
     }
-}
-
-VPflipImgH() {
-   Static lastInvoked := 1
-   If (A_TickCount - lastInvoked < 50)
-      Return
-
-   If blockBrokenIMGrefresh(1)
-      Return
-
-   lastInvoked := A_TickCount
-   resetSlideshowTimer()
-   ForceRefreshNowThumbsList()
-   FlipImgH := !FlipImgH
-   friendly := (FlipImgH=1) ? "ON" : "off"
-   showTOOLtip("Horizontal mirroring: " friendly, A_ThisFunc, 1)
-   SetTimer, RemoveTooltip, % -msgDisplayTime
-   INIaction(1, "FlipImgH", "General")
-   dummyTimerDelayiedImageDisplay(50)
-   If (AnyWindowOpen=10 && imgEditPanelOpened=1)
-   {
-      GuiControl, SettingsGUIA:, FlipImgH, % FlipImgH
-      updatePanelColorsInfo()
-      updatePanelColorSliderz()
-   }
 }
 
 doOpenStartFolder(ByRef didSomething:=0) {
