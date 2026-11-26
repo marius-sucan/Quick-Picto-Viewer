@@ -92745,22 +92745,25 @@ resetOpeningPanel() {
 }
 
 BtnNextImg() {
-  BtnNextPrevImg(1)
-}
-
-BtnPrevImg() {
-  BtnNextPrevImg(-1)
-}
-
-BtnNextPrevImg(direction) {
   If (maxFilesIndex<2 || !maxFilesIndex)
      Return
 
-  If (direction=1)
-     NextPicture()
-  Else
-     PreviousPicture()
+  NextPicture()
+  If (AnyWindowOpen=90)
+  {
+     SetTimer, UIpopulatePDFtexts, -150
+     SetTimer, UIpopulatePDFbookmarks, -225
+  } Else If (AnyWindowOpen=22)
+     SetTimer, updateUIcaptionsPanel, -100
+  Else If (AnyWindowOpen=5)
+     SetTimer, uiPopulateImgInfos, -125
+}
 
+BtnPrevImg() {
+  If (maxFilesIndex<2 || !maxFilesIndex)
+     Return
+
+  PreviousPicture()
   If (AnyWindowOpen=90)
   {
      SetTimer, UIpopulatePDFtexts, -150
