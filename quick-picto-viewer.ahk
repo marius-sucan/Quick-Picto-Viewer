@@ -47426,7 +47426,8 @@ BTNperformIndexSearchReplace() {
 
       BtnCloseWindow()
       limitSearchReplaceSelected := (performSRindexMode=2) ? 1 : 0
-      SearchAndReplaceThroughIndex(editF5, editF6, 0, userSrcRplcIndexFolder, limitSearchReplaceSelected)
+      ; a database list holds its paths in lower case
+      SearchAndReplaceThroughIndex(editF5, (SLDtypeLoaded=3) ? Format("{:L}", editF6) : editF6, 0, userSrcRplcIndexFolder, limitSearchReplaceSelected)
    } Else If (performSRindexMode=3)
    {
       If (mustRecordSeenImgs!=1)
