@@ -41245,8 +41245,9 @@ multiRenameSummary(actu, keyu:="", msgu:="") {
    GuiControl, SettingsGUIA:, txtMultiRenameLblSummary, % msgu
 }
 
-multiRenameFileStatus(srcPath, srcAttr, newFileName, newPath, ByRef seenNames, thisIndex, ByRef sameAs) {
-; 1 OK, 2 not found, 3 invalid name, 4 same new name as the file at index sameAs, 5 name taken, 6 a folder has the name
+multiRenameFileStatus(srcPath, srcAttr, newFileName, newPath, ByRef seenNames, thisIndex, ByRef sameAs, nameFree:=0) {
+; 1 OK, 2 not found, 3 invalid name, 4 same new name as the file at index sameAs, 5 name taken, 6 a folder has the name;
+; nameFree=1: newPath is free at the file's turn, see multiRenamePlainNext()
    If !srcAttr
       Return 2
 
@@ -41259,7 +41260,7 @@ multiRenameFileStatus(srcPath, srcAttr, newFileName, newPath, ByRef seenNames, t
       Return InStr(FileExist(newPath), "D") ? 6 : 4
 
    seenNames[keyu] := thisIndex
-   If (keyu==Format("{:L}", srcPath))   ; only the letter case changes
+   If (keyu==Format("{:L}", srcPath) || nameFree=1)   ; only the letter case changes, or the name is free
       Return 1
 
    attribs := FileExist(newPath)
@@ -41296,6 +41297,8 @@ BTNmultiRenameCheckAll() {
 
    counterFilez := new hashtable()
    seenNames := new hashtable()
+   freedNames := new hashtable()
+   givenNames := new hashtable()
    countu := [0, 0, 0, 0, 0, 0]
    unchanged := countTFilez := deletedFiles := 0
    startOperation := prevMSGdisplay := A_TickCount
@@ -41357,7 +41360,14 @@ BTNmultiRenameCheckAll() {
          Continue
       }
 
-      newFileName := decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, counterFilez[OutDirAsc], parentFolderName, imgPath, objuTemp)
+      If (objuTemp.renamingCount=1)
+      {
+         plainNum := counterFilez[OutDirAsc]
+         newFileName := multiRenamePlainNext(plainNum, fileNamuNoEXT, OriginalNewFileName, parentFolderName, imgPath, OutDir, fileEXTu, objuTemp, freedNames, givenNames)
+         counterFilez[OutDirAsc] := plainNum
+      } Else
+         newFileName := decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, counterFilez[OutDirAsc], parentFolderName, imgPath, objuTemp)
+
       file2save := OutDir "\" newFileName "." fileEXTu
       If (file2save==imgPath || newFileName="" || newFileName=A_Space || newFileName="  " || newFileName=".")
       {
@@ -41365,11 +41375,16 @@ BTNmultiRenameCheckAll() {
          Continue
       }
 
-      zpi := multiRenameFileStatus(imgPath, srcAttr, newFileName "." fileEXTu, file2save, seenNames, A_Index, sameAs)
+      zpi := multiRenameFileStatus(imgPath, srcAttr, newFileName "." fileEXTu, file2save, seenNames, A_Index, sameAs, objuTemp.renamingCount)
+      If (zpi=1 && objuTemp.renamingCount=1)
+      {
+         freedNames[Format("{:L}", imgPath)] := 1
+         givenNames[Format("{:L}", file2save)] := 1
+      }
       countu[zpi]++
    }
 
-   counterFilez := seenNames := ""
+   counterFilez := seenNames := freedNames := givenNames := ""
    GuiControl, SettingsGUIA:, uiLblBusyNow, % CSthin
    If (abandonAll=1 && GetKeyState("Escape", "P"))
    {
@@ -41735,6 +41750,31 @@ decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, countFilez, parentFol
    Return newFileName
 }
 
+multiRenamePlainNext(ByRef countFilez, fileNamuNoEXT, OriginalNewFileName, parentFolderName, imgPath, OutDir, fileEXTu, obju, freedNames:="", givenNames:="") {
+; A plain name's new name: its number passes over the names in use at the file's turn. «Check all files» and the
+; preview pass the names that the earlier files free and take, which the disk does not show yet
+   ownKey := Format("{:L}", imgPath)
+   Loop, 99999
+   {
+      newFileName := decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, countFilez, parentFolderName, imgPath, obju)
+      pathu := OutDir "\" newFileName "." fileEXTu
+      keyu := Format("{:L}", pathu)
+      If (keyu==ownKey)
+         Break
+
+      If IsObject(givenNames)
+         inUse := givenNames[keyu] ? 1 : freedNames[keyu] ? 0 : FileExist(pathu)
+      Else
+         inUse := FileExist(pathu)
+
+      If !inUse
+         Break
+
+      countFilez++
+   }
+   Return newFileName
+}
+
 UIlvMultiRenameResponder(a, b, c) {
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: ListView, LViewOthers
@@ -41847,6 +41887,8 @@ uiPopulateLVmultiRename() {
      lti := A_TickCount
      pageNames := new hashtable()
      counterFilez := new hashtable()
+     freedNames := new hashtable()
+     givenNames := new hashtable()
      maxItems := (userPrivateMode=1) ? 100 : 9100
      perFolderCount := (objuTemp.TrimmingMode!=1 && objuTemp.renamingCount=1)
      GuiControl, SettingsGUIA:, uiLblBusyNow, % ltop
@@ -41880,9 +41922,10 @@ uiPopulateLVmultiRename() {
             Continue
          }
 
-         If (selCounter<=uiLVoffset)
+         ; files before the page still take their per-folder numbers; fast mode gives the folder without a disk read.
+         ; Those of a plain name are named in full: their numbers pass over the names in use
+         If (selCounter<=uiLVoffset && (objuTemp.renamingCount!=1 || userPrivateMode=1))
          {
-            ; files before the page still take their per-folder numbers; fast mode gives the folder without a disk read
             If perFolderCount
             {
                zPlitPath(imgPath, 1, OutFileName, OutDir)
@@ -41914,7 +41957,13 @@ uiPopulateLVmultiRename() {
             If (objuTemp.IndexModeCount=1)
                counterFilez[OutDirAsc] := selCounter - deletedFiles
 
-            newFileName := decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, counterFilez[OutDirAsc], parentFolderName, imgPath, objuTemp)
+            If (objuTemp.renamingCount=1 && srcAttr)
+            {
+               plainNum := counterFilez[OutDirAsc]
+               newFileName := multiRenamePlainNext(plainNum, fileNamuNoEXT, OriginalNewFileName, parentFolderName, imgPath, OutDir, fileEXTu, objuTemp, freedNames, givenNames)
+               counterFilez[OutDirAsc] := plainNum
+            } Else
+               newFileName := decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, counterFilez[OutDirAsc], parentFolderName, imgPath, objuTemp)
          }
          ; ToolTip, % fileEXTu "|" newFileName , , , 2
          file2save := OutDir "\" newFileName "." fileEXTu
@@ -41923,9 +41972,17 @@ uiPopulateLVmultiRename() {
 
          If (userPrivateMode!=1)
          {
-            c := multiRenameFileStatus(imgPath, srcAttr, newFileName "." fileEXTu, file2save, pageNames, A_Index, sameAs)
+            c := multiRenameFileStatus(imgPath, srcAttr, newFileName "." fileEXTu, file2save, pageNames, A_Index, sameAs, objuTemp.renamingCount)
+            If (c=1 && objuTemp.renamingCount=1)
+            {
+               freedNames[Format("{:L}", imgPath)] := 1
+               givenNames[Format("{:L}", file2save)] := 1
+            }
             statusu := (c=1) ? "OK" : (c=2) ? "Not found" : (c=3) ? "Invalid name" : (c=4) ? "Same new name as #" sameAs ": " sameNameWords[Round(onConflictMultiRenameAct)] : (c=5) ? "Name taken: " actWords[Round(onConflictMultiRenameAct)] : "Name taken by a folder"
          }
+
+         If (selCounter<=uiLVoffset)
+            Continue
 
          loopzu++
          LV_Add(A_Index, OutFileName, newFileName "." fileEXTu, statusu, OutDir "\", A_Index)
@@ -41941,7 +41998,7 @@ uiPopulateLVmultiRename() {
      pageAtEnd := (selCounter>=filesElected) ? 1 : 0
      UImultiRenameChangeLVoffset("covered", selCounter, pageAtEnd)
      multiRenameSummary("pattern", summaryKey, (cutShort=1) ? "Stopped after 5 seconds at file " groupDigits(selCounter) " of " groupDigits(filesElected) : (loopzu=0 && pageAtEnd && uiLVoffset=0) ? "No selected file name would change" : "Not checked yet")
-     counterFilez := pageNames := ""
+     counterFilez := pageNames := freedNames := givenNames := ""
      LV_ModifyCol(3, "AutoHdr Left")
      LV_ModifyCol(4, "AutoHdr Left")
      LV_ModifyCol(5, "AutoHdr Left")
@@ -42061,7 +42118,14 @@ coreBatchMultiRenameFiles() {
          If (objuTemp.IndexModeCount=1)
             counterFilez[OutDirAsc] := countTFilez - deletedFiles
 
-         newFileName := decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, counterFilez[OutDirAsc], parentFolderName, file2rem, objuTemp)
+         If (objuTemp.renamingCount=1)
+         {
+            plainNum := counterFilez[OutDirAsc]
+            newFileName := multiRenamePlainNext(plainNum, fileNamuNoEXT, OriginalNewFileName, parentFolderName, file2rem, OutDir, fileEXTu, objuTemp)
+            counterFilez[OutDirAsc] := plainNum
+         } Else
+            newFileName := decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, counterFilez[OutDirAsc], parentFolderName, file2rem, objuTemp)
+
          file2save := OutDir "\" newFileName "." fileEXTu
          lockDestinationFileName(file2save, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
          If (file2save==file2rem || newFileName="" || newFileName=A_Space || newFileName="." || newFileName="  ")
@@ -42109,7 +42173,7 @@ coreBatchMultiRenameFiles() {
 
          originalFileInfos := ""
          thisFileExists := (caseOnly=1) ? 0 : FileRexists(file2save, 0)
-         mustReplace := (performOverwrite=1 && objuTemp.renamingCount!=1 && thisFileExists=1) ? 1 : 0
+         mustReplace := (performOverwrite=1 && thisFileExists=1) ? 1 : 0
          If mustReplace
          {
             jso := GetFileAttributesEx(file2save)
@@ -42151,7 +42215,7 @@ coreBatchMultiRenameFiles() {
 
             filezRenamed++
             overwrittenFiles += mustReplace
-            extraMarker := (thisFileExists=1 && performOverwrite=1 && objuTemp.renamingCount!=1) ? "*" : ""
+            extraMarker := mustReplace ? "*" : ""
             recordUndoFileActs(file2save, resultedFilesList[thisFileIndex, 1], extraMarker, 2, startZeit, originalFileInfos)
             rowFreed := 0
             If (SLDtypeLoaded=3)
