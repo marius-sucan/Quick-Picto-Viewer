@@ -53,6 +53,8 @@ outcomes as at `7ee44f5`. Marius chose to fix findings 4 and 7 and to leave 3 an
 
 - Finding 4 is fixed in `e06ea0a`: a plain name's number passes over the names in use.
 - Finding 7 is fixed in `e88f125`: the «Invalid RegEx» row leaves # empty.
+- Since `bccc022`, at Marius's word, a later preview page counts the files before it cheaply again: as fast as
+  before, and its plain-name numbers can be lower than those the batch gives.
 
 Three new batches, L, M and N, run renumberings, cycles, database lists, undo and plain names (see «How this was
 checked»). Their runs at `6a66bf9` record more shapes of finding 5. Sections 4 and 7 end with what was run and a
@@ -252,8 +254,9 @@ Run again at `6a66bf9` (A1-A3): the same outcomes. The new batches add plain nam
 selection, a selected file not renamed yet, a folder, an earlier file's new name. Names that earlier files freed
 are used again, so the numbers still rise in list order. The batch reads the disk as it is at that turn (:42124).
 The preview and «Check all files» count the same way (:41963, :41366), with the names that earlier files free and
-take, which the disk does not show yet; their rows read «OK» (`multiRenameFileStatus()`, `nameFree`, :41263). On a
-later preview page, a plain name's files before the page are named in full (:41927). The batch's `mustReplace`
+take, which the disk does not show yet; their rows read «OK» (`multiRenameFileStatus()`, `nameFree`, :41263). A
+later preview page counts the files before it by number only, for speed (`bccc022`), so its plain-name numbers
+can be lower than the batch's (see the end of this section). The batch's `mustReplace`
 (:42176) and its undo marker (:42218) no longer exempt plain names, as in the other tools: a plain name now meets
 a taken name only when another program takes it during the batch.
 
@@ -267,8 +270,8 @@ under «Overwrite»:
   its turn still holds its number, as the batch keeps list order (finding 5).
 - **N1**: holiday (1), (3) and (7) become (1), (2) and (3), as at `6a66bf9`; the row of holiday (7) now reads
   «OK» where it read «Name taken».
-- **N2**: four files, holiday (1) held: holiday (2) to (5). The page after the first two files shows holiday (4)
-  and (5), as the whole list does.
+- **N2**: four files, holiday (1) held: holiday (2) to (5). The page after the first two files showed holiday (4)
+  and (5) at `e06ea0a`, as the whole list does; since `bccc022` it shows holiday (3) and (4).
 - **N3**: a missing file takes its number without the search, as the batch counts it: «Not found», then holiday
   (2) and (3), as at `6a66bf9`.
 - **N4**: two folders. In the first, where holiday (2) is held, a.png and b.png become holiday (1) and (3); in
@@ -285,12 +288,13 @@ Batch P, «Skip», at `6a66bf9` and at `e06ea0a`, runs three shapes the batches 
   the other two became holiday (2) and (3); now the three become holiday (2), (3) and (4). The database holds
   their three rows at the new paths.
 
-**The fix costs time on a later preview page.** There, a plain name's files before the page are named in full,
-with a disk check each, and the page's 1-second and 5-second limits do not reach that pass. In P4, 3,000
-files with holiday (1) held, under Wine, the page after 2,990 files took 2,855 ms, against 73 ms at `6a66bf9`;
-that page now shows holiday (2992) for f2991, where `6a66bf9` showed holiday (2991). The first page (1,019 ms,
-against 1,020) and «Check all files» (2,861 ms, against 2,815) cost the same as before. Not measured on
-Windows.
+**A later preview page: the cost, then the speed back.** At `e06ea0a`, a later page named a plain name's files
+before it in full, with a disk check each, and the page's 1-second and 5-second limits did not reach that pass.
+In P4, 3,000 files with holiday (1) held, under Wine, the page after 2,990 files took 2,855 ms, against 73 ms at
+`6a66bf9`, and showed holiday (2992) for f2991, as the batch gives. Marius preferred the speed: since `bccc022`
+the files before the page take their numbers by count again, as at `6a66bf9`, and that page takes 71 ms and
+shows holiday (2991) for f2991, a number the batch then raises. The first page (1,015 to 1,020 ms) and «Check
+all files» (2,815 to 2,896 ms) cost the same at the three revisions. Not measured on Windows.
 
 ---
 
@@ -324,7 +328,8 @@ earlier, and the names of selected files the pattern leaves unchanged; it does n
 waiting for their turn.
 
 Plain names are outside this finding since `e06ea0a` (section 4): their numbers pass over the names in use at
-each file's turn, and the preview and «Check all files» count them as the batch does.
+each file's turn, and the preview and «Check all files» count them as the batch does, except on a later preview
+page since `bccc022`.
 
 ---
 
@@ -589,11 +594,13 @@ the others are open too.
   - N: plain names: gaps closed (N1), a later preview page (N2, with `uiLVoffset` set as the page buttons set
     it), a missing file (N3), two folders (N4);
   - D0: the setup of D1 without the double-click, the control for a redisplay seen in D1;
-  - P, at `6a66bf9` and `e06ea0a`: plain names with a token (P1), with `case{U}` (P2), on a database list (P3),
+  - P, at `6a66bf9`, `e06ea0a` and `bccc022`: plain names with a token (P1), with `case{U}` (P2), on a database
+    list (P3),
     and the time a long selection takes (P4: 3,000 files; the preview's first page, a page after 2,990 files,
     and «Check all files», timed with `A_TickCount` around the calls).
 - **The fixes** were checked on their committed text, compared by sha256: batch D at `e88f125`, and every batch
-  but E and E4 at `e06ea0a`, against the runs at `6a66bf9`. Lines that differ between two runs of the same text
+  but E and E4 at `e06ea0a`, against the runs at `6a66bf9`; then A, L, M, N and P at `bccc022`, against those at
+  `e06ea0a`, where only the later page of N2 and P4 changed. Lines that differ between two runs of the same text
   were left out of those comparisons: the conflict box shown before or after the destination's image size is
   read, which file the app shows at start, the order of the start-up image's load in the log, and the order of
   hash-named files in the Recycle Bin.
@@ -608,5 +615,6 @@ the others are open too.
 - **The kit**: `.claude/scratch/multi-rename-panel-2026-11-24/` (README.txt). `app/run-mr.sh <tag> <test
   function> [revision]` runs one batch, about a minute each, and writes `app/results/<tag>.txt`; the logs of
   this report are kept there, those of the runs at `7ee44f5` under the tags `<batch>-7ee44f5`, at `6a66bf9`
-  under `<batch>-6a66bf9`, and at the fixes under `D-fix7` and `<batch>-fix4`. It reuses the files filter kit's
+  under `<batch>-6a66bf9`, and at the fixes under `D-fix7`, `<batch>-fix4` (`P-e06ea0a` for P) and
+  `<batch>-page` (`bccc022`). It reuses the files filter kit's
   `patch.py`, `patch-ff.py` and helpers, and adds `patch-mr.py` and `test-mr.ahk`.
