@@ -94352,31 +94352,45 @@ advImgResizerCalcIMGsize(imgPath, file2save, w, h, ByRef newW, ByRef newH, ByRef
 }
 
 EditResizeWidth() {
+   EditResizeDimension(1)
+}
+
+EditResizeHeight() {
+   EditResizeDimension(0)
+}
+
+EditResizeDimension(isWidth) {
    Gui, SettingsGUIA: Default
    GuiControlGet, userEditWidth
    GuiControlGet, userEditHeight
    GuiControlGet, ResizeKeepAratio
    GuiControlGet, ResizeInPercentage
-   
-   If (A_TickCount - lastEditRHChange < 200)
+
+   If (A_TickCount - (isWidth ? lastEditRHChange : lastEditRWChange) < 200)
       Return
 
    If (AnyWindowOpen=4)
       decideUserImgRotationOption()
 
+   otherEdit := isWidth ? "userEditHeight" : "userEditWidth"
    filesElected := getSelectedFiles()
    If (filesElected>1 && ResizeKeepAratio=1 && ResizeInPercentage=1)
    {
-      Global lastEditRWChange := A_TickCount
-      GuiControl, SettingsGUIA:, userEditHeight, % Round(userEditWidth)
+      If isWidth
+         lastEditRWChange := A_TickCount
+      Else
+         lastEditRHChange := A_TickCount
+      GuiControl, SettingsGUIA:, %otherEdit%, % Round(isWidth ? userEditWidth : userEditHeight)
       Return
    }
 
    If (filesElected>1)
       Return
 
-   If (userEditWidth<1 || !userEditWidth)
+   If (isWidth && (userEditWidth<1 || !userEditWidth))
       userEditWidth := 1
+   Else If (!isWidth && (userEditHeight<1 || !userEditHeight))
+      userEditHeight := 1
 
    If (AnyWindowOpen=73 || AnyWindowOpen=28)
       trGdip_GetImageDimensions(useGdiBitmap(), oImgW, oImgH)
@@ -94385,76 +94399,27 @@ EditResizeWidth() {
    Else
       GetImgFileDimension(img2resizePath, oImgW, oImgH)
 
-   Global lastEditRWChange := A_TickCount
-   Sleep, 5
-   givenAngle := (ResizeRotationUser>0) ? ResizeRotationUser : 360 + ResizeRotationUser
-   If (ResizeKeepAratio=1)
-   {
-      thisWidth := (ResizeInPercentage=1) ? (oImgW/100)*userEditWidth : userEditWidth
-      calcIMGdimensions(oImgW, oImgH, thisWidth, 90000*oImgH, newW, newH)
-      newValue := (ResizeInPercentage=1) ? Round((newH/oimgH)*100) : newH
-      GuiControl, SettingsGUIA:, userEditHeight, % Round(newValue)
-
-      Gdip_GetRotatedDimensions(newW, newH, givenAngle, thisWidth, thisHeight)
-      GuiControl, SettingsGUIA:, ResultEditWidth, % Round(thisWidth)
-      GuiControl, SettingsGUIA:, ResultEditHeight, % Round(thisHeight)
-   } Else
-   {
-      thisHeight := (ResizeInPercentage=1) ? (oImgH/100)*userEditHeight : userEditHeight
-      thisWidth := (ResizeInPercentage=1) ? (oImgW/100)*userEditWidth : userEditWidth
-      Gdip_GetRotatedDimensions(thisWidth, thisHeight, givenAngle, thisWidth, thisHeight)
-      GuiControl, SettingsGUIA:, ResultEditWidth, % Round(thisWidth)
-      GuiControl, SettingsGUIA:, ResultEditHeight, % Round(thisHeight)
-   }
-
-   mpx := Round((Round(thisWidth) * Round(thisHeight))/1000000, 1)
-   f := isImgSizeTooLarge(Round(thisWidth), Round(thisHeight)) ? "(!) " : ""
-   GuiControl, SettingsGUIA: , infoline, %f%%mpx% MPx
-}
-
-EditResizeHeight() {
-   Gui, SettingsGUIA: Default
-   GuiControlGet, userEditWidth
-   GuiControlGet, userEditHeight
-   GuiControlGet, ResizeKeepAratio
-   GuiControlGet, ResizeInPercentage
-
-   If (A_TickCount - lastEditRWChange < 200)
-      Return
-
-   If (AnyWindowOpen=4)
-      decideUserImgRotationOption()
-
-   filesElected := getSelectedFiles()
-   If (filesElected>1 && ResizeKeepAratio=1 && ResizeInPercentage=1)
-   {
-      Global lastEditRHChange := A_TickCount
-      GuiControl, SettingsGUIA:, userEditWidth, % Round(userEditHeight)
-      Return
-   }
-
-   If (filesElected>1)
-      Return
-
-   If (userEditHeight<1 || !userEditHeight)
-      userEditHeight := 1
-
-   If (AnyWindowOpen=28 || AnyWindowOpen=73)
-      trGdip_GetImageDimensions(useGdiBitmap(), oImgW, oImgH)
-   Else If (img2resizePath=getIDimage(currentFileIndex))
-      GetImgFileDimension(getIDimage(currentFileIndex), oImgW, oImgH, 1, currentFileIndex)
+   If isWidth
+      lastEditRWChange := A_TickCount
    Else
-      GetImgFileDimension(img2resizePath, oImgW, oImgH)
-
-   Global lastEditRHChange := A_TickCount
+      lastEditRHChange := A_TickCount
    Sleep, 5
    givenAngle := (ResizeRotationUser>0) ? ResizeRotationUser : 360 + ResizeRotationUser
    If (ResizeKeepAratio=1)
    {
-      thisHeight := (ResizeInPercentage=1) ? (oImgH/100)*userEditHeight : userEditHeight
-      calcIMGdimensions(oImgW, oImgH, 90000*oImgW, thisHeight, newW, newH)
-      newValue := (ResizeInPercentage=1) ? Round((newW/oimgW)*100) : newW
-      GuiControl, SettingsGUIA:, userEditWidth, % Round(newValue)
+      If isWidth
+      {
+         thisWidth := (ResizeInPercentage=1) ? (oImgW/100)*userEditWidth : userEditWidth
+         calcIMGdimensions(oImgW, oImgH, thisWidth, 90000*oImgH, newW, newH)
+         newValue := (ResizeInPercentage=1) ? Round((newH/oimgH)*100) : newH
+      } Else
+      {
+         thisHeight := (ResizeInPercentage=1) ? (oImgH/100)*userEditHeight : userEditHeight
+         calcIMGdimensions(oImgW, oImgH, 90000*oImgW, thisHeight, newW, newH)
+         newValue := (ResizeInPercentage=1) ? Round((newW/oimgW)*100) : newW
+      }
+
+      GuiControl, SettingsGUIA:, %otherEdit%, % Round(newValue)
       Gdip_GetRotatedDimensions(newW, newH, givenAngle, thisWidth, thisHeight)
       GuiControl, SettingsGUIA:, ResultEditWidth, % Round(thisWidth)
       GuiControl, SettingsGUIA:, ResultEditHeight, % Round(thisHeight)
@@ -94466,6 +94431,7 @@ EditResizeHeight() {
       GuiControl, SettingsGUIA:, ResultEditWidth, % Round(thisWidth)
       GuiControl, SettingsGUIA:, ResultEditHeight, % Round(thisHeight)
    }
+
    mpx := Round((Round(thisWidth) * Round(thisHeight))/1000000, 1)
    f := isImgSizeTooLarge(Round(thisWidth), Round(thisHeight)) ? "(!) " : ""
    GuiControl, SettingsGUIA: , infoline, %f%%mpx% MPx
