@@ -1934,7 +1934,7 @@ delayedGuiResizeUpdater() {
 
 PVwinGuiDropFiles(GuiHwnd, FileArray, CtrlHwnd, X, Y) {
    Static lastInvoked := 1
-   If (AnyWindowOpen>0 || colorPickerModeNow=1 || mustCaptureCloneBrush=1 || whileLoopExec=1 || drawingShapeNow=1 || imageLoading=1 || runningLongOperation=1 || groppedFiles.Count()>0) || (A_TickCount - lastInvoked<300)
+   If (MsgBox2hwnd || AnyWindowOpen>0 || colorPickerModeNow=1 || mustCaptureCloneBrush=1 || whileLoopExec=1 || drawingShapeNow=1 || imageLoading=1 || runningLongOperation=1 || groppedFiles.Count()>0) || (A_TickCount - lastInvoked<300)
    {
       showDelayedTooltip("WARNING: The main window is busy, files dropped ignored.")
       Return
