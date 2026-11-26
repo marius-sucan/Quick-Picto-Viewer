@@ -41922,10 +41922,10 @@ uiPopulateLVmultiRename() {
             Continue
          }
 
-         ; files before the page still take their per-folder numbers; fast mode gives the folder without a disk read.
-         ; Those of a plain name are named in full: their numbers pass over the names in use
-         If (selCounter<=uiLVoffset && (objuTemp.renamingCount!=1 || userPrivateMode=1))
+         If (selCounter<=uiLVoffset)
          {
+            ; files before the page still take their per-folder numbers; fast mode gives the folder without a disk read.
+            ; for speed, a plain name's numbers in use are not passed over: a later page may show lower ones than the batch
             If perFolderCount
             {
                zPlitPath(imgPath, 1, OutFileName, OutDir)
@@ -41980,9 +41980,6 @@ uiPopulateLVmultiRename() {
             }
             statusu := (c=1) ? "OK" : (c=2) ? "Not found" : (c=3) ? "Invalid name" : (c=4) ? "Same new name as #" sameAs ": " sameNameWords[Round(onConflictMultiRenameAct)] : (c=5) ? "Name taken: " actWords[Round(onConflictMultiRenameAct)] : "Name taken by a folder"
          }
-
-         If (selCounter<=uiLVoffset)
-            Continue
 
          loopzu++
          LV_Add(A_Index, OutFileName, newFileName "." fileEXTu, statusu, OutDir "\", A_Index)
