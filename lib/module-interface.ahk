@@ -1962,7 +1962,7 @@ dummyTimerProcessDroppedFiles() {
       ; the image is still being drawn, as after the window is restored: the files wait for it, up to 2 s
       If !waitStart
          waitStart := A_TickCount
-      If (A_TickCount - waitStart<2000)
+      If (A_TickCount - waitStart<3000)
       {
          SetTimer, dummyTimerProcessDroppedFiles, -50
          Return
