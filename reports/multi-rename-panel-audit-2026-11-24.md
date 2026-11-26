@@ -59,7 +59,7 @@ finding 5 was run again at `96feeef` with the same outcomes, he chose two of the
   before, and its plain-name numbers can be lower than those the batch gives.
 - Finding 5 is fixed in part in `82cdeeb`: under «Overwrite» a selected file still at its old name is no longer
   replaced, and the preview and «Check all files» follow the batch's order. Shifts and swaps still end skipped
-  or with «[1]» names.
+  or with «[1]» names. Small thing 9.5 is fixed with it.
 
 Three new batches, L, M and N, run renumberings, cycles, database lists, undo and plain names (see «How this was
 checked»). Their runs at `6a66bf9` record more shapes of finding 5. Sections 4 and 7 end with what was run and a
@@ -100,7 +100,7 @@ batch Q, and cites lines at `82cdeeb`.
 | 6 | A renamed favourite keeps its mark on the new name, and the favourites keep the old path | low | run | open |
 | 7 | The «Invalid RegEx» row acts as a file: a double-click sets the current index to «-», «Solo rename» offers the list's first file | low | run | **fixed**, `e88f125` |
 | 8 | A preview timer that fires after the panel closed re-creates a hidden panel window, and empties the list of a list panel opened meanwhile | low, narrow | run | **fixed**, `2663c62`, by Marius |
-| 9 | Small things, numbered 9.1 to 9.9 | low | run and read | open |
+| 9 | Small things, numbered 9.1 to 9.9 | low | run and read | open; 9.5 **fixed**, `82cdeeb` |
 
 The rows give the status at `82cdeeb`.
 
@@ -493,11 +493,12 @@ AnyWindowOpen=…» still shows, because the kit logs the call before the functi
   no «Overwritten files», no undo record of the replaced file. J2: an empty a-x.png on disk, `[this]-x`: the
   message says «Finished renaming 2 out of 2 selected files» and the Recycle Bin holds nothing new (run). No
   content is lost; the list entry of such a file, if listed, keeps its path.
-- **9.5. A file renamed onto a selected file the pattern leaves unchanged reads «Name taken: overwrite».** The
+- ✅ **9.5. A file renamed onto a selected file the pattern leaves unchanged reads «Name taken: overwrite».** The
   batch protects that file on purpose (`7bb9721`: its name is taken before the unchanged-name skip, :42054,
   and «Overwrite» auto-renames onto a taken name, :44264). A5: `IMG_//` on a.png and IMG_a.png, «Overwrite»:
   the row and «Check all files» say overwrite, and IMG_a.png becomes «a [1].png» (run). Only the status word
-  is wrong.
+  is wrong. Fixed in `82cdeeb`, with finding 5: the row reads «Name taken by #1: auto-rename», and «Check all
+  files» says «Taken by selected files (auto-rename): 1» (A5, run).
 - **9.6. The closing message counts unchanged files as skipped.** A file the pattern leaves unchanged adds to
   `skippedFiles` (:42055-42058). A5, B3: «Finished renaming 1 out of 2 selected files | Skipped files: 1»,
   while «Check all files» calls the same file «Unchanged» (run).
@@ -546,7 +547,7 @@ AnyWindowOpen=…» still shows, because the kit logs the call before the functi
   the save question comes first, and the edits survive its «Discard» (K9).
 - **«Check all files»** gives the same counts as the preview's statuses in every case run (A1, A4, A5, C1),
   so its numbers inherit findings 4 and 5, nothing more (run). Since `82cdeeb` both follow the batch's order,
-  and the summary counts the names that selected files hold apart (A, H, J, L, M, Q).
+  and the summary counts the names that selected files hold apart (A, L, M, Q).
 - **The page buttons** carry the texts «First», «Previous», «Next» and «Last», which
   `UImultiRenameChangeLVoffset()` reads and compares (:41181); `GuiAddButton()` gives the button that text and
   shows «<<» and the rest through `SetImgButtonStyle()` (:26782-26785) (read).
@@ -599,11 +600,12 @@ open on 2026-11-26; the others are open too.
 5. Finding 5: should the preview and «Check all files» follow the batch's order, with names freed and taken as
    they go? Should the batch rename in two passes, through temporary names, so that swaps and shifts work under
    any collision action? Or should a selected file waiting for its turn never be overwritten?
-   **Settled in part in `82cdeeb`**, by Marius. Six fixes were offered, from the least work to the most: a line
-   in Help; «Overwrite» never replacing a selected file; the preview and «Check all files» following the batch's
-   order; renaming each file after the selected file that holds its new name; the same, with one temporary name
-   per cycle (swaps, rotations); every renamed file through a temporary name, in two passes. He chose the second
-   and the third, with these answers: under «Overwrite» the file gets a «[1]» name rather than being skipped; the
+   **Settled in part in `82cdeeb`**, by Marius. Six fixes were offered, each rated by the work it takes: a line
+   in Help (trivial); «Overwrite» never replacing a selected file (low); the preview and «Check all files»
+   following the batch's order (low after the second, medium alone); renaming each file after the selected file
+   that holds its new name (high); the same, with one temporary name per cycle, for swaps and rotations (very
+   high); every renamed file through a temporary name, in two passes (high, with worse outcomes than the fifth).
+   He chose the second and the third, with these answers: under «Overwrite» the file gets a «[1]» name rather than being skipped; the
    conflict box warns, and its «Overwrite» is honoured; the rows read «Name taken by #N: …»; «Check all files»
    counts them apart. Open: the fourth or the fifth, so that shifts and swaps complete.
 6. Finding 6: should the batch move a favourite to its new path, or take it out as the single file rename does?
@@ -614,7 +616,7 @@ open on 2026-11-26; the others are open too.
    **Settled in `2663c62`**, by Marius: the function returns at once when panel 8 is not open.
 9. The 5-second cut of the preview (`selCounter>A_Year`, :41857, `428fcca`): it applies only past file 2,026
    of the selection, a number that grows each year. Is a fixed count meant there?
-10. Small things 9.1 to 9.9 and «Seen in passing» A to C: which to fix.
+10. Small things 9.1 to 9.9 and «Seen in passing» A to C: which to fix. 9.5 is fixed with finding 5 (`82cdeeb`).
 
 ---
 

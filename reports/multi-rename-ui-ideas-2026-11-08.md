@@ -185,5 +185,8 @@ Also:
 - The rename does not touch a file whose new name has a character not allowed in file names; it counts as failed.
 - Nor a file whose new name a folder has: it counts as failed, and the preview gives every file with that new name
   «Name taken by a folder».
+- Under «Overwrite», a selected file still at its old name is never replaced: the file renamed onto it gets a
+  «[1]» name. The preview gives such a file «Name taken by #N: …», and «Check all files» counts it as «Taken by
+  selected files (…): N».
 - The preview stays blank for an empty pattern or just `[this]`, and shows a single «Invalid RegEx» row for a bad
   RegEx.
