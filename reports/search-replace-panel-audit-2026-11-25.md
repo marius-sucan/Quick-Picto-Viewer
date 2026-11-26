@@ -25,15 +25,15 @@ marks its lines in the kit's logs.
 outcomes of `bbc49e4`. Marius answered decision 1 with (a), decision 2 with the literal replace, and the folder-mode
 half of decision 3 with «balance the separators without a word». Of four guards offered with the fix, he chose two.
 
-- Findings 1 and 2 are fixed in folder mode in `474793a`. The same change fixes finding 3 in folder mode, and H1, H3
-  and H5 of finding 7.
+- Findings 1 and 2 are fixed in folder mode in `474793a`. The same change fixes finding 3 in folder mode and H1 and
+  H3 of finding 7; H5 now merges, which leaves decision 7 open.
 - `c2fde82`: in folder mode and for the seed folders, an empty «Search for» or «Replace with» is refused.
 - `12fc79d`: on a database list, «Replace with» goes to the pass in lower case, as the database stores it (X1, new).
 
-Two new batches, X and Y, run what A-N lacked: the letter case, entries of deleted files, network paths, drive roots,
-a nested move, a filtered list in folder mode, and empty or identical strings (see «How this was checked»). Sections
-1, 2, 3, 7 and 10 and small thing 11.5 end with what was run and a note on what the code does now; those notes cite
-lines at `12fc79d`. The other line numbers stay those of `bbc49e4`.
+Three new batches, X, Y and Z, run what A-N lacked: the letter case, entries of deleted files, network paths, drive
+roots, a nested move, a filtered list in folder mode, and empty or identical strings in targets 1, 3 and 4 (see «How
+this was checked»). Sections 1, 2, 3, 7 and 10 and small thing 11.5 end with what was run and a note on what the
+code does now; those notes cite lines at `12fc79d`. The other line numbers stay those of `bbc49e4`.
 The runs used the fix's text over `57d1f81`; the commits sit on Marius's `1fbbb4c` (see «How this was checked»).
 
 ## Terms
@@ -70,7 +70,7 @@ The runs used the fix's text over `57d1f81`; the commits sit on Marius's `1fbbb4
 | 4 | «Current files list» on a filtered list: a database list loses its filter without a word and every record is rewritten; a plain list rewrites only what the filter shows | medium | run | open |
 | 5 | A new path that another entry holds: on a database list the record keeps its old path while the list shows the new one, twice; a plain list gets the duplicate silently | medium | run | open |
 | 6 | Database lists: the captions, the audio notes and the folders list stay at the old paths; the renamed images lose their captions | medium | run | open |
-| 7 | «Main seed folders list»: no message whatever happens; every network path in the list loses its leading backslash; a list of network paths alone counts as empty; the result is not cleaned | medium | run | in part: H1, H3 and H5 **fixed** with finding 1, `474793a`; no message and H4 open |
+| 7 | «Main seed folders list»: no message whatever happens; every network path in the list loses its leading backslash; a list of network paths alone counts as empty; the result is not cleaned | medium | run | in part: H1 and H3 **fixed** with finding 1, `474793a`; H5 now merges (decision 7 open); no message and H4 open |
 | 8 | Private mode: the two fields hide their text, then the on-screen message prints both strings in full | low | run (the message) + read (the display) | open |
 | 9 | «Entire seen images database»: the progress and time-left display never appears | low | run | open |
 | 10 | The «identical strings» check compares numbers: «01» and «1», «1» and «1.0» are refused | low | run | open |
@@ -190,6 +190,9 @@ Runs with the fix, over `57d1f81`:
 - **B3** (whole-path mode): as before; the list and the database agree.
 - **X1**, **X1b**: the list holds «…\db\new\a.png», as the database does. **Y2b**: the list and the database agree,
   «olds\c.png» stays.
+- **Z4** (batch Z, new; a change of letter case alone, «…\db\old» → «…\db\Old»): at `57d1f81` the list showed
+  «…\db\Old\…» until the database was opened again; with the fix nothing changes, though the message says «2 records
+  were modified». A database list cannot hold such a change: its records are in lower case.
 
 ## 3. A separator at the end of one string only glues folder names together
 
@@ -233,6 +236,9 @@ Runs with the fix, over `57d1f81`:
   as before.
 - **Y4**, **Y4b**: «WARNING: No replacement folder given»; nothing changes. **Y5**: «WARNING: No search criteria
   given». **Y6**: «WARNING: The search and replacement strings are identical».
+- **Z3** (batch Z; the seen images database, folder mode, «Replace with» empty): at `57d1f81` the records became
+  «\a.png» and «sub\b.png»; with the fix, «WARNING: No replacement folder given», and nothing changes. The seed
+  folders' cases, Z1 and Z2, are under finding 7.
 
 ## 4. «Current files list» on a filtered list: two scopes, and a database list loses its filter
 
@@ -323,9 +329,10 @@ Run again at `57d1f81` (H1-H5): the same outcomes.
 **In part fixed in `474793a`**, with finding 1. The branch hands the two strings, without their trailing separators,
 to `renameDynamicFoldersEntries()` (:47445), the seed folders' own rename. That function matches whole folders from
 the start of the path, keeps the `|` mark and leaves a network path whole. Its result goes through
-`cleanDynamicFoldersList()`, so H5 now merges the two entries instead of refusing the replace as the seed folders
-panel's rename does: the merge was part of option (a) as offered to Marius. It writes the table only when an entry
-changed. Still open: no message (H1, H2) and H4.
+`cleanDynamicFoldersList()`, so H5 now merges the two entries, where the seed folders panel's rename refuses such a
+rename. The merge comes with the helper: whether to refuse or to merge (decision 7) was not put to Marius, and is
+still his to answer. The function writes the table only when an entry changed. Still open: no message (H1, H2), H4,
+and decision 7.
 
 Runs with the fix, over `57d1f81`:
 
@@ -334,6 +341,10 @@ Runs with the fix, over `57d1f81`:
 - **H3**: «\\nas\share\pics» keeps its leading «\\», in `DynamicFoldersList` and in the table.
 - **H4**: as before.
 - **H5**: «<work>\h\other» and «|<work>\h\other» merge into «<work>\h\other», scanned with its subfolders.
+- **Z1** (batch Z, new; «Replace with» empty): at `57d1f81` the seed folder «pics» was dropped from the list and from
+  the table; with the fix, «WARNING: No replacement folder given», and nothing changes (`c2fde82`). **Z2** («…\h\pics»
+  → «…\h\pics\»): at `57d1f81` nothing changed, yet the table was written again and the list marked modified; with
+  the fix, «WARNING: The search and replacement strings are identical».
 
 ## 8. Private mode shows what the fields hide
 
@@ -479,8 +490,8 @@ the user is not told which path is taken.
    `.SLD` file?
 7. **Finding 7.** The wording of a closing message for the seed folders (a count, and «nothing matched»); whether a
    replace onto a folder already listed is refused, as the seed folders panel's rename refuses it, or merged by
-   `cleanDynamicFoldersList()`. Since `474793a` it is merged, as option (a) of decision 1 offered it (H5); the
-   closing message is still open.
+   `cleanDynamicFoldersList()`. Since `474793a` it is merged, a consequence of `renameDynamicFoldersEntries()` (H5).
+   This question was not put to Marius and is still open, as is the closing message.
 8. **Finding 8.** In private mode, leave the two strings out of the messages, or show them masked?
 9. **11.1 and 11.2.** Should the panel open with fewer than three files, for targets 3 and 4 or for all of them?
    Should target 3 work while recording of seen images is off?
@@ -535,14 +546,16 @@ folder path. Such a text now ends with «0 records were modified».
     every line cited here. `mkfix.py` on `1fbbb4c` (`rebase/`) gives the texts of `474793a`, `c2fde82` and
     `12fc79d`, identical to the commits (SHA-256) and loaded too; they differ from the run texts by his edit alone.
   - **The panel's batches.** Every batch, A to N, ran on `57d1f81` and on `s3.ahk` (`run-panel.sh`). X (the letter
-    case, entries marked `||`, network paths, drive roots) and Y (letters outside A-Z, a nested move, a filtered list,
-    empty and identical strings) are new, and also ran on both texts (`test-fix.ahk`, `run-x.sh`). Their logs print
-    paths with their letter case; those of A-N do not.
+    case, entries marked `||`, network paths, drive roots), Y (letters outside A-Z, a nested move, a filtered list,
+    empty and identical strings) and Z (empty and identical strings for the seed folders and the seen images
+    database, a change of letter case alone on a database list) are new, and also ran on both texts
+    (`test-fix.ahk`, `run-x.sh`). Their logs print paths with their letter case; those of A-N do not.
   - **The other callers.** The rest of the code that calls `SearchAndReplaceThroughIndex()` ran on both texts
     (`run-callers.sh`): the folders tree's folder rename (T6 and T15 of the folders tree kit), the folders list
     panel's rename (static H) and the seed folders panel's rename (MG, U, Y9, D13, S85 of the seed folders kit).
-    Their logs are the same on both texts (`compare.sh` leaves out the display noise those kits record), except
-    U4: a direct call with the part of a name «lpha\», which now matches nothing in folder mode.
+    These tags name those kits' batches, not this report's. Their logs are the same on both texts (`compare.sh`
+    leaves out the display noise those kits record), except U4: a direct call with the part of a name «lpha\»,
+    which now matches nothing in folder mode.
   - **The differential.** `run-diff.sh` cuts the old and the new folder-mode branches out of the two texts and
     compares them. Inputs shaped as the folder renames pass them (absolute folders, both strings ending in «\»): they
     agree on 15,840 files list cases in each of the three modes, on 504 database records and on 7,920 seen images
