@@ -36583,7 +36583,7 @@ uiCachesOverviewSizeEstimate(totalz, rowsDef) {
 ; for every file it indexes.
    Static bytesFileDetails := 16, bytesImgDetails := 15, bytesHistogram := 64, bytesHash := 16
    Static treeOverhead := 1.1   ; b-trees do not fill their pages to the last byte
-   pageSize := getSQLdbPragmaValue("page_size")
+   pageSize := getSQLdbNumber("PRAGMA page_size;")
    If (pageSize<512)
       pageSize := 4096
 
@@ -88323,9 +88323,8 @@ throwSQLqueryDBerror(funcu) {
    ; SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
-getSQLdbPragmaValue(pragmau) {
+getSQLdbNumber(SQL) {
   ; only one row retrieved
-  SQL := "PRAGMA " pragmau ";"
   If !activeSQLdb.GetTable(SQL, RecordSet)
   {
      addJournalEntry(A_ThisFunc "() " activeSQLdb.ErrorMsg)
@@ -88365,24 +88364,7 @@ getMaxRowIDsqlDB() {
 }
 
 getTotalIMGsSQLdb(morus:="") {
-  ; only one row retrieved
-  SQL := "SELECT COUNT(*) FROM images " morus ";"
-  If !activeSQLdb.GetTable(SQL, RecordSet)
-  {
-     addJournalEntry(A_ThisFunc "() " activeSQLdb.ErrorMsg)
-     Return
-  }
-
-  value := 0
-  Loop, % RecordSet.RowCount
-  {
-      Rowu := RecordSet.Rows[A_Index]
-      If IsNumber(Rowu[1])
-         value := Rowu[1]
-  }
-
-  RecordSet.Free()
-  Return value
+  Return getSQLdbNumber("SELECT COUNT(*) FROM images " morus ";")
 }
 
 OpenSLDBdataBase(fileNamu, importMode:=0) {
