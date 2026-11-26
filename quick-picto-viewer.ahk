@@ -150,7 +150,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , rDesireWriteFMT := "jpg", FIMfailed2init := 0, prevDestPosX := "", prevDestPosY := "", CSdrk := "▓"
    , totalFramesIndex := 0, pVwinTitle := "", AprevImgCall := "", BprevImgCall := "", CSthin := "░", CSmid := "▒"
    , desiredFrameIndex := 0, sqlFailedInit := 0, currentImgModified := 0, prevSetWinPosX := "", prevSetWinPosY := ""
-   , diffIMGdecX := 0, diffIMGdecY := 0, oldZoomLevel := 0, fullPath2exe := ""   , scrollBarHy := 0, scrollBarVx := 0
+   , diffIMGdecX := 0, diffIMGdecY := 0, oldZoomLevel := 0, fullPath2exe := "", scrollBarHy := 0, scrollBarVx := 0
    , drawModeAzeit := 1, drawModeCzeit := 1, prevColorAdjustZeit := 1, liveDrawingBrushTool := 0
    , GDIfadeVPcache := "", executingCanceableOperation := 1, hCropCornersPic, UserMemBMP := "", userSearchString := ""
    , systemCores := 1, realSystemCores := 1, hasInitSpecialMode := 0, CountGIFframes := 0, prevSlideShowStop := 1
@@ -5098,7 +5098,7 @@ thumbsInfoYielder(ByRef maxItemsW, ByRef maxItemsH, ByRef maxItemsPage, ByRef ma
    If (maxItemsW<4 && thumbsListViewMode=1)
       maxItemsW := mainWidth//Round(thumbsW*0.95)
 
-   maxItemsH := mainHeight//thumbsH              ;    startPageIndex
+   maxItemsH := mainHeight//thumbsH
    If (maxItemsH<7 && thumbsListViewMode=1)
       maxItemsH := mainHeight//Round(thumbsH*0.95)
 
@@ -26586,7 +26586,6 @@ PanelDefineKbdShortcut() {
     If (defaultHotKateRaw=pp && !posu)
        defaultHotKateRaw := ""
 
-    combosDarkModus := (uiUseDarkMode=1) ? "-theme -border " : ""
     reused := "x+0 +0x1000 w" btnWid " hp "
     Gui, Add, Text, x15 y15 w%txtWid% Section, Please configure the shortcut for:
     GuiAddEdit("y+5 wp ReadOnly r1 -wrap -multi vtxtLine1", menuName " | " menuLocation, "Menu item selected", "customKbdGUIA")
@@ -28082,7 +28081,6 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
     }
 
     initQPVmainDLL()
-    combosDarkModus := (uiUseDarkMode=1) ? "-theme -border " : ""
     If (isImgLiveEditor=1)
     {
        If throwErrorNoImageLoaded()
