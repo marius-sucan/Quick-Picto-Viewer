@@ -17239,45 +17239,31 @@ ImgSelRedoAct(dummy:=0) {
 }
 
 ImgVectorRedoAct() {
-   Critical, on
-   If (drawingShapeNow!=1)
-      Return
-
-   totalUndos := Round(undoVectorShapesLevelsArray.Count())
-   If !IsObject(undoVectorShapesLevelsArray[currentVectorUndoLevel + 1])
-   {
-      zz := totalUndos ? currentVectorUndoLevel/totalUndos : 0
-      showTOOLtip("Shape redo [ " currentVectorUndoLevel " / " totalUndos " ]", 0, 0, zz)
-      SetTimer, RemoveTooltip, % -msgDisplayTime//2
-      Return
-   }
-
-   currentVectorUndoLevel := clampInRange(currentVectorUndoLevel + 1, 1, totalUndos)
-   restoreGivenVectorUndoLevel(currentVectorUndoLevel)
-   showTOOLtip("Shape redo [ " currentVectorUndoLevel " / " totalUndos " ]", A_ThisFunc, 1, currentVectorUndoLevel/totalUndos)
-   If (drawingShapeNow=1)
-      showQuickActionButtonsDrawingShape()
-   SetTimer, dummyRefreshImgSelectionWindow, -25
-   SetTimer, RemoveTooltip, % -msgDisplayTime//2
+   ImgVectorUndoRedo(1, A_ThisFunc)
 }
 
 ImgVectorUndoAct() {
+   ImgVectorUndoRedo(-1, A_ThisFunc)
+}
+
+ImgVectorUndoRedo(direction, funcu) {
    Critical, on
    If (drawingShapeNow!=1)
       Return
 
+   actu := (direction=1) ? "redo" : "undo"
    totalUndos := Round(undoVectorShapesLevelsArray.Count())
-   If !IsObject(undoVectorShapesLevelsArray[currentVectorUndoLevel - 1])
+   If !IsObject(undoVectorShapesLevelsArray[currentVectorUndoLevel + direction])
    {
       zz := totalUndos ? currentVectorUndoLevel/totalUndos : 0
-      showTOOLtip("Shape undo [ " currentVectorUndoLevel " / " totalUndos " ]", 0, 0, zz)
+      showTOOLtip("Shape " actu " [ " currentVectorUndoLevel " / " totalUndos " ]", 0, 0, zz)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
       Return
    }
 
-   currentVectorUndoLevel := clampInRange(currentVectorUndoLevel - 1, 1, totalUndos)
+   currentVectorUndoLevel := clampInRange(currentVectorUndoLevel + direction, 1, totalUndos)
    restoreGivenVectorUndoLevel(currentVectorUndoLevel)
-   showTOOLtip("Shape undo [ " currentVectorUndoLevel " / " totalUndos " ]", A_ThisFunc, 1, currentVectorUndoLevel/totalUndos)
+   showTOOLtip("Shape " actu " [ " currentVectorUndoLevel " / " totalUndos " ]", funcu, 1, currentVectorUndoLevel/totalUndos)
    If (drawingShapeNow=1)
       showQuickActionButtonsDrawingShape()
    SetTimer, dummyRefreshImgSelectionWindow, -25
