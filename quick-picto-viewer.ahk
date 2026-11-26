@@ -44392,6 +44392,13 @@ PanelRenameThisFile(dummy:=0) {
        PanelUpdateThisFileIndex()
        Return
     }
+
+    ; the spelling on disk: database lists hold the paths lowered
+    diskPath := file2rem
+    Loop, Files, %file2rem%, F
+       diskPath := A_LoopFileLongPath
+
+    zPlitPath(diskPath, 0, OutFileName, OutDir)
     If !doLastOption
        askAboutFileCollision(0, 0, 1, 3, 0, nullvar)
 
@@ -44416,7 +44423,7 @@ PanelRenameThisFile(dummy:=0) {
       doLastOption := msgResult.check
       newFileName := Trimmer(msgResult.edit)
       file2rem := getIDimage(currentFileIndex)
-      zPlitPath(file2rem, 0, OutFileName, OutDir, OutFileNameNoExt, extu)
+      zPlitPath(diskPath, 0, OutFileName, OutDir, OutFileNameNoExt, extu)
       If !InStr(newFileName, ".")
          newFileName .= "." extu
 
@@ -44426,7 +44433,7 @@ PanelRenameThisFile(dummy:=0) {
       If askAboutFileSave(" and the current file will be renamed and reloaded")
          Return
 
-      r := BTNrenameSoloFileAct(Trimmer(msgResult.edit), file2rem, doLastOption)
+      r := BTNrenameSoloFileAct(Trimmer(msgResult.edit), file2rem, doLastOption, diskPath)
       If !r 
       {
          Sleep, 100
@@ -44434,7 +44441,7 @@ PanelRenameThisFile(dummy:=0) {
       } Else
       {
          ; a new name that differs only by dots, commas or spaces trimmed by filterFileName() renames nothing
-         renamed := !(getIDimage(currentFileIndex)==file2rem)
+         renamed := (r=2)
          If renamed
          {
             If (resultedFilesList[currentFileIndex, 5]=1)
@@ -48371,11 +48378,14 @@ filterFileName(ostring, allow:=1) {
   Return string
 }
 
-BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
+BTNrenameSoloFileAct(newFileName, file2rem, doLastOption, diskPath) {
+; returns 2 when renamed, 1 when the name is the same, 0 or empty when not renamed
   newFileName := filterFileName(newFileName)
   If (StrLen(newFileName)>3)
   {
-     zPlitPath(file2rem, 0, OutFileName, OutDir, fileNamuNoEXT, oldEXT)
+     ; the new path keeps the list's folder; the name, extension and the folder shown come from the disk
+     zPlitPath(file2rem, 0, OutFileName, OutDir)
+     zPlitPath(diskPath, 0, OutFileName, diskDir, fileNamuNoEXT, oldEXT)
      If !InStr(newFileName, ".")
         newFileName .= "." oldEXT
 
@@ -48396,7 +48406,7 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
      }
 
      ; the same file spelled in another case: nothing is in the way
-     caseOnly := isSameFileOtherCase(file2rem, file2save)
+     caseOnly := isSameFileOtherCase(OutDir "\" OutFileName, file2save)
      If (caseOnly!=1 && FileRexists(file2save, 0))
         file2save := askAboutFileCollision(file2rem, file2save, 0, doLastOption + 1, 0, performOverwrite)
 
@@ -48436,8 +48446,8 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
 
      If moveFailed
      {
-        OutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
-        msgBeepTimer("ERROR: Access denied. The file could not be renamed.`n" OutFileName "`n" OutDir "\")
+        diskDir := PathCompact(diskDir, "a", 1, OSDfontSize)
+        msgBeepTimer("ERROR: Access denied. The file could not be renamed.`n" OutFileName "`n" diskDir "\")
         Return 0
      } Else
      {
@@ -48451,7 +48461,7 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
         }
 
         extraMarker := (thisFileExists=1 && performOverwrite=1) ? "*" : ""
-        recordUndoFileActs(file2save, resultedFilesList[currentFileIndex, 1], extraMarker, 2, A_Now, originalFileInfos)
+        recordUndoFileActs(file2save, OutDir "\" OutFileName, extraMarker, 2, A_Now, originalFileInfos)
         rowFreed := 0
         If (SLDtypeLoaded=3)
            rowFreed := moveSQLdbEntry(file2rem, file2save, updateDates, resultedFilesList[currentFileIndex, 12])
@@ -48464,15 +48474,16 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
         watchFolderDetails := ""
         updateViewportCachesID(oMD5name, currentFileIndex, file2rem, file2save)
         dummyTimerDelayiedImageDisplay(50)
+        zPlitPath(file2save, 0, OutFileName, OutDir)
         If (userPrivateMode=1)
         {
-           OutDir := "*:\*******\******"
-           newFileName := "******.***"
-        } Else OutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
+           diskDir := "*:\*******\******"
+           OutFileName := "******.***"
+        } Else
+           diskDir := PathCompact(diskDir, "a", 1, OSDfontSize)
 
-        zPlitPath(file2save, 0, OutFileName, OutDir, fileNamuNoEXT, oldEXT)
-        msgBeepTimer("File renamed successfully to:`n" OutFileName "`n" OutDir "\", 0)
-        Return 1
+        msgBeepTimer("File renamed successfully to:`n" OutFileName "`n" diskDir "\", 0)
+        Return 2
      }
   } Else Return 0
 }
