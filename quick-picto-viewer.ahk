@@ -47406,15 +47406,18 @@ BTNperformIndexSearchReplace() {
    GuiControlGet, editF6
    GuiControlGet, performSRindexMode
    GuiControlGet, userSrcRplcIndexFolder
-   If (editF5="")
-      Return msgBeepTimer("WARNING: No search criteria given")
-
    ; in folder mode and for the seed folders both strings are folder paths: a trailing separator does not count
    folderPaths := (userSrcRplcIndexFolder=1 || performSRindexMode=4) ? 1 : 0
    whatu := folderPaths ? RTrim(editF5, "\") : editF5
    replacerz := folderPaths ? RTrim(editF6, "\") : editF6
+   If (whatu="")
+      Return msgBeepTimer("WARNING: No search criteria given")
+
    If (whatu==replacerz)
       Return msgBeepTimer("WARNING: The search and replacement strings are identical")
+
+   If (folderPaths && replacerz="")
+      Return msgBeepTimer("WARNING: No replacement folder given")
 
    If (performSRindexMode=1 || performSRindexMode=2)
    {
