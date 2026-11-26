@@ -1227,14 +1227,15 @@ setMenusTheme(modus) {
    If (A_OSVersion="WIN_7" || A_OSVersion="WIN_XP")
       Return
 
-   uxtheme := DllCall("GetModuleHandle", "str", "uxtheme", "uptr")
-   SetPreferredAppMode := DllCall("GetProcAddress", "uptr", uxtheme, "Uptr", 135, "uptr")
-   global AllowDarkModeForWindow := DllCall("GetProcAddress", "uptr", uxtheme, "Uptr", 133, "uptr")
-   FlushMenuThemes := DllCall("GetProcAddress", "uptr", uxtheme, "Uptr", 136, "uptr")
+   Static uxtheme, SetPreferredAppMode, FlushMenuThemes
+   If (uxtheme="")
+   {
+      uxtheme := DllCall("GetModuleHandle", "str", "uxtheme", "uptr")
+      SetPreferredAppMode := DllCall("GetProcAddress", "uptr", uxtheme, "Uptr", 135, "uptr")
+      FlushMenuThemes := DllCall("GetProcAddress", "uptr", uxtheme, "Uptr", 136, "uptr")
+   }
    DllCall(SetPreferredAppMode, "int", modus) ; Dark
    DllCall(FlushMenuThemes)
-   ; [merge] the forward to the interface thread's copy is gone - one interpreter,
-   ; one process-wide dark-mode flush [a self-post here would loop forever]
 }
 
 setDarkWinAttribs(hwndGUI, modus:=2) {
@@ -1248,6 +1249,14 @@ setDarkWinAttribs(hwndGUI, modus:=2) {
           DWMWA_USE_IMMERSIVE_DARK_MODE := 20
        DllCall("dwmapi\DwmSetWindowAttribute", "UPtr", hwndGUI, "int", DWMWA_USE_IMMERSIVE_DARK_MODE, "int*", modus, "int", 4)
    }
+
+   Static uxtheme, AllowDarkModeForWindow
+   If (uxtheme="")
+   {
+      uxtheme := DllCall("GetModuleHandle", "str", "uxtheme", "uptr")
+      AllowDarkModeForWindow := DllCall("GetProcAddress", "uptr", uxtheme, "Uptr", 133, "uptr")
+   }
+
    DllCall(AllowDarkModeForWindow, "UPtr", hwndGUI, "int", modus) ; Dark
 }
 

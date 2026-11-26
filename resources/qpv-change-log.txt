@@ -4,11 +4,12 @@
 // Project began in early May 2019.
 // Related: general-code-overview.txt
 
-- v6.3.10 (2026-10-**)
+- v6.3.50 (2026-10-**)
   - [new] ability to extract text from images with the OCR engine preinstalled on Windows 10 / 11
   - [new] added support for JPEG XL (JXL), APNG, MNG, HEIC and AVIF images and animations, in addition to WEBP and GIF
   - [new] ability to join images as animated JXL, WEBP, APNG or MNG, in addition to the GIF, TIFF and PDF formats
   - [new] ability to set delay per frame when creating animated images
+  - [new] option to have dynamic number of columns in thumbnails mode
   - color management now works through FreeImage loaded files as well 
   - PDF joiner much improved
   - fixed bugs in convert image file formats and extract frames from multi-page image files

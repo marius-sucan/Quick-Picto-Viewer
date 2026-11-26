@@ -6,14 +6,14 @@
 
 Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, ImgHistoBox, ImgInfoBox, ImgNavBox, OSDmsgsLine
      , picVscroll, picHscroll, hPic0, hPic1, hPic2, hPic3, hPic4, hPic5, hPic6, hPic7, hPic8, hPic9, hPic10, hPic11
-     , hFlyOut, hFlyBtn1, hFlyBtn2, hFlyBtn3, menuArray := [], menuTotalIndex := 0, menusList := ""
+     , hFlyOut, hFlyBtn1, hFlyBtn2, hFlyBtn3, menuArray := [], menuTotalIndex := 0
      , menusflyOutVisible := 0, wasMenuFlierCreated := 0, lastContextMenuZeit := 1, defaultTempBtnDisplay := 4000
      , taskBarUI, groppedFiles := [], LbtnDwn := 0, penPressureRaw := 0, hasPenPressureAPI
      , canCancelImageLoad := 0, mustAbandonCurrentOperations := 0, userPendingAbortOperations := 0
      , lastCloseInvoked := -1, lastDoubleClickZeit := 1, lastMouseLeave := 1, lastSwipeZeitGesture := 1
      , lastWinStatus := "", lastZeitPanCursor := 1, lastZeitToolTip := 1, statusBarTooltipVisible := 0, doNormalCursor := 1
      , prevFullIMGload := 1, popupRootSeen, barMenuSession := 0, PrevGuiSizeEvent := 0
-     , menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0, menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000
+     , menuJITmap := {}, menuJITlist := [], hLLmouseHook := 0, menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000
      , flyoutAnchorMenu := 0, lastLongOperationStart := 1, menuRButtonEaten := 0, menuReaderOSDdeadline := 0
 
 initInterfaceModule() {
@@ -135,7 +135,7 @@ uiInstallSentMsgHook() {
 ;    invoked for the 4 four menu WM messages.
 ; fallback: all in AHK. registered callback for uiCallWndProc() using SetWindowsHookEx().
 
-   Static cbSentMsg := 0, cbCWP := 0, nativeHook := 0, missingLogged := 0
+   Static cbSentMsg := 0, cbCWP := 0, nativeHook := 0, missingLogged := 0, hCWPhook := 0
    If (nativeHook=1)
       Return
 
@@ -187,8 +187,10 @@ uiInstallSentMsgHook() {
    }
    If hCWPhook
       Return
+
    If !cbCWP
       cbCWP := RegisterCallback("uiCallWndProc", "F")
+
    hCWPhook := DllCall("SetWindowsHookEx", "Int", 4, "UPtr", cbCWP, "UPtr", 0, "UInt", DllCall("GetCurrentThreadId"), "UPtr")
 }
 

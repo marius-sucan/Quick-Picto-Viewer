@@ -105,11 +105,11 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , resultedFilesList := [], currentFileIndex := "", maxFilesIndex := 0, gdiBitmapIDentire := 0
    , appTitle := "Quick Picto Viewer", FirstRun := 1, hSNDmediaFile := "", mouseToolTipWinCreated := 0
    , bckpResultedFilesList := [], bckpMaxFilesIndex := 0, DynamicFoldersList := ""
-   , animGIFplaying := 0, startPageIndex := 0, RandyIMGids := [], IMGdecalageY := 1, IMGdecalageX := 1
+   , animGIFplaying := 0, RandyIMGids := [], IMGdecalageY := 1, IMGdecalageX := 1
    , RandyIMGnow := 0, GDIPToken := "", gdiBitmapSmall := "", hSNDmedia := "", imgIndexEditing := 0
    , AprevGdiBitmap := "", BprevGdiBitmap := "", msgDisplayTime := 3000, gdiBitmapIDcall := ""
    , slideShowRunning := 0, CurrentSLD := "", markedSelectFile := 0, IMGlargerViewPort := 0, thisPanelTab := 1
-   , ResolutionWidth := "", ResolutionHeight := "", prevStartIndex := 1, mustReloadThumbsList := 0
+   , ResolutionWidth := "", ResolutionHeight := "", prevThumbsStartIndex := 1, mustReloadThumbsList := 0
    , gdiBitmap := "", mainSettingsFile := "quick-picto-viewer.ini", mainRecentsFile := "quick-picto-viewer-recents.ini"
    , mustOpenStartFolder := "", mainFavesFile := "quick-picto-viewer-favourites.ini", miniFavesFile := "quick-picto-viewer-minifaves.ini"
    , RegExAllFilesPattern := "ico|dib|dng|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|AVIF|HEIC|HEIF|JXL|APNG|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif|webp|svg|pdf"
@@ -145,13 +145,12 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , prevImgSelX1 := 0, prevImgSelY1 := 0, prevImgSelX2 := -1, prevImgSelY2 := -1, selDotCy := "", selDotDx := "", selDotDy := ""
    , selDotX := "", selDotY := "", selDotAx := "", selDotAy := "", selDotBx := "", selDotBy := "", selDotCx := ""
    , prcSelX1 := 0, prcSelX2 := 0.5, prcSelY1 := 0, prcSelY2 := 0.5, pBrushF := "", lastWasLowQuality := 0
-   , SelDotsSize := imgHUDbaseUnit//4, ViewPortBMPcache := "", startZeitIMGload := 0
+   , SelDotsSize := imgHUDbaseUnit//4, ViewPortBMPcache := "", startZeitIMGload := 0, HistogramBMP := ""
    , imageLoading := 0, PrevGuiSizeEvent := 0, imgSelOutViewPort := 0, prevLastImg := [], userUIshapeCavity := 0
    , rDesireWriteFMT := "jpg", FIMfailed2init := 0, prevDestPosX := "", prevDestPosY := "", CSdrk := "▓"
    , totalFramesIndex := 0, pVwinTitle := "", AprevImgCall := "", BprevImgCall := "", CSthin := "░", CSmid := "▒"
    , desiredFrameIndex := 0, sqlFailedInit := 0, currentImgModified := 0, prevSetWinPosX := "", prevSetWinPosY := ""
-   , diffIMGdecX := 0, diffIMGdecY := 0, oldZoomLevel := 0, fullPath2exe := "", hasMemThumbsCached := 0
-   , scrollBarHy := 0, scrollBarVx := 0, HistogramBMP := "", internalColorDepth := 0, printerDevModeOptions := ""
+   , diffIMGdecX := 0, diffIMGdecY := 0, oldZoomLevel := 0, fullPath2exe := ""   , scrollBarHy := 0, scrollBarVx := 0
    , drawModeAzeit := 1, drawModeCzeit := 1, prevColorAdjustZeit := 1, liveDrawingBrushTool := 0
    , GDIfadeVPcache := "", executingCanceableOperation := 1, hCropCornersPic, UserMemBMP := "", userSearchString := ""
    , systemCores := 1, realSystemCores := 1, hasInitSpecialMode := 0, CountGIFframes := 0, prevSlideShowStop := 1
@@ -162,7 +161,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , prevVPselRotation, prevrotateSelBoundsKeepRatio, prevEllipseSelectMode, currentSelUndoLevel := 1
    , seenImagesDB := "", mustRecordSeenImgs := 0, hEditField := "", gdiBMPvPsize := "", hamLowLim := 0, hamUppLim := 0, cachedHamDistLvl := ""
    , GDIcacheSRCfileA := "", idGDIcacheSRCfileA := "", GDIcacheSRCfileB := "", idGDIcacheSRCfileB := "", prevOpenedWindow := []
-   , simpleOpRotationAngle := 1, UserTextArea := "", hKbdGuia, GDIPbrushHatch := ""
+   , simpleOpRotationAngle := 1, UserTextArea := "", hKbdGuia, GDIPbrushHatch := "", internalColorDepth := 0
    , runningLongOperation := 0, hasReachedMaxUndoLevels := 0, GIFframesPlayied := 0, allImagesWereSeen := 0
    , 2NDglHbitmap := "", 2NDglHDC := "", 2NDglOBM := "", 2NDglPG := "", mainThreadHwnd := "", imgDecLX := "", imgDecLY := ""
    , undoLevelsArray := [], currentUndoLevel := 0, maxUndoLevels := 50, undoLevelsRecorded := 0, hGDIinfosWin := ""
@@ -179,7 +178,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0
    , QPVpid := GetCurrentProcessId(), preventUndoLevels := 0, maxMemUndoLevels := 979394
    , lastOSDtooltipInvoked := 1, lastTimeToggleThumbs := 1, dupesStringFilter := ""
-   , dupesFilterWhat := 1, dupesFilterStringPos := 1, dupesFilterStringIsNot := 0
+   , dupesFilterWhat := 1, dupesFilterStringPos := 1, dupesFilterStringIsNot := 0, printerDevModeOptions := ""
    , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := [], bckpCurrentFileIndex := 0
    , TVlistFolders, hfdTreeWinGui, folderTreeWinOpen := 0, VPstampBMPx := 0, VPstampBMPy := 0
    , reviewSelectedIndexes := [], toBeExcludedIndexes := [], staticListViewFilteru
@@ -192,7 +191,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , ToolbarWinW := 0, ToolbarWinH := 0, isToolbarKBDnav := 0, lastZeitIMGsaved := [], navKeysCounter := 0
    , CustomShapeSymmetry := 0, CustomShapeLockedSymmetry := 0, viewportQPVimage := new screenQPVimage
    , vpSymmetryPointXdp := 0, vpSymmetryPointYdp := 0, FloodFillSelectionAdj := 0
-   , createdQuickMenuSearchWin := 0, lastUserRclickVPx := 0, lastUserRclickVPy := 0, vpFreeformShapeOffset := []
+   , lastUserRclickVPx := 0, lastUserRclickVPy := 0, vpFreeformShapeOffset := []
    , customShapeHasSelectedPoints := 0, currentVectorUndoLevel := 1, undoVectorShapesLevelsArray := []
    , hGradientAlphaMSKpreview, hGradientFillpreview, userMonitorImgPos, uiSlidersArray := []
    , mseUppLim := 0, mseLowLim := 0, userHamDistStringStringPos := 1, userHamDistStringFilterWhat := 1
@@ -206,22 +205,21 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , lastFastImgChangeHUDzeit := 1, forceProtectLoadedImg := 0, currIMGdetails := []
 
 Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameSavedVectorShape := ""
-   , postVectorWinOpen := 0, isWelcomeScreenu := 0, prevVectorShapeSymmetryMode := [], AllowDarkModeForWindow := ""
+   , postVectorWinOpen := 0, isWelcomeScreenu := 0, prevVectorShapeSymmetryMode := []
    , iduStaticFoldersListCache := 0, lastFilterEditSearch := "", additionalLVrows := 1, uLVr := 12, hSliderWidget
    , omniBoxMode := 0, hLVquickSearchMenus := "", hotkate, vk_hwnd, lastInfoBoxBMP := [], lastSymmetryCoords := []
-   , userFriendlyPrevImgSelAction, keywrdLVfilter, prevPasteInPlaceVPcoords := []
+   , userFriendlyPrevImgSelAction, keywrdLVfilter, prevPasteInPlaceVPcoords := [], PDFpwdsCache := []
    , lastLclickX, lastLclickY, lastTlbrClicked := 0, uiLVoffset := 0, repositionedWindow := 0, hCollapseWidget := 0
    , selDotMaX, selDotMaY, selDotMbX, selDotMbY, selDotMcX, selDotMcY, selDotMdX, selDotMdY, OnExtractConflictOverwrite := 4
    , lastInfoBoxZeitToggle := 1, prevHistoBoxString := "", menuHotkeys, lastMenuZeit := 1, viewportPDFbookMarks := []
    , userExtractFramesFmt := 3, maxMultiPagesAllowed := 2048, maxMemLimitMultiPage := 2198765648, alphaMaskCoffsetX := 0
    , userImgClrMtrxBrightness, userImgClrMtrxContrast, userImgClrMtrxSaturation, userImgVPthreshold, userImgVPgammaLevel
-   , cmdExifTool := "", tabzDarkModus := 0, maxRecentOpenedFolders := 6, UIuserToneMapParamA := 210, UIuserToneMapParamB := 160
-   , userImgChannelRlvl, userImgChannelGlvl, userImgChannelBlvl, userImgChannelAlvl, combosDarkModus := ""
+   , tabzDarkModus := 0, maxRecentOpenedFolders := 6, UIuserToneMapParamA := 210, UIuserToneMapParamB := 160
+   , userImgChannelRlvl, userImgChannelGlvl, userImgChannelBlvl, userImgChannelAlvl, prevAlphaMaskCoordsPreview := []
    , sillySeparator :=  "▪", menuCustomNames := new hashtable(), clrGradientCoffX := 0, clrGradientCoffY := 0
    , userBlendModesList := "Darken*|Multiply*|Linear burn*|Colour burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Colour dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Subtract|Luminosity|Ghosting|Inverted difference*|Clip to alpha*|Replace*|Behind*"
-   , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := []
-   , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
-   , PDFpwdsCache := [], multiCoreThumbsInitGood := "n", thumbsPoolState := 0
+   , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := [], thumbsPoolState := 0
+   , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, multiCoreThumbsInitGood := "n"
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := A_IsCompiled ? "" : "(dev) "
    , appVersion := "6.3.50", vReleaseDate := "2026/11/28" ; yyyy-mm-dd
 
@@ -320,7 +318,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , BrushToolApplyColorFX := 0, PasteInPlaceBlendMode := 1, PasteInPlaceGlassy := 1, ToolbarScaleFactor := 1
    , ToolbarBgrColor := "212121", TLBRverticalAlign := 1, TLBRtwoColumns := 1, FillAreaApplyColorFX := 0
    , UserGIFsDelayu := 30, FloodFillCartoonMode := 0, FloodFillDynamicOpacity := 0, FloodFillAltToler := 1
-   , FloodFillEightWays := 0, maxVectorUndoLevels := 30, showNewVectorPointPreview := 1, hamDistInterpolation := 0
+   , FloodFillEightWays := 0, showNewVectorPointPreview := 1, hamDistInterpolation := 0
    , allowUserQuickFileActions := 0, userAllowsGradientRecentering := 0, TextInAreaCaseTransform := 1
    , customZoomAdaptMode := 0, allowFreeIMGpanning := 0, lockToolbar2Win := 1, showFilesListMap := 0
    , showFolderTreeDetails := 0, userSaveBitsDepth := 1, uiUseDarkMode := 0, uiPreferedFileStats := 1
@@ -5096,7 +5094,7 @@ ToggleTDupesGroupsFading() {
 thumbsInfoYielder(ByRef maxItemsW, ByRef maxItemsH, ByRef maxItemsPage, ByRef maxPages, ByRef startIndex, ByRef mainWidth, ByRef mainHeight) {
    Static prevRealThumbsIndex := -1
    vpWinClientSize(mainWidth, mainHeight) ; global vars:
-   maxItemsW := mainWidth//thumbsW               ;    prevStartIndex
+   maxItemsW := mainWidth//thumbsW               ;    prevThumbsStartIndex
    If (maxItemsW<4 && thumbsListViewMode=1)
       maxItemsW := mainWidth//Round(thumbsW*0.95)
 
@@ -5230,8 +5228,7 @@ RefreshThumbsList() {
 
 ForceRefreshNowThumbsList() {
    ; mustReloadThumbsList := 1
-   prevStartIndex := -1 ; this will trigger a refresh of the painted thumbnails in the window
-   ; dummyTimerDelayiedImageDisplay(50)
+   prevThumbsStartIndex := -1 ; this will trigger a refresh of the painted thumbnails in the window
 }
 
 determineNavKeysDown() {
@@ -5281,7 +5278,6 @@ UpdateThumbsScreen(forceReload:=0, forceFastMode:=0) {
    {
       modus := (thumbsListViewMode>1) ? 2 : 1
       moda := (thumbsListViewMode>2) ? 1 : 0
-      ; If (startPageIndex!=prevFullIndexThumbsUpdate)
       prevFullThumbsUpdate := A_TickCount
       If determineNavKeysDown()
       {
@@ -5294,17 +5290,17 @@ UpdateThumbsScreen(forceReload:=0, forceFastMode:=0) {
    If (thumbsListViewMode>1 && (modus>0 || skippedKeys>2))
       QPV_listThumbnailsGridMode(moda, glPG, glHDC, hGDIthumbsWin)
  
-   If (modus=0 && skippedKeys<6 && (prevStartIndex!=startPageIndex || mustReloadThumbsList=1 || forceReload=1))
+   If (modus=0 && skippedKeys<6 && (prevThumbsStartIndex!=startPageIndex || mustReloadThumbsList=1 || forceReload=1))
    {
       r := QPV_ShowThumbnails()
       If r
          prevFullIndexThumbsUpdate := startPageIndex
-      
+
       mustReloadThumbsList := 0
    } ; Else r := 1
 
    QPV_ListViewGridHUDoverlay(0, modus)
-   prevStartIndex := startPageIndex
+   prevThumbsStartIndex := startPageIndex
    ; prevRealThumbsIndex := startIndex
    ; lastInvoked := A_TickCount
    prevNavKeysu := navKeysCounter
@@ -12658,7 +12654,7 @@ doOpenStartFolder(ByRef didSomething:=0) {
       imgPath := getIDimage(currentFileIndex)
       If !FileRexists(imgPath)
       {
-         If askAboutFileSave(" and files found in " mustOpenStartFolder "\ will be indexed")
+         If askAboutFileSave(" and files found in the folder will be indexed")
             Return currentFileIndex
       }
  
@@ -17334,6 +17330,8 @@ ImgVectorUndoAct() {
 }
 
 recordVectorUndoLevels() {
+   Static maxVectorUndoLevels := 30
+
    bonus := 0
    mainArray := customShapePoints.Clone()
    VPstuffArray := customShapePropPoints.Clone()
@@ -26643,6 +26641,7 @@ GuiAddEdit(options, defaultu, labelu:="", guiu:="SettingsGUIA") {
 }
 
 GuiAddDropDownList(options, listu, labelu:="", tipu:="", guiu:="SettingsGUIA") {
+    combosDarkModus := (uiUseDarkMode=1) ? "-theme -border " : ""
     If (labelu && !IsObject(labelu))
     {
        posu := ""
@@ -28068,7 +28067,6 @@ repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:=
 
 createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
     Critical, on
-    combosDarkModus := (uiUseDarkMode=1) ? "-theme -border " : ""
     lastFilterEditSearch := ""
     If (thumbsDisplaying=1 && isImgLiveEditor=1)
     {
@@ -28084,6 +28082,7 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
     }
 
     initQPVmainDLL()
+    combosDarkModus := (uiUseDarkMode=1) ? "-theme -border " : ""
     If (isImgLiveEditor=1)
     {
        If throwErrorNoImageLoaded()
@@ -42647,10 +42646,12 @@ UIeditQuickMenuSearchTrigger() {
 
 PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
     Global LVsearchMenus, StatusLineQuickSearch, UIclearBtn, UImenuQSbtn
-    Static lastState := 0
+    Static lastState := 0, createdQuickMenuSearchWin := 0
+
     stopGifORslidesPlayback()
     If (AnyWindowOpen=61 || AnyWindowOpen=83)
        CloseWindow()
+
     initQPVmainDLL()
     mouseTurnOFFtooltip()
     If (given="yes" && StrLen(whatu)>1 && createdQuickMenuSearchWin=1)
@@ -52746,9 +52747,8 @@ PanelDrawParametricLines() {
     btnWid := (PrefsLargeFonts=1) ? 166 : 105
     sml := (PrefsLargeFonts=1) ? 55 : 34
     BtnHeight := thisBtnHeight - 5
-    Global infoDrawLineAreaOpacity, infoDrawLineAreaContour, PickuDrawLineAreaColor
+    Global PickuDrawLineAreaColor
     ; Gui, Add, Text, x15 y15 Section, Please configure what lines to draw and how.
-
     Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Style
 
     Gui, Tab, 1
@@ -53750,7 +53750,6 @@ PanelZoomBlurSelectedArea() {
        Gui, Font, s%LargeUIfontValue%
     }
 
-    Global infoBlurAmount
     If !testAllowSelInvert()
        BlurAreaInverted := 0
 
@@ -54457,7 +54456,7 @@ PanelNewImage() {
     }
 
     thisOpacity := Round((FillAreaOpacity / 255) * 100)
-    Global PickuOutlierFillColor, infoResultRes
+    Global PickuOutlierFillColor
     Gui, Add, Text, x15 y15 Section, Create a new RGBA image. Please set the image dimensions.
     GuiAddDropDownList("y+10 wp gupdateUInewImagePanel AltSubmit Choose" PredefinedDocsSizes " vPredefinedDocsSizes", "Viewport size|Screen size|Current image size|640x480|800x600|1024x768|HD 480p|HD 720p|HD 1080p|HD 2160p [4K]|A4 @ 300 dpi|A4 @ 150 dpi|Previously used dimensions", "Image dimensions preset")
     Gui, Add, Text, xs y+10 w%EditWid%, Width (px)
@@ -55028,9 +55027,7 @@ PanelIMGselProperties() {
     }
 
     btnWid2 := EditWid//2 - 2
-    Global NewPosX1, NewPosY1, NewPosX2, NewPosY2, NewVProt
-         , BtnPosX1m, BtnPosX1p, BtnPosY1m, BtnPosY1p, BtnPosX2m, BtnPosX2p, BtnPosY2m, BtnPosY2p
-         , BtnPosXm, BtnPosXp, BtnPosYm, BtnPosYp, BtnPosZm, BtnPosZp
+    Global NewPosX1, NewPosY1, NewPosX2, NewPosY2, BtnPosX1m, BtnPosY1m, BtnPosX2m, BtnPosY2m, BtnPosXm, BtnPosYm, BtnPosZm
 
     trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
     Gui, Add, Text, x15 y15 Section, Current image size: %imgW% x %imgH% px.
@@ -55041,13 +55038,10 @@ PanelIMGselProperties() {
     Gui, Add, Text, x+3 wp vtxtLine2, Y1
     Gui, Add, Text, x+3 wp vtxtLine3, X2
     Gui, Add, Text, x+3 wp vtxtLine4, Y2
-    ; Gui, Add, Text, x+3 wp, Rotation
     GuiAddEdit("xs+15 y+7 wp r1 limit9 -multi -wantTab -wrap gupdateUIselPropPanel vNewPosX1", imgSelX1, "X1")
     GuiAddEdit("x+3 wp r1 limit9 -multi -wantTab -wrap gupdateUIselPropPanel vNewPosY1", imgSelY1, "Y1")
     GuiAddEdit("x+3 wp r1 limit9 -multi -wantTab -wrap gupdateUIselPropPanel vNewPosX2", imgSelX2, "X2")
     GuiAddEdit("x+3 wp r1 limit9 -multi -wantTab -wrap gupdateUIselPropPanel vNewPosY2", imgSelY2, "Y2")
-    ; Gui, Add, Text, x+3 wp h1 Hide, Rotation
-    ; Gui, Add, ComboBox, xp yp wp limit9 -multi -wrap gupdateUIselPropPanel vNewVProt, 0|45|90|105|135|150|180|200|225|250|270|300|315|%VPselRotation%||
     Gui, Add, Text, xs y+10, Adjust current selection coordinates:
     Gui, Add, Button, xs+15 y+7 w%btnWid2% gUIoffsetSelProperPanel vbtnFldr6, &Align
     Gui, Add, Text, Border +TabStop Center +0x200 x+3 hp wp gUIoffsetSelProperPanel vBtnPosX1m, X1
@@ -55334,7 +55328,6 @@ updateUIselPropPanel() {
    GuiControlGet, NewPosY1, SettingsGUIA:, NewPosY1
    GuiControlGet, NewPosX2, SettingsGUIA:, NewPosX2
    GuiControlGet, NewPosY2, SettingsGUIA:, NewPosY2
-   ; GuiControlGet, NewVProt, SettingsGUIA:, NewVProt
    GuiControlGet, lockSelectionAspectRatio, SettingsGUIA:, lockSelectionAspectRatio
    GuiControlGet, userDefinedSelCoords, SettingsGUIA:, userDefinedSelCoords
    GuiControlGet, SelectionCoordsType, SettingsGUIA:, SelectionCoordsType
@@ -59210,7 +59203,6 @@ PanelAdjustToneMapping() {
 
     sml := (PrefsLargeFonts=1) ? 30 : 20
     showTOOLtip("Initializing tone-mapping panel, please wait")
-    Global SliderA, SliderB, infoSliderA, infoSliderB
     Gui, SettingsGUIA: -DPIScale
     Gui, Add, Text, x15 y15 w460 h320 +0x1000 +0xE +hwndhLVmainu, Image before 
     Gui, Add, Text, x480 y15 w460 h320 +0x1000 +0xE +hwndhCropCornersPic, Image after
@@ -60779,7 +60771,7 @@ InvokeCopyFiles() {
 }
 
 CopyMovePanelWindow(isFresh:=0) {
-    Global BtnCpyMv, LViewDynas, lastInvoked := 1
+    Global BtnCpyMv, LViewDynas
     ; Static prevmainDynaFoldersListu, prevCurrentSLD
     If warnFramesActionPrevented("COPY/MOVE")
        Return
@@ -60805,7 +60797,6 @@ CopyMovePanelWindow(isFresh:=0) {
     EditWid -= sml
     lstWid := sml + editWid
     prevCurrentSLD := CurrentSLD
-    lastInvoked := A_TickCount
     getSelectedFiles(0, 1)
     If (markedSelectFile>1)
        infoSelection := "Selected files: " groupDigits(markedSelectFile) ". "
@@ -76309,11 +76300,11 @@ ShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
         usePrevious := 0
 
      prevImgPath :=  imgPath
-     If (thumbsDisplaying=1) && (A_TickCount - prevFullThumbsUpdate < 200) ; && (prevStartIndex!=prevFullIndexThumbsUpdate)
+     If (thumbsDisplaying=1) && (A_TickCount - prevFullThumbsUpdate < 200) ; && (prevThumbsStartIndex!=prevFullIndexThumbsUpdate)
         prevTryThumbsUpdate := A_TickCount
 
      coreShowTheImage(imgPath, usePrevious, ForceIMGload)
-     If (thumbsDisplaying=1) && (A_TickCount - prevFullThumbsUpdate < 200) ; && (prevStartIndex!=prevFullIndexThumbsUpdate)
+     If (thumbsDisplaying=1) && (A_TickCount - prevFullThumbsUpdate < 200) ; && (prevThumbsStartIndex!=prevFullIndexThumbsUpdate)
         prevTryThumbsUpdate := A_TickCount
   }
 
@@ -87011,7 +87002,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
     Critical, on
     ; which page was left unfinished and how many times it has been asked for again; see
     ; the retry at the end of this function
-    Static prevAbortedPage := 0, abortedPageRetries := 0
+    Static prevAbortedPage := 0, abortedPageRetries := 0, hasMemThumbsCached := 0
     prevFullThumbsUpdate := A_TickCount
     mainStartZeit := A_TickCount
     thisPageSig := thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, startIndex, mainWidth, mainHeight)
@@ -91203,8 +91194,8 @@ InitialFindDupesSettingsPanel(modus) {
 }
 
 PanelFindDupes(dummy:=0) {
-    Global userFindDupesSelectAllDummy := 0, hasOpened, txtLine1, editFc, editFr
-    Static userWasWarned := 0
+    Global userFindDupesSelectAllDummy := 0, txtLine1, editFc, editFr
+    Static userWasWarned := 0, hasOpened := 0
 
     userFindDupesSelectAllDummy := 0
     If !hasOpened
@@ -92459,7 +92450,7 @@ BtnOpenPanelAdjustToneMapping() {
 }
 
 coreColorsAdjusterWindow(modus:=0) {
-    Global realTimePreview, uiIMGresizingMode, UIvpImgAlignCenter
+    Global uiIMGresizingMode, UIvpImgAlignCenter
 
     openingPanelNow := 1
     idu := (modus="img") ? 74 : 10
@@ -93081,7 +93072,6 @@ updatePanelColorsInfo() {
 }
 
 btnResetImageView() {
-  ; GuiControlGet, realTimePreview
   If (AnyWindowOpen!=10 && AnyWindowOpen!=74)
      Return
 
@@ -93185,7 +93175,6 @@ UpdateUIadjustVPcolors(dummy:=0) {
 
    imgFxMode := (UIimgFxMode>2) ? UIimgFxMode + 1 : UIimgFxMode
    ForceNoColorMatrix := !doImgEditLivePreview
-   ; GuiControlGet, realTimePreview
    If (dummy!="ignore-zoom" && AnyWindowOpen=10)
    {
       GuiControlGet, uiIMGresizingMode, SettingsGUIA:, uiIMGresizingMode
