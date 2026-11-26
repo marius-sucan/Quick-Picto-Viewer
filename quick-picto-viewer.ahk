@@ -67227,7 +67227,10 @@ GuiDroppedFiles(ByRef imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) 
    Critical, on
    Static lastInvoked := 1, noAsking := 0
    If (A_TickCount - lastInvoked<900)
+   {
+      showDelayedTooltip("WARNING: The main window is busy, files dropped ignored.")
       Return
+   }
    
    initFIMGmodule()
    initQPVmainDLL()
