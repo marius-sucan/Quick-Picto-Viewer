@@ -41222,11 +41222,11 @@ multiRenameSummary(actu, keyu:="", msgu:="") {
    GuiControl, SettingsGUIA:, txtMultiRenameLblSummary, % msgu
 }
 
-multiRenameFileStatus(srcPath, srcAttr, newFileName, newPath, thisIndex, ByRef sameAs, batchNames, nameFree:=0) {
+multiRenameFileStatus(srcPath, srcAttr, newFileName, newPath, thisIndex, ByRef sameAs, freedNames, givenNames, batchNames, nameFree:=0) {
 ; 1 OK, 2 not found, 3 invalid name, 4 same new name as the file at index sameAs, 5 name taken, 6 a folder has the name,
 ; 7 name taken by the selected file at index sameAs; nameFree=1: newPath is free at the file's turn, see multiRenamePlainNext().
-; batchNames goes in the batch's list order: the names earlier files took [seen] and left [freed] under the action [act];
-; [held], made on first use, maps the selected files from entry [heldFrom] on, at most [heldMax] of them
+; called in the batch's list order: the names earlier files took [givenNames] and left [freedNames] under the action batchNames.act;
+; batchNames.held, made on first use, maps the selected files from entry [heldFrom] on, at most [heldMax] of them
    If !srcAttr
       Return 2
 
@@ -41235,13 +41235,13 @@ multiRenameFileStatus(srcPath, srcAttr, newFileName, newPath, thisIndex, ByRef s
 
    keyu := Format("{:L}", newPath)
    ; the later files given a folder's name are refused too
-   If (sameAs := batchNames.seen[keyu])
+   If (sameAs := givenNames[keyu])
    {
       r := InStr(FileExist(newPath), "D") ? 6 : 4
    } Else
    {
       ; only the letter case changes, the name is free, or an earlier file left it
-      If (keyu==Format("{:L}", srcPath) || nameFree=1 || batchNames.freed[keyu])
+      If (keyu==Format("{:L}", srcPath) || nameFree=1 || freedNames[keyu])
       {
          r := 1
       } Else If !(attribs := FileExist(newPath))
@@ -41260,12 +41260,12 @@ multiRenameFileStatus(srcPath, srcAttr, newFileName, newPath, thisIndex, ByRef s
 
       ; a selected file in the way keeps its name
       If (r!=7)
-         batchNames.seen[keyu] := thisIndex
+         givenNames[keyu] := thisIndex
    }
 
    ; «Auto-rename» and «Overwrite» also rename the files that meet a taken name
    If (r=1 || r!=6 && isInRange(batchNames.act, 2, 3))
-      batchNames.freed[Format("{:L}", srcPath)] := 1
+      freedNames[Format("{:L}", srcPath)] := 1
    Return r
 }
 
@@ -41299,7 +41299,9 @@ BTNmultiRenameCheckAll() {
       OutDirAsc := "a"
 
    counterFilez := new hashtable()
-   batchNames := {seen: new hashtable(), freed: new hashtable(), act: Round(onConflictMultiRenameAct), heldFrom: 1, heldMax: 0}
+   freedNames := new hashtable()
+   givenNames := new hashtable()
+   batchNames := {act: Round(onConflictMultiRenameAct), heldFrom: 1, heldMax: 0}
    countu := [0, 0, 0, 0, 0, 0, 0]
    unchanged := countTFilez := deletedFiles := 0
    startOperation := prevMSGdisplay := A_TickCount
@@ -41364,7 +41366,7 @@ BTNmultiRenameCheckAll() {
       If (objuTemp.renamingCount=1)
       {
          plainNum := counterFilez[OutDirAsc]
-         newFileName := multiRenamePlainNext(plainNum, fileNamuNoEXT, OriginalNewFileName, parentFolderName, imgPath, OutDir, fileEXTu, objuTemp, batchNames.freed, batchNames.seen)
+         newFileName := multiRenamePlainNext(plainNum, fileNamuNoEXT, OriginalNewFileName, parentFolderName, imgPath, OutDir, fileEXTu, objuTemp, freedNames, givenNames)
          counterFilez[OutDirAsc] := plainNum
       } Else
          newFileName := decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, counterFilez[OutDirAsc], parentFolderName, imgPath, objuTemp)
@@ -41376,11 +41378,11 @@ BTNmultiRenameCheckAll() {
          Continue
       }
 
-      zpi := multiRenameFileStatus(imgPath, srcAttr, newFileName "." fileEXTu, file2save, A_Index, sameAs, batchNames, objuTemp.renamingCount)
+      zpi := multiRenameFileStatus(imgPath, srcAttr, newFileName "." fileEXTu, file2save, A_Index, sameAs, freedNames, givenNames, batchNames, objuTemp.renamingCount)
       countu[zpi]++
    }
 
-   counterFilez := batchNames := ""
+   counterFilez := batchNames := freedNames := givenNames := ""
    GuiControl, SettingsGUIA:, uiLblBusyNow, % CSthin
    If (abandonAll=1 && GetKeyState("Escape", "P"))
    {
@@ -41885,8 +41887,10 @@ uiPopulateLVmultiRename() {
      lti := A_TickCount
      counterFilez := new hashtable()
      maxItems := (userPrivateMode=1) ? 100 : 9100
+     freedNames := new hashtable()
+     givenNames := new hashtable()
      ; a name's holder is looked for among the maxItems selected files from the page's first
-     batchNames := {seen: new hashtable(), freed: new hashtable(), act: Round(onConflictMultiRenameAct), heldMax: maxItems}
+     batchNames := {act: Round(onConflictMultiRenameAct), heldMax: maxItems}
      perFolderCount := (objuTemp.TrimmingMode!=1 && objuTemp.renamingCount=1)
      GuiControl, SettingsGUIA:, uiLblBusyNow, % ltop
      Loop, % maxFilesIndex
@@ -41960,7 +41964,7 @@ uiPopulateLVmultiRename() {
             If (objuTemp.renamingCount=1 && srcAttr)
             {
                plainNum := counterFilez[OutDirAsc]
-               newFileName := multiRenamePlainNext(plainNum, fileNamuNoEXT, OriginalNewFileName, parentFolderName, imgPath, OutDir, fileEXTu, objuTemp, batchNames.freed, batchNames.seen)
+               newFileName := multiRenamePlainNext(plainNum, fileNamuNoEXT, OriginalNewFileName, parentFolderName, imgPath, OutDir, fileEXTu, objuTemp, freedNames, givenNames)
                counterFilez[OutDirAsc] := plainNum
             } Else
                newFileName := decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, counterFilez[OutDirAsc], parentFolderName, imgPath, objuTemp)
@@ -41972,7 +41976,7 @@ uiPopulateLVmultiRename() {
 
          If (userPrivateMode!=1)
          {
-            c := multiRenameFileStatus(imgPath, srcAttr, newFileName "." fileEXTu, file2save, A_Index, sameAs, batchNames, objuTemp.renamingCount)
+            c := multiRenameFileStatus(imgPath, srcAttr, newFileName "." fileEXTu, file2save, A_Index, sameAs, freedNames, givenNames, batchNames, objuTemp.renamingCount)
             statusu := (c=1) ? "OK" : (c=2) ? "Not found" : (c=3) ? "Invalid name" : (c=4) ? "Same new name as #" sameAs ": " sameNameWords[Round(onConflictMultiRenameAct)] : (c=5) ? "Name taken: " actWords[Round(onConflictMultiRenameAct)] : (c=7) ? "Name taken by #" sameAs ": " sameNameWords[Round(onConflictMultiRenameAct)] : "Name taken by a folder"
          }
 
@@ -41990,7 +41994,7 @@ uiPopulateLVmultiRename() {
      pageAtEnd := (selCounter>=filesElected) ? 1 : 0
      UImultiRenameChangeLVoffset("covered", selCounter, pageAtEnd)
      multiRenameSummary("pattern", summaryKey, (cutShort=1) ? "Stopped after 5 seconds at file " groupDigits(selCounter) " of " groupDigits(filesElected) : (loopzu=0 && pageAtEnd && uiLVoffset=0) ? "No selected file name would change" : "Not checked yet")
-     counterFilez := batchNames := ""
+     counterFilez := batchNames := freedNames := givenNames := ""
      LV_ModifyCol(3, "AutoHdr Left")
      LV_ModifyCol(4, "AutoHdr Left")
      LV_ModifyCol(5, "AutoHdr Left")
