@@ -27148,12 +27148,24 @@ omniBoxFolderSetProtected() {
 }
 
 omniBoxFolderCreateNew() {
+   omniBoxFolderNewOrRename(0)
+}
+
+omniBoxFolderRename() {
+   omniBoxFolderNewOrRename(1)
+}
+
+omniBoxFolderNewOrRename(isRename) {
    folderPath := OmniBoxGetSelectedFolder()
    If !folderPath
       Return
 
    prevOmniBoxFolder := SubStr(folderPath, InStr(folderPath, "\", 0, -1) + 1)
-   r := UIcoreFolderNew(folderPath, newFileName)
+   If isRename
+      r := UIcoreFolderRename(folderPath, newFileName)
+   Else
+      r := UIcoreFolderNew(folderPath, newFileName)
+
    If !VisibleQuickMenuSearchWin
       PanelQuickSearchMenuOptions()
 
@@ -27188,24 +27200,6 @@ omniBoxFoldersPaste() {
    WinActivate, ahk_id %hQuickMenuSearchWin%
    If (r=2)
       uiPopulateQuickMenuSearch("resel")
-}
-
-omniBoxFolderRename() {
-   folderPath := OmniBoxGetSelectedFolder()
-   If !folderPath
-      Return
-
-   prevOmniBoxFolder := SubStr(folderPath, InStr(folderPath, "\", 0, -1) + 1)
-   r := UIcoreFolderRename(folderPath, newFileName)
-   If !VisibleQuickMenuSearchWin
-      PanelQuickSearchMenuOptions()
-
-   WinActivate, ahk_id %hQuickMenuSearchWin%
-   If r
-   {
-      prevOmniBoxFolder := newFileName
-      SetTimer, uiPopulateQuickMenuSearch, -150
-   }
 }
 
 omniBoxFolderDelete() {
