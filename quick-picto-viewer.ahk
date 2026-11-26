@@ -47409,7 +47409,11 @@ BTNperformIndexSearchReplace() {
    If (editF5="")
       Return msgBeepTimer("WARNING: No search criteria given")
 
-   If (editF5==editF6)
+   ; in folder mode and for the seed folders both strings are folder paths: a trailing separator does not count
+   folderPaths := (userSrcRplcIndexFolder=1 || performSRindexMode=4) ? 1 : 0
+   whatu := folderPaths ? RTrim(editF5, "\") : editF5
+   replacerz := folderPaths ? RTrim(editF6, "\") : editF6
+   If (whatu==replacerz)
       Return msgBeepTimer("WARNING: The search and replacement strings are identical")
 
    If (performSRindexMode=1 || performSRindexMode=2)
@@ -47434,14 +47438,7 @@ BTNperformIndexSearchReplace() {
          Return msgBeepTimer("WARNING: The seed folders list is empty")
 
       BtnCloseWindow()
-      listu := StrReplace(listu, "`n", "\`n")
-      listu := StrReplaceCaseless(listu, editF5, editF6, replacedCount)
-      listu := StrReplace(listu, "\\", "\")
-      DynamicFoldersList := StrReplace(listu, "\`n", "`n")
-      If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
-         recreateDynaFoldersSQLdbList(DynamicFoldersList)
-
-      If replacedCount
+      If renameDynamicFoldersEntries(whatu, replacerz, 1)
          currentFilesListModified := 1
    }
 }
@@ -99060,13 +99057,19 @@ StrReplaceCaseless(haystack, needle, replacement, ByRef countu:=0) {
 SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlySelected:=0) {
     ; onlySelected=1 limits the operation to the files the user selected.
     ; in folderMode=1, both strings always cover entire folder paths: 
-    ; whole folders are matched
+    ; whole folders are matched, from the start of the path
     ; d:\pics\old must never match d:\pics\oldies
     ; folderMode=2 does the same for the given folder alone, not its subfolders.
     ; The matches ignore the case of every letter: a database and the folders lists
     ; hold their paths in lower case.
     ; Returns 0 when the database could not be updated
 
+    If (folderMode=1 || folderMode=2)
+       whatu := RTrim(whatu, "\") "\", replacerz := RTrim(replacerz, "\") "\"
+
+    ; the stored paths carry no trailing separator, see SQLfolderMatchClause()
+    whatuBare := Format("{:L}", RTrim(whatu, "\"))
+    replaceru := RegExReplace(replacerz, "\\+$")
     If (silentus=0)
        showTOOLtip("Performing search and replace in the files list index:`n" whatu "`n" replacerz)
 
@@ -99085,8 +99088,6 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
     selectedFiles := totalAffected := doneFiles := 0
     If (SLDtypeLoaded=3 && onlySelected!=1)
     {
-       ; the stored paths carry no trailing separator, see SQLfolderMatchClause()
-       replaceru := RegExReplace(replacerz, "\\+$")
        activeSQLdb.Exec("BEGIN TRANSACTION;")
        If (folderMode=1 || folderMode=2)
           SQLstr := "UPDATE images SET imgfolder='" SQLescapeStr(Format("{:L}", replaceru)) "' WHERE " SQLfolderMatchClause("|" whatu) ";"
@@ -99126,7 +99127,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
                  If (folderMode=1)
                  {
 
-                    newFolder := RegExReplace(repairPathSeparators(StrReplaceCaseless(Row[2] "\", whatu, replacerz)), "\\+$")
+                    newFolder := RegExReplace(movedFolderPath(Row[2], whatuBare, replaceru), "\\+$")
                     newFileu := Row[3]
                     pathOK := (StrLen(newFolder)>1) ? 1 : 0
                  } Else
@@ -99162,7 +99163,6 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
           activeSQLdb.Exec("BEGIN TRANSACTION;")
 
        owle := setWhileLoopBusy()
-       whatuBare := Format("{:L}", RTrim(whatu, "\"))
        Loop, % maxFilesIndex + 1
        {
            imgPath := resultedFilesList[A_Index, 1]
@@ -99196,7 +99196,14 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
                  {
                     affected := (Format("{:L}", RTrim(fileFolder, "\"))==whatuBare) ? 1 : 0
                     newFolder := affected ? replacerz : fileFolder
-                 } Else newFolder := StrReplaceCaseless(fileFolder, whatu, replacerz, affected)
+                 } Else
+                 {
+                    ; the entry of a file deleted from the disk starts with ||
+                    gone := (SubStr(fileFolder, 1, 2)="||") ? "||" : ""
+                    newFolder := movedFolderPath(SubStr(fileFolder, StrLen(gone) + 1, -1), whatuBare, replaceru)
+                    affected := (newFolder!="") ? 1 : 0
+                    newFolder := affected ? gone newFolder : fileFolder
+                 }
                  value := repairPathSeparators(newFolder "\" SubStr(imgPath, thisPos + 1))
               }
            } Else
@@ -99264,10 +99271,14 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
 
 SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
     ; folderMode=1 confines the replacement to the folder part of every path: the file names
-    ; are left exactly as they are.
+    ; are left exactly as they are, and whole folders are matched from the start of the path.
     initSeenImagesListDB()
     If (sqlFailedInit=1)
        Return msgBeepTimer("Failed to initialize the database of seen images")
+
+    whatBare := RTrim(what, "\"), replacerBare := RTrim(replacer, "\")
+    If (folderMode=1)
+       what := whatBare "\", replacer := replacerBare "\"
 
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
@@ -99311,8 +99322,10 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
                  thisPos := InStr(Row[2], "\", 0, -1)
                  If (thisPos>1)
                  {
-                    newFolder := StrReplaceCaseless(SubStr(Row[2], 1, thisPos), what, replacer, affected)
-                    newFolderName := repairPathSeparators(newFolder "\" SubStr(Row[2], thisPos + 1))
+                    newFolder := movedFolderPath(SubStr(Row[2], 1, thisPos - 1), whatBare, replacerBare)
+                    affected := (newFolder!="") ? 1 : 0
+                    If affected
+                       newFolderName := newFolder "\" SubStr(Row[2], thisPos + 1)
                  }
               } Else
               {
