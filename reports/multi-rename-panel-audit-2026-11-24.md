@@ -49,16 +49,22 @@ Sections 1, 2 and 8 end with what was run again and a note on what the code does
 lines at `7ee44f5`; the other line numbers stay those of `468aef9`.
 
 **Status, 2026-11-26.** Before any fix, the batches were run again at `6a66bf9`: findings 3 to 7 give the same
-outcomes as at `7ee44f5`. Marius chose to fix findings 4 and 7 and to leave 3 and 5 open.
+outcomes as at `7ee44f5`. Marius chose to fix findings 4 and 7 and to leave 3 and 5 open. Later that day, after
+finding 5 was run again at `96feeef` with the same outcomes, he chose two of the six fixes offered for it
+(decision 5).
 
 - Finding 4 is fixed in `e06ea0a`: a plain name's number passes over the names in use.
 - Finding 7 is fixed in `e88f125`: the «Invalid RegEx» row leaves # empty.
 - Since `bccc022`, at Marius's word, a later preview page counts the files before it cheaply again: as fast as
   before, and its plain-name numbers can be lower than those the batch gives.
+- Finding 5 is fixed in part in `82cdeeb`: under «Overwrite» a selected file still at its old name is no longer
+  replaced, and the preview and «Check all files» follow the batch's order. Shifts and swaps still end skipped
+  or with «[1]» names.
 
 Three new batches, L, M and N, run renumberings, cycles, database lists, undo and plain names (see «How this was
 checked»). Their runs at `6a66bf9` record more shapes of finding 5. Sections 4 and 7 end with what was run and a
-note on what the code does now; those notes cite lines at `e06ea0a`.
+note on what the code does now; those notes cite lines at `e06ea0a`. Section 5 ends the same way, with a new
+batch Q, and cites lines at `82cdeeb`.
 
 ## Terms
 
@@ -90,18 +96,18 @@ note on what the code does now; those notes cite lines at `e06ea0a`.
 | 2 | `case{U}`, `case{L}` and `case{T}` on a name with non-ASCII letters: the file collides with itself | medium | run (Wine) | **fixed**: the batch in `0433cd3`, by Marius; the preview and «Check all files» in `7ee44f5` |
 | 3 | On a database list, the parts of the old name that the new name keeps come out in lowercase on disk, the extension too | medium | run | open |
 | 4 | A plain name with «Overwrite», or «Ask user» answered «Overwrite», skips the file; the status and the summary say «overwrite» | medium | run | **fixed**, `e06ea0a`: the number passes over the names in use |
-| 5 | The batch meets the names of the other selected files as they change, while the preview judges each file against the disk as it was: names freed earlier read «taken»; under «Overwrite» a selected file is recycled before its own turn | medium | run | open |
+| 5 | The batch meets the names of the other selected files as they change, while the preview judges each file against the disk as it was: names freed earlier read «taken»; under «Overwrite» a selected file is recycled before its own turn | medium | run | **partly fixed**, `82cdeeb`: «Overwrite» no longer replaces a selected file, and the preview and «Check all files» follow the batch's order; shifts and swaps still end skipped or with «[1]» names |
 | 6 | A renamed favourite keeps its mark on the new name, and the favourites keep the old path | low | run | open |
 | 7 | The «Invalid RegEx» row acts as a file: a double-click sets the current index to «-», «Solo rename» offers the list's first file | low | run | **fixed**, `e88f125` |
 | 8 | A preview timer that fires after the panel closed re-creates a hidden panel window, and empties the list of a list panel opened meanwhile | low, narrow | run | **fixed**, `2663c62`, by Marius |
 | 9 | Small things, numbered 9.1 to 9.9 | low | run and read | open |
 
-The rows give the status at `e06ea0a`.
+The rows give the status at `82cdeeb`.
 
 Finding 1 loses work for good. Findings 2 and 3 rename files to names the user did not ask for, and say
 nothing about it. Findings 4 and 5 do something else than the preview and the summary announce; in finding 5
 that can mean a selected file in the Recycle Bin. Findings 6 to 8 leave stale state behind. Findings 1, 2, 4,
-7 and 8 are fixed.
+7 and 8 are fixed, and finding 5 in part.
 
 ---
 
@@ -331,6 +337,57 @@ Plain names are outside this finding since `e06ea0a` (section 4): their numbers 
 each file's turn, and the preview and «Check all files» count them as the batch does, except on a later preview
 page since `bccc022`.
 
+Run again at `96feeef`, before the fix (A, H, J, L, M): the same outcomes. Batches L and M, first run at
+`6a66bf9`, add two consequences of b:
+
+- **The later numbers drop.** A downward shift, a.png, x 1, x 2 and x 3 renamed to x 1 to x 4 under «Overwrite»
+  (L1.3): #1 recycles x 1.png, #2's entry counts as deleted, and `[counter]` (the selection position less the
+  deleted entries) falls by one for #3 and #4, which get their own names back: «Finished renaming 1 out of 4
+  selected files | Skipped files: 2 | Overwritten files: 1».
+- **A database list loses a row.** `moveSQLdbEntry()` deletes the row that already holds the new path: the shift
+  and the swap on a database list (M5, M6) end with 2 rows of 3 and 1 row of 2.
+
+**Fixed in part in `82cdeeb`**, by the two fixes Marius chose of the six offered (decision 5):
+
+- **The batch** (`coreBatchMultiRenameFiles()` :42089, :42185-42194): under «Overwrite», a new name held by a
+  selected file still at its old name gets an auto-renamed name, as the batch's own outputs do since `7bb9721`.
+  No selected file goes to the Recycle Bin, so the later numbers no longer drop and database lists keep their
+  rows. Under «Ask user», the conflict box starts with «The destination is a selected file, not renamed yet.»,
+  and its «Overwrite» is still honoured. «Skip files» and «Auto-rename» do as before.
+- **The preview and «Check all files»** (`multiRenameFileStatus()` :41257) follow the batch's list order for every
+  pattern. A name an earlier file leaves reads free (a). A name held by a selected file that has not moved by the
+  file's turn reads «Name taken by #N: …», with what the batch will do (b, c); «Check all files» counts those rows
+  as «Taken by selected files (…): N» (:41429). A file waiting on the conflict box is taken to keep its name. A
+  later page looks for the holders among the 9,100 selected files from its first one and does not see the names
+  that the files before it leave, so its rows can still differ from the batch, as since `bccc022`.
+
+Runs of the fix against `96feeef`, every batch but E and E4 (outcomes not named here are the same):
+
+- **A4**: #2's row reads «OK», and «Check all files» says «Will be renamed: 2». **A5**: «Name taken by #1:
+  auto-rename», where the batch gives «a [1].png».
+- **H2**: #1's row reads «Name taken by #2: …» and #2's «OK», under every action. H2.3 ends with «photo [1].png»
+  and photo.png, nothing recycled; in H2.4 the box's «Overwrite» still recycles Photo.png.
+- **J1.3, M2.3**: the swap ends with «x 1 [1].png» and x 2.png, as under «Auto-rename».
+- **L1.3**: 4 of 4 renamed, to «x 1 [1]», «x 2 [1]», «x 3 [1]» and x 4, nothing recycled; **L2.3**: 3 of 3;
+  **L3.3**: «x 1 [1]», «x 2 [1]», and #3 replaces x 3.png, the unselected file, as «Overwrite» does.
+- **M5, M6**: «Finished renaming 3 out of 3» and «2 out of 2»; the database lists keep 3 and 2 rows.
+- **Batch Q**, new: the H2 shape under «Ask user», the box answered «Overwrite» (Q1): the box's first line is the
+  note, and Photo.png is recycled. A chain blocked by an unselected file under «Ask user» (Q2): the two boxes for
+  selected files carry the note, the third does not. A rotation of five under «Overwrite» (Q3): 5 of 5 renamed,
+  4 to «[1]» names; on the page after 2 files, #3 and #4 read «Name taken by #4» and «… by #5», and #5 «Name
+  taken: overwrite», as its holder, #1, is before the page.
+- **The cost**, under Wine, 3,000 files shifted down under «Skip» (Q4, and Qt: three rounds in one session). The
+  first page stops after one second at both revisions; it shows 2,730 to 2,853 rows (median 2,772), against
+  2,487 to 2,897 (median 2,855). The page after 2,990 files takes 19 to 29 ms, against 18 to 21 (one round
+  156). «Check all files» takes 224 to 232 ms, against 202 to 211. A plain name (P4, one round): 752 rows on the
+  first page against 775, 79 ms against 71 for the later page, 2,866 ms against 2,889 for «Check all files». Not
+  measured on Windows.
+
+Left open: a shift or a swap within the selection still does not complete. Under «Skip» and under «Ask user»
+answered «Skip file», its files keep their names; under «Auto-rename» and «Overwrite», they take «[1]» names.
+Renaming each file after the selected file that holds its new name, with or without one temporary name per
+cycle, would complete them (decision 5).
+
 ---
 
 ## 6. A renamed favourite keeps its mark, and the favourites keep the old path
@@ -488,7 +545,8 @@ AnyWindowOpen=…» still shows, because the kit logs the call before the functi
 - **The edited image when it is not renamed** keeps its edits through the redisplay (E4) (run). At `7ee44f5`
   the save question comes first, and the edits survive its «Discard» (K9).
 - **«Check all files»** gives the same counts as the preview's statuses in every case run (A1, A4, A5, C1),
-  so its numbers inherit findings 4 and 5, nothing more (run).
+  so its numbers inherit findings 4 and 5, nothing more (run). Since `82cdeeb` both follow the batch's order,
+  and the summary counts the names that selected files hold apart (A, H, J, L, M, Q).
 - **The page buttons** carry the texts «First», «Previous», «Next» and «Last», which
   `UImultiRenameChangeLVoffset()` reads and compares (:41181); `GuiAddButton()` gives the button that text and
   shows «<<» and the rest through `SetImgButtonStyle()` (:26782-26785) (read).
@@ -517,8 +575,8 @@ AnyWindowOpen=…» still shows, because the kit logs the call before the functi
 
 ## Decisions to make before fixing
 
-Decisions 1, 2, 4, 7 and 8 are settled, with one question left under 1. Marius left 3 and 5 open on 2026-11-26;
-the others are open too.
+Decisions 1, 2, 4, 7 and 8 are settled, with one question left under 1, and decision 5 in part. Marius left 3
+open on 2026-11-26; the others are open too.
 
 1. Finding 1: should «Rename files» ask the save question when the edited image is among the selected files?
    Should the double-click and «Solo rename» ask before they change the image, or should «Solo rename» rename
@@ -541,7 +599,13 @@ the others are open too.
 5. Finding 5: should the preview and «Check all files» follow the batch's order, with names freed and taken as
    they go? Should the batch rename in two passes, through temporary names, so that swaps and shifts work under
    any collision action? Or should a selected file waiting for its turn never be overwritten?
-   **Left open on 2026-11-26**, by Marius.
+   **Settled in part in `82cdeeb`**, by Marius. Six fixes were offered, from the least work to the most: a line
+   in Help; «Overwrite» never replacing a selected file; the preview and «Check all files» following the batch's
+   order; renaming each file after the selected file that holds its new name; the same, with one temporary name
+   per cycle (swaps, rotations); every renamed file through a temporary name, in two passes. He chose the second
+   and the third, with these answers: under «Overwrite» the file gets a «[1]» name rather than being skipped; the
+   conflict box warns, and its «Overwrite» is honoured; the rows read «Name taken by #N: …»; «Check all files»
+   counts them apart. Open: the fourth or the fifth, so that shifts and swaps complete.
 6. Finding 6: should the batch move a favourite to its new path, or take it out as the single file rename does?
 7. Finding 7: should the «Invalid RegEx» row leave «#» empty, as the other placeholder row does?
    **Settled in `e88f125`**, by Marius: yes.
@@ -597,24 +661,33 @@ the others are open too.
   - P, at `6a66bf9`, `e06ea0a` and `bccc022`: plain names with a token (P1), with `case{U}` (P2), on a database
     list (P3),
     and the time a long selection takes (P4: 3,000 files; the preview's first page, a page after 2,990 files,
-    and «Check all files», timed with `A_TickCount` around the calls).
+    and «Check all files», timed with `A_TickCount` around the calls);
+  - Q, at `96feeef` and on the fix: the H2 shape under «Ask user», the box answered «Overwrite» and its first
+    line logged (Q1); a chain blocked by a file outside the selection, under «Ask user» (Q2); a rotation of five
+    under «Overwrite», on a later page and on the first (Q3); 3,000 files shifted down, timed as in P4 (Q4); and
+    Qt, Q4's timings three times in one session.
 - **The fixes** were checked on their committed text, compared by sha256: batch D at `e88f125`, and every batch
   but E and E4 at `e06ea0a`, against the runs at `6a66bf9`; then A, L, M, N and P at `bccc022`, against those at
-  `e06ea0a`, where only the later page of N2 and P4 changed. Lines that differ between two runs of the same text
-  were left out of those comparisons: the conflict box shown before or after the destination's image size is
-  read, which file the app shows at start, the order of the start-up image's load in the log, and the order of
-  hash-named files in the Recycle Bin.
+  `e06ea0a`, where only the later page of N2 and P4 changed. Finding 5's fix: every batch but E and E4 on
+  its text over `96feeef` (sha256 `c01ce28f…`), against runs at `96feeef`, with Q and Qt at both; `82cdeeb`
+  makes the same change over `d1c7c83`, which only removes `simulateCalcImageCoordsInVP()`, and was
+  load-checked only. Lines that differ between
+  two runs of the same text were left out of those comparisons: the conflict box shown before or after the
+  destination's image size is read, which file the app shows at start, the order of the start-up image's load
+  in the log, the order of hash-named files in the Recycle Bin, and in G3 whether the file actions history list
+  is filled 100 ms after it opens (empty in one of two runs at `96feeef`).
 - **Read, not run, at this revision**: «Insert», «Examples», «Erase history», «Help», «<<», «<», «>>», «Preserve
   original file date and time» and «Dark mode UI». The 2026-11-08 kits ran the menus, «Erase history» and the
   paging at earlier revisions; no finding about them here means none was found by reading.
 - **Not run on Windows**: how NTFS and the Recycle Bin handle the «Overwrite» case of finding 2, which the
   batch no longer reaches since its fix; what Alt+M does in 9.7; a rename on a network share (A).
 - **Not run at all**: Escape during «Check all files»; private mode; multi-page preview mode; a selection
-  longer than one page, except that N2 shows a later page by setting its offset; Quick search actions or
-  user-defined shortcuts fired while the panel is open.
+  longer than one page, except that N2, Q3 and Q4 show a later page by setting its offset; Quick search actions
+  or user-defined shortcuts fired while the panel is open.
 - **The kit**: `.claude/scratch/multi-rename-panel-2026-11-24/` (README.txt). `app/run-mr.sh <tag> <test
   function> [revision]` runs one batch, about a minute each, and writes `app/results/<tag>.txt`; the logs of
   this report are kept there, those of the runs at `7ee44f5` under the tags `<batch>-7ee44f5`, at `6a66bf9`
   under `<batch>-6a66bf9`, and at the fixes under `D-fix7`, `<batch>-fix4` (`P-e06ea0a` for P) and
-  `<batch>-page` (`bccc022`). It reuses the files filter kit's
+  `<batch>-page` (`bccc022`); finding 5's runs under `<batch>-96feeef` and `<batch>-fix5`, with the fix's script
+  in `fix-2026-11-26/patch5.py`. It reuses the files filter kit's
   `patch.py`, `patch-ff.py` and helpers, and adds `patch-mr.py` and `test-mr.ahk`.
