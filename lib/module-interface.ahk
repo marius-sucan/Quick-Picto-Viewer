@@ -1958,7 +1958,13 @@ dummyTimerProcessDroppedFiles() {
    Static lastInvoked := 1
    totalGroppy := groppedFiles.Count()
    If (!totalGroppy || (A_TickCount - lastInvoked<400))
+   {
+      groppedFiles := []   ; a non-empty list is a busy test of PVwinGuiDropFiles()
+      ToolTip, , , , 2
+      If totalGroppy
+         showDelayedTooltip("WARNING: The main window is busy, files dropped ignored.")
       Return
+   }
 
    isCtrlDown := GetKeyState("Ctrl", "P")
    lastInvoked := A_TickCount
