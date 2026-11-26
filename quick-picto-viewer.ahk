@@ -105708,7 +105708,7 @@ InvokeSelShapesMenu(givenCoords:=0) {
    Return "m"
 }
 
-tlbrUndoAction() {
+tlbrUndoAction(redo:=0) {
    If isNowAlphaPainting()
    {
       performUndoAlphaPainting()
@@ -105718,11 +105718,18 @@ tlbrUndoAction() {
    whileLoopExec := 1
    While, (determineLClickState()=1 || A_Index=1)
    {
-      ImgUndoAction()
+      If redo
+         ImgRedoAction()
+      Else
+         ImgUndoAction()
       Sleep, % (A_Index<10) ? 200 : 90
    }
    whileLoopExec := 0
    Return "m"
+}
+
+tlbrRedoAction() {
+   Return tlbrUndoAction(1)
 }
 
 tlbrPanIMG() {
@@ -105750,23 +105757,6 @@ tlbrPanIMG() {
       lastInvoked := A_TickCount
       decideWinReactivation()
    }
-   Return "m"
-}
-
-tlbrRedoAction() {
-   If isNowAlphaPainting()
-   {
-      performUndoAlphaPainting()
-      Return
-   }
-
-   whileLoopExec := 1
-   While, (determineLClickState()=1 || A_Index=1)
-   {
-      ImgRedoAction()
-      Sleep, % (A_Index<10) ? 200 : 90
-   }
-   whileLoopExec := 0
    Return "m"
 }
 
