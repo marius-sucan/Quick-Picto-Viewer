@@ -15228,38 +15228,6 @@ QPV_AlterAlphaChannel(pBitmap, givenLevel, replaceAll) {
   return r
 }
 
-QPV_ResizeSplitBlendChannels(pBitmap, x, y, nw, nh, opacity, passesX:=0, passesY:=0) {
-  ; thisStartZeit := A_TickCount
-  initQPVmainDLL()
-  If !qpvMainDll
-  {
-     addJournalEntry(A_ThisFunc "(): QPV .dll file is missing or failed to initialize: qpvMain.dll")
-     Return 0
-  }
-
-  thisStartZeit := A_TickCount
-  trGdip_GetImageDimensions(pBitmap, w, h)
-  If (!w || !h || !validBMP(pBitmap))
-  {
-     addJournalEntry(A_ThisFunc "(): failed - possibly malformed pBitmap given: " pBitmap)
-     Return 0
-  }
-
-  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
-  If !E1
-  {
-     If (passesX>0 || passesY>0)
-        r := DllCall("qpvmain.dll\openCVblurFilters", "UPtr", iScan, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", 0, "Int", 0, "int", stride, "int", 32)
-
-     r := DllCall("qpvmain.dll\openCVresizeBlendEachChannel", "UPtr", iScan, "Int", w, "Int", h, "int", 32, "int", stride, "int", x, "int", y, "int", nw, "int", nh, "float", opacity)
-     Gdip_UnlockBits(pBitmap, iData)
-  } Else 
-     addJournalEntry(A_ThisFunc "(): failed - unable to lock the bitmap bits")
-
-  ; fnOutputDebug(A_ThisFunc "(" r "): " A_TickCount - thisStartZeit)
-  return r
-}
-
 QPV_FillBitmapHoles(pBitmap, newColor) {
   ; thisStartZeit := A_TickCount
   initQPVmainDLL()
