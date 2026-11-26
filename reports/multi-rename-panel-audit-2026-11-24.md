@@ -19,7 +19,7 @@ audit also covers what those controls run, and the routes that open the panel. T
 
 Line numbers are `quick-picto-viewer.ahk` on `development` at `468aef9`. The audit changed no code.
 
-Eight findings, a list of small things (row 9 of the summary) and four things seen in passing. Each one
+Eight findings, a list of small things (row 9 of the summary) and five things seen in passing. Each one
 says how it was checked: **run** means the real application did it under headless Wine, on the stock
 AutoHotkey 1.1.37.02; **read** means it follows from the code and was not run. Nothing was run on Windows.
 Each run carries a tag such as A1 or E3: the letter names its batch (listed under «How this was checked»),
@@ -60,11 +60,14 @@ finding 5 was run again at `96feeef` with the same outcomes, he chose two of the
 - Finding 5 is fixed in part in `82cdeeb`: under «Overwrite» a selected file still at its old name is no longer
   replaced, and the preview and «Check all files» follow the batch's order. Shifts and swaps still end skipped
   or with «[1]» names. Small thing 9.5 is fixed with it.
+- «Seen in passing» B is fixed in `3f12857`: the single file rename takes the name, the extension and the folder
+  it shows from the disk. D is marked settled: H1 at `bf12b07` gives the outcome D records. E is new, found
+  while fixing B.
 
 Three new batches, L, M and N, run renumberings, cycles, database lists, undo and plain names (see «How this was
 checked»). Their runs at `6a66bf9` record more shapes of finding 5. Sections 4 and 7 end with what was run and a
 note on what the code does now; those notes cite lines at `e06ea0a`. Section 5 ends the same way, with a new
-batch Q, and cites lines at `82cdeeb`.
+batch Q, and cites lines at `82cdeeb`. A batch R runs the single file rename for «Seen in passing» B.
 
 ## Terms
 
@@ -525,15 +528,29 @@ AnyWindowOpen=…» still shows, because the kit logs the call before the functi
   (run for the split; no network share was available under Wine, so a rename on one was not run). The helper
   has 186 calls in the script and its lib; whatever else rebuilds a path from its folder is likely hit the
   same way (read).
-- **B. The single file rename on a database list** offers the lowered name in its box (:44307-44308), and a
+- ✅ **B. The single file rename on a database list** offers the lowered name in its box (:44307-44308), and a
   typed name without an extension takes the lowered extension (:44341-44343); finding 3 in another panel (read).
+  Run at `bf12b07` (batch R), it reaches further: an edit of the offered name lowers the whole name on disk
+  (R2); «Undo rename» puts the file back under the lowered name, since the undo record keeps the list's path
+  (R3); typing the disk's own spelling counts as a rename, with an undo record (R5). Fixed in `3f12857`, on every
+  list, by Marius's choices: the box reads the name and the extension from the disk (`Loop, Files` and
+  `A_LoopFileLongPath`), the undo record keeps that spelling of the old name, and the box and the closing
+  message show the folder as spelled on disk. The new path keeps the list's folder. In the same commit, the
+  closing message masks the name and the folder in private mode again: since `4e9b180` the split after the
+  masking overwrote it, and `PathCompact()` with it (R8). That message's folder is now shortened, on every list.
+  Left as it is: the undo's own message shows the folder as the list holds it (R3) (run).
 - **C. The collision action is kept for the session only.** `onConflictMultiRenameAct` is set at start-up to 4
   (:347) and has no `RegAction()` or `INIaction()`, so «Ask user» comes back at every start (read). Maybe on
   purpose.
-- **D. The first defect left open on 2026-11-13 no longer holds.** «Ask user», each box answered «Overwrite»,
+- ✅ **D. The first defect left open on 2026-11-13 no longer holds.** «Ask user», each box answered «Overwrite»,
   three files onto photo.jpg (H1): the list now marks the two replaced entries deleted (`||…\photo.jpg`) and
   keeps one live entry, where on 2026-11-13 it held the live path three times. `markReplacedListEntry()` does
-  it, called from the batch since `3df8de3` (2026-11-14) (run).
+  it, called from the batch since `3df8de3` (2026-11-14) (run). Run again at `bf12b07`: the same outcome.
+- **E. The single file rename refuses a name of three characters or fewer, without a word.**
+  `BTNrenameSoloFileAct()` wants more than three characters before it adds the extension (:48384 at `3f12857`)
+  and returns 0, so `PanelRenameThisFile()` opens the box again with no message. R0, «Pic» typed: the box comes
+  back, at `bf12b07` and on the fix (run). The batch accepts two characters (9.3). Found on
+  2026-11-26, while fixing B.
 
 ---
 
@@ -616,7 +633,9 @@ open on 2026-11-26; the others are open too.
    **Settled in `2663c62`**, by Marius: the function returns at once when panel 8 is not open.
 9. The 5-second cut of the preview (`selCounter>A_Year`, :41857, `428fcca`): it applies only past file 2,026
    of the selection, a number that grows each year. Is a fixed count meant there?
-10. Small things 9.1 to 9.9 and «Seen in passing» A to C: which to fix. 9.5 is fixed with finding 5 (`82cdeeb`).
+10. Small things 9.1 to 9.9 and «Seen in passing» A, C and E: which to fix. 9.5 is fixed with finding 5
+    (`82cdeeb`), and B in `3f12857`, by Marius's choices: the disk's spelling on every list, the undo record and
+    the folder shown included, and the private-mode masking of the closing message restored with it.
 
 ---
 
@@ -643,7 +662,9 @@ open on 2026-11-26; the others are open too.
     not run; other boxes answered from a script timer; Wine's shell boxes answered «No» by a second process
     (finding 2);
   - the late preview timer started as the box's g-label starts it, `SetTimer, uiPopulateLVmultiRename, -450`
-    (finding 8).
+    (finding 8);
+  - the single file rename box answered from a script timer, which logs the name the box offers and types into
+    its field (B).
 - **Batches**: A (collisions against the preview), B (database lists), C (non-ASCII case), D (the «Invalid RegEx»
   row), E and E4 (an edited image), F (favourites), G and G0 (the late timer), H (the defects left open on
   2026-11-13),
@@ -667,15 +688,23 @@ open on 2026-11-26; the others are open too.
   - Q, at `96feeef` and on the fix: the H2 shape under «Ask user», the box answered «Overwrite» and its first
     line logged (Q1); a chain blocked by a file outside the selection, under «Ask user» (Q2); a rotation of five
     under «Overwrite», on a later page and on the first (Q3); 3,000 files shifted down, timed as in P4 (Q4); and
-    Qt, Q4's timings three times in one session.
+    Qt, Q4's timings three times in one session;
+  - R, at `bf12b07` and on the fix: the single file rename on a plain list and on a database list, through
+    `PanelRenameThisFile("single")`: a 3-letter name, the reopened box cancelled (R0); the offered name,
+    cancelled (R1); «-x» inserted in it (R2); «Undo rename» afterwards (R3); a name typed without an extension
+    (R4); the disk's own spelling typed (R5); the lowered spelling typed, on a favourite (R6); upper case typed
+    (R7); private mode (R8); the database's rows read after R3, R6 and R8, and the list reopened.
 - **The fixes** were checked on their committed text, compared by sha256: batch D at `e88f125`, and every batch
   but E and E4 at `e06ea0a`, against the runs at `6a66bf9`; then A, L, M, N and P at `bccc022`, against those at
   `e06ea0a`, where only the later page of N2 and P4 changed. Finding 5's fix: every batch but E and E4 on
   its text over `96feeef` (sha256 `c01ce28f…`), against runs at `96feeef`, with Q and Qt at both; `82cdeeb`
   makes the same change over `d1c7c83`, which only removes `simulateCalcImageCoordsInVP()`, and was
-  load-checked only. Lines that differ between
-  two runs of the same text were left out of those comparisons: the conflict box shown before or after the
-  destination's image size is read, which file the app shows at start, the order of the start-up image's load
+  load-checked only. B's fix: R, D and K on its text over `bf12b07` (sha256 `02a4e165…`), against runs at
+  `bf12b07`; `3f12857` makes the same change over `8b67080`, which only removes two OpenCV functions, and was
+  load-checked only. Only batch R changed. On the plain list only the closing message changed: its folder is
+  shortened, and in private mode it is masked (R8). The database rows and the reopened list are the same at
+  both. Lines that differ between two runs of the same text were left out of those comparisons: the conflict
+  box shown before or after the destination's image size is read, which file the app shows at start, the order of the start-up image's load
   in the log, the order of hash-named files in the Recycle Bin, and in G3 whether the file actions history list
   is filled 100 ms after it opens (empty in one of two runs at `96feeef`).
 - **Read, not run, at this revision**: «Insert», «Examples», «Erase history», «Help», «<<», «<», «>>», «Preserve
@@ -683,13 +712,14 @@ open on 2026-11-26; the others are open too.
   paging at earlier revisions; no finding about them here means none was found by reading.
 - **Not run on Windows**: how NTFS and the Recycle Bin handle the «Overwrite» case of finding 2, which the
   batch no longer reaches since its fix; what Alt+M does in 9.7; a rename on a network share (A).
-- **Not run at all**: Escape during «Check all files»; private mode; multi-page preview mode; a selection
-  longer than one page, except that N2, Q3 and Q4 show a later page by setting its offset; Quick search actions
-  or user-defined shortcuts fired while the panel is open.
+- **Not run at all**: Escape during «Check all files»; private mode, except the single file rename's closing
+  message (R8); multi-page preview mode; a selection longer than one page, except that N2, Q3 and Q4 show a later
+  page by setting its offset; Quick search actions or user-defined shortcuts fired while the panel is open.
 - **The kit**: `.claude/scratch/multi-rename-panel-2026-11-24/` (README.txt). `app/run-mr.sh <tag> <test
   function> [revision]` runs one batch, about a minute each, and writes `app/results/<tag>.txt`; the logs of
   this report are kept there, those of the runs at `7ee44f5` under the tags `<batch>-7ee44f5`, at `6a66bf9`
   under `<batch>-6a66bf9`, and at the fixes under `D-fix7`, `<batch>-fix4` (`P-e06ea0a` for P) and
   `<batch>-page` (`bccc022`); finding 5's runs under `<batch>-96feeef` and `<batch>-fix5`, with the fix's script
-  in `fix-2026-11-26/patch5.py`. It reuses the files filter kit's
+  in `fix-2026-11-26/patch5.py`; B's under `<batch>-bf12b07` (D, H, K, R) and `<batch>-fixB` (D, K, R).
+  It reuses the files filter kit's
   `patch.py`, `patch-ff.py` and helpers, and adds `patch-mr.py` and `test-mr.ahk`.
