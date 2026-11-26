@@ -51025,19 +51025,6 @@ testIsBezierAltViewPathClosed() {
     Return r
 }
 
-testBezierFirstLastPointsCollapsed(modus) {
-    totalz := customShapePoints.Count()
-    If (totalz<4)
-       Return -1
-
-    ; this assumes drawingShapeNow = 0 ;
-    f := (modus="first") ? 2 : totalz
-    xA := customShapePoints[f - 1, 1],        yA := customShapePoints[f - 1, 2]
-    xB := customShapePoints[f, 1],            yB := customShapePoints[f, 2]
-    r := (xA=xB && yA=yB) ? 1 : 0
-    Return r
-}
-
 toggleAutoReflectAnchors() {
    autoReflectVectorAnchors := !autoReflectVectorAnchors
    RegAction(1, "autoReflectVectorAnchors")
