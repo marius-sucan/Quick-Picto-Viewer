@@ -41815,7 +41815,8 @@ uiPopulateLVmultiRename() {
      ; a malformed «\>...//...» regex would throw inside the preview: show it instead
      multiRenameSummary("pattern", summaryKey, "The regular expression after «\>» is invalid")
      LV_Delete()
-     LV_Add("", "Invalid", "RegEx", "-", "-", "-")
+     ; no index in #: the handlers take the row for no file
+     LV_Add("", "Invalid", "RegEx", "-", "-")
      GuiControl, +Redraw, LViewOthers
      Return
   }
