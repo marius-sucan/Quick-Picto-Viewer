@@ -47427,7 +47427,8 @@ BTNperformIndexSearchReplace() {
       BtnCloseWindow()
       limitSearchReplaceSelected := (performSRindexMode=2) ? 1 : 0
       ; a database list holds its paths in lower case
-      SearchAndReplaceThroughIndex(editF5, (SLDtypeLoaded=3) ? Format("{:L}", editF6) : editF6, 0, userSrcRplcIndexFolder, limitSearchReplaceSelected)
+      plu := (SLDtypeLoaded=3) ? Format("{:L}", editF6) : editF6
+      SearchAndReplaceThroughIndex(editF5, plu, 0, userSrcRplcIndexFolder, limitSearchReplaceSelected)
    } Else If (performSRindexMode=3)
    {
       If (mustRecordSeenImgs!=1)
@@ -99069,7 +99070,10 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
     ; Returns 0 when the database could not be updated
 
     If (folderMode=1 || folderMode=2)
-       whatu := RTrim(whatu, "\") "\", replacerz := RTrim(replacerz, "\") "\"
+    {
+       whatu := RTrim(whatu, "\") "\"
+       replacerz := RTrim(replacerz, "\") "\"
+    }
 
     ; the stored paths carry no trailing separator, see SQLfolderMatchClause()
     whatuBare := Format("{:L}", RTrim(whatu, "\"))
@@ -99280,9 +99284,13 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
     If (sqlFailedInit=1)
        Return msgBeepTimer("Failed to initialize the database of seen images")
 
-    whatBare := RTrim(what, "\"), replacerBare := RTrim(replacer, "\")
+    whatBare := RTrim(what, "\")
+    replacerBare := RTrim(replacer, "\")
     If (folderMode=1)
-       what := whatBare "\", replacer := replacerBare "\"
+    {
+       what := whatBare "\"
+       replacer := replacerBare "\"
+    }
 
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
