@@ -275,6 +275,23 @@ under «Overwrite»:
   the second, where a folder is named «holiday (1).png», c.png and d.png become holiday (2) and (3).
 - **A3**, the control, is unchanged.
 
+Batch P, «Skip», at `6a66bf9` and at `e06ea0a`, runs three shapes the batches above leave out:
+
+- **P1**: `[pfdname]` alone, in folder trip, trip (1) held by a file outside the selection. At `6a66bf9`, a.png
+  was skipped and b.png became trip (2); now a.png and b.png become trip (2) and (3).
+- **P2**: `case{U} holiday`, HOLIDAY (1) held. At `6a66bf9`, a.png was skipped; now they become HOLIDAY (2) and
+  (3).
+- **P3**: a database list, a.png, b.png and holiday (1).png, all selected. At `6a66bf9`, a.png was skipped and
+  the other two became holiday (2) and (3); now the three become holiday (2), (3) and (4). The database holds
+  their three rows at the new paths.
+
+**The fix costs time on a later preview page.** There, a plain name's files before the page are named in full,
+with a disk check each, and the page's 1-second and 5-second limits do not reach that pass. In P4, 3,000
+files with holiday (1) held, under Wine, the page after 2,990 files took 2,855 ms, against 73 ms at `6a66bf9`;
+that page now shows holiday (2992) for f2991, where `6a66bf9` showed holiday (2991). The first page (1,019 ms,
+against 1,020) and «Check all files» (2,861 ms, against 2,815) cost the same as before. Not measured on
+Windows.
+
 ---
 
 ## 5. The batch meets the other selected files' names as they change; the preview does not
@@ -305,6 +322,9 @@ by a later selected file is about to be freed. Three outcomes follow, all run:
 The protection of 2026-11-08 (`7bb9721`, `lockDestinationFileName()`) covers the names the batch wrote
 earlier, and the names of selected files the pattern leaves unchanged; it does not cover selected files still
 waiting for their turn.
+
+Plain names are outside this finding since `e06ea0a` (section 4): their numbers pass over the names in use at
+each file's turn, and the preview and «Check all files» count them as the batch does.
 
 ---
 
@@ -568,7 +588,10 @@ the others are open too.
     first two entries), «undo last» of a rotation (M7) and a one-file undo after a swap (M8);
   - N: plain names: gaps closed (N1), a later preview page (N2, with `uiLVoffset` set as the page buttons set
     it), a missing file (N3), two folders (N4);
-  - D0: the setup of D1 without the double-click, the control for a redisplay seen in D1.
+  - D0: the setup of D1 without the double-click, the control for a redisplay seen in D1;
+  - P, at `6a66bf9` and `e06ea0a`: plain names with a token (P1), with `case{U}` (P2), on a database list (P3),
+    and the time a long selection takes (P4: 3,000 files; the preview's first page, a page after 2,990 files,
+    and «Check all files», timed with `A_TickCount` around the calls).
 - **The fixes** were checked on their committed text, compared by sha256: batch D at `e88f125`, and every batch
   but E and E4 at `e06ea0a`, against the runs at `6a66bf9`. Lines that differ between two runs of the same text
   were left out of those comparisons: the conflict box shown before or after the destination's image size is
