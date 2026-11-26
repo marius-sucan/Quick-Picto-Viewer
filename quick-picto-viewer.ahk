@@ -44412,7 +44412,7 @@ PanelRenameThisFile(dummy:=0) {
    multiBtn := (markedSelectFile>1) ? "&Multi-rename|" : ""
    fileMsg := (userPrivateMode=1) ? "" : "File location:`n" OutDir "\`n `n"
    typeu := (userPrivateMode=1) ? " Password " : ""
-   msgResult := msgBoxWrapper("panelu|Rename file: " appTitle, fileMsg "Please type the new file name.`n ", "&Rename file|" undoBtn multiBtn "&Modify index entry|C&ancel", 1, "modify-file", "On file name collision, use the previous answer", doLastOption, 0, "limit9050" typeu, OutFileName)
+   msgResult := msgBoxWrapper("panelu|Rename file: " appTitle, fileMsg "Please type the new file name.`n ", "&Rename file|" undoBtn multiBtn "M&odify index entry|C&ancel", 1, "modify-file", "On file name collision, use the previous answer", doLastOption, 0, "limit9050" typeu, OutFileName)
    If InStr(msgResult.btn, "multi")
    {
       SetTimer, PanelMultiRenameFiles, -100
@@ -48385,7 +48385,7 @@ filterFileName(ostring, allow:=1) {
 BTNrenameSoloFileAct(newFileName, file2rem, doLastOption, diskPath) {
 ; returns 2 when renamed, 1 when the name is the same, 0 or empty when not renamed
   newFileName := filterFileName(newFileName)
-  If (StrLen(newFileName)>3)
+  If (StrLen(newFileName)>0)
   {
      ; the new path keeps the list's folder; the name, extension and the folder shown come from the disk
      zPlitPath(file2rem, 0, OutFileName, OutDir)
