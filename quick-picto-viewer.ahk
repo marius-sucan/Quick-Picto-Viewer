@@ -12595,9 +12595,14 @@ VPflipImage(axis, funcu) {
    resetSlideshowTimer()
    ForceRefreshNowThumbsList()
    If (axis="V")
-      varName := "FlipImgV", newState := FlipImgV := !FlipImgV
-   Else
-      varName := "FlipImgH", newState := FlipImgH := !FlipImgH
+   {
+      varName := "FlipImgV"
+      newState := FlipImgV := !FlipImgV
+   } Else
+   {
+      varName := "FlipImgH"
+      newState := FlipImgH := !FlipImgH
+   }
 
    friendly := (newState=1) ? "ON" : "off"
    showTOOLtip(((axis="V") ? "Vertical" : "Horizontal") " mirroring: " friendly, funcu, 1)
