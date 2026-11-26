@@ -31394,7 +31394,7 @@ FolderTreeRepopulate(dummy:=0, listuGiven:=0) {
           aListu := listuGiven
        } Else
        {
-          aListu := readRecentOpenedFolderEntries(0, 0)
+          aListu := readRecentOpenedEntries("RecentFolderOpened", 0, 0)
           aListu .= readRecentFileDesties()
           If FolderExist(prevFileSavePath)
              aListu .= "`n" prevFileSavePath "`n"
@@ -39337,60 +39337,28 @@ writeSlideSettingsINI(file2save) {
     ; throwMSGwriteError()
 }
 
-readRecentOpenedFolderEntries(forceNewList:=0, doFiltering:=1) {
-   Static lastInvoked := 1, historyList
+readRecentOpenedEntries(section, forceNewList:=0, doFiltering:=1) {
+   Static lastInvoked := {}, historyLists := {}
 
    If (StrLen(forceNewList)>4)
    {
-      historyList := forceNewList
-      lastInvoked := A_TickCount
+      historyLists[section] := forceNewList
+      lastInvoked[section] := A_TickCount
       Return
    }
 
-   If (StrLen(historyList)>4 && (A_TickCount - lastInvoked<3500))
+   If (StrLen(historyLists[section])>4 && (A_TickCount - lastInvoked[section]<3500))
    {
-      lastInvoked := A_TickCount
-      Return historyList
+      lastInvoked[section] := A_TickCount
+      Return historyLists[section]
    }
 
    historyList := ""
    Loop, % maxRecentOpenedFolders
    {
-       IniRead, newEntry, % mainRecentsFile, RecentFolderOpened, E%A_Index%, @
+       IniRead, newEntry, % mainRecentsFile, % section, E%A_Index%, @
        newEntry := Trimmer(newEntry)
-       If (StrLen(newEntry)>4 && doFiltering=1)
-          historyList .= newEntry "`n"
-       Else If (doFiltering!=1)
-          historyList .= newEntry "`n"
-   }
-  
-   List_MakeUnique(historyList, "`n", 0, 1)
-   lastInvoked := A_TickCount
-   Return historyList
-}
-
-readRecentOpenedImagesEntries(forceNewList:=0, doFiltering:=1) {
-   Static lastInvoked := 1, historyList
-
-   If (StrLen(forceNewList)>4)
-   {
-      historyList := forceNewList
-      lastInvoked := A_TickCount
-      Return
-   }
-
-   If (StrLen(historyList)>4 && (A_TickCount - lastInvoked<3500))
-   {
-      lastInvoked := A_TickCount
-      Return historyList
-   }
-
-   historyList := ""
-   Loop, % maxRecentOpenedFolders
-   {
-       IniRead, newEntry, % mainRecentsFile, RecentImgOpened, E%A_Index%, @
-       newEntry := Trimmer(newEntry)
-       If !RegExMatch(newEntry, RegExFilesPattern)
+       If (section="RecentImgOpened" && !RegExMatch(newEntry, RegExFilesPattern))
           Continue
 
        If (StrLen(newEntry)>4 && doFiltering=1)
@@ -39398,9 +39366,10 @@ readRecentOpenedImagesEntries(forceNewList:=0, doFiltering:=1) {
        Else If (doFiltering!=1)
           historyList .= newEntry "`n"
    }
-  
+
    List_MakeUnique(historyList, "`n", 0, 1)
-   lastInvoked := A_TickCount
+   historyLists[section] := historyList
+   lastInvoked[section] := A_TickCount
    Return historyList
 }
 
@@ -39461,7 +39430,7 @@ RecordFoldersOpenedManager(entry2add) {
   If (StrLen(entry2add)<3 || !allowRecordHistory || userPrivateMode=1)
      Return
 
-  historyList := readRecentOpenedFolderEntries()
+  historyList := readRecentOpenedEntries("RecentFolderOpened")
   historyList := entry2add "`n" historyList
   List_MakeUnique(historyList, "`n", 0, 0)
   Loop, Parse, historyList, `n, `r
@@ -39477,14 +39446,14 @@ RecordFoldersOpenedManager(entry2add) {
       newHistoryList .= A_LoopField "`n"
   }
 
-  readRecentOpenedFolderEntries(newHistoryList)
+  readRecentOpenedEntries("RecentFolderOpened", newHistoryList)
 }
 
 RecordImagesOpenedManager(entry2add) {
   If (StrLen(entry2add)<5 || !allowRecordHistory || userPrivateMode=1 || !FileRexists(entry2add) || !RegExMatch(entry2add, RegExFilesPattern))
      Return
 
-  historyList := readRecentOpenedImagesEntries()
+  historyList := readRecentOpenedEntries("RecentImgOpened")
   historyList := entry2add "`n" historyList
   List_MakeUnique(historyList, "`n", 0, 0)
   Loop, Parse, historyList, `n, `r
@@ -39500,7 +39469,7 @@ RecordImagesOpenedManager(entry2add) {
       newHistoryList .= A_LoopField "`n"
   }
 
-  readRecentOpenedImagesEntries(newHistoryList)
+  readRecentOpenedEntries("RecentImgOpened", newHistoryList)
 }
 
 markUndefinedFavedList() {
@@ -60885,7 +60854,7 @@ fillCopyMoveDestiesList() {
     listu := readRecentFileDesties()
     listu .= "--={ other destinations }=--`n"
     setImageLoading()
-    historyList := readRecentOpenedFolderEntries()
+    historyList := readRecentOpenedEntries("RecentFolderOpened")
     whileLoopExec := 1
     Loop, Parse, historyList, `n
     {
@@ -72736,7 +72705,7 @@ createMenuOpenRecents(modus:=0) {
    {
       countItemz := 0
       kMenu("PVopenF", "AddSeparator", 0)
-      historyList := readRecentOpenedImagesEntries(0, 0)
+      historyList := readRecentOpenedEntries("RecentImgOpened", 0, 0)
       Loop, Parse, historyList, `n
       {
          If (A_Index>maxRecentOpenedFolders)
@@ -72752,7 +72721,7 @@ createMenuOpenRecents(modus:=0) {
 
       countItemz := 0
       kMenu("PVopenF", "AddSeparator", 0)
-      historyList := readRecentOpenedFolderEntries(0, 0)
+      historyList := readRecentOpenedEntries("RecentFolderOpened", 0, 0)
       Loop, Parse, historyList, `n
       {
          If (A_Index>maxRecentOpenedFolders)
@@ -104400,7 +104369,7 @@ WICcontainerFmts(containerID, imgPath) {
 recentOpenedFolders() {
    If (allowRecordHistory=1)
    {
-      historyList := readRecentOpenedFolderEntries()
+      historyList := readRecentOpenedEntries("RecentFolderOpened")
       historyList .= readRecentFileDesties()
       Loop, Parse, historyList, `n
       {
@@ -104425,7 +104394,7 @@ dialogRecentFolders(forSave:=0) {
    If (allowRecordHistory!=1 || userPrivateMode=1)
       Return
 
-   openedList := prevOpenFolderPath "`n" readRecentOpenedFolderEntries()
+   openedList := prevOpenFolderPath "`n" readRecentOpenedEntries("RecentFolderOpened")
    destList := prevFileSavePath "`n" prevFileMovePath "`n"
    Loop, 15
    {
