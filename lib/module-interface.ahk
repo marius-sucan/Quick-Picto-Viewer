@@ -1934,7 +1934,7 @@ delayedGuiResizeUpdater() {
 
 PVwinGuiDropFiles(GuiHwnd, FileArray, CtrlHwnd, X, Y) {
    Static lastInvoked := 1
-   If (MsgBox2hwnd || AnyWindowOpen>0 || colorPickerModeNow=1 || mustCaptureCloneBrush=1 || whileLoopExec=1 || drawingShapeNow=1 || imageLoading=1 || runningLongOperation=1 || groppedFiles.Count()>0) || (A_TickCount - lastInvoked<300)
+   If (MsgBox2hwnd || AnyWindowOpen>0 || colorPickerModeNow=1 || mustCaptureCloneBrush=1 || whileLoopExec=1 || drawingShapeNow=1 || runningLongOperation=1 || groppedFiles.Count()>0) || (A_TickCount - lastInvoked<300)
    {
       showDelayedTooltip("WARNING: The main window is busy, files dropped ignored.")
       Return
@@ -1955,9 +1955,22 @@ PVwinGuiDropFiles(GuiHwnd, FileArray, CtrlHwnd, X, Y) {
 }
 
 dummyTimerProcessDroppedFiles() {
-   Static lastInvoked := 1
+   Static lastInvoked := 1, waitStart := 0
    totalGroppy := groppedFiles.Count()
-   If (!totalGroppy || (A_TickCount - lastInvoked<400))
+   If (totalGroppy && A_TickCount - lastInvoked>=400 && imageLoading=1)
+   {
+      ; the image is still being drawn, as after the window is restored: the files wait for it, up to 2 s
+      If !waitStart
+         waitStart := A_TickCount
+      If (A_TickCount - waitStart<2000)
+      {
+         SetTimer, dummyTimerProcessDroppedFiles, -50
+         Return
+      }
+   }
+
+   waitStart := 0
+   If (!totalGroppy || (A_TickCount - lastInvoked<400) || imageLoading=1)
    {
       groppedFiles := []   ; a non-empty list is a busy test of PVwinGuiDropFiles()
       ToolTip, , , , 2
