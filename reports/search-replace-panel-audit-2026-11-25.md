@@ -46,6 +46,10 @@ one rule in every target, with three checks only (`c359491`). His answers on the
 and reverse decision 1, the balancing of decision 3 and the refusal of `c2fde82`; see «2026-11-27: the panel as a
 replace of text», after the summary, with batch S and the regression runs.
 
+**Status, 2026-11-27, later.** Findings 6, 8 and 9 and small thing 11.1 were run again at `892ba6e`, the `.SLD` half of
+finding 6 for the first time, and fixed on Marius's answers to decisions 6, 8 and 9 (`b0cc029`, `860a10f`, `a1dd2cb`, `7e93452`);
+see «2026-11-27: findings 6, 8, 9 and 11.1», with batches P and Q and the regression runs.
+
 ## Terms
 
 - **The panel**: panel 56, «Search and replace in the files index». Its routes: Ctrl+H (:1461-1464), «Search and
@@ -79,12 +83,12 @@ replace of text», after the summary, with batch S and the regression runs.
 | 3 | A separator at the end of one string only: folder mode glues each subfolder's name to the new folder («photossub»), while the folder's own files come out right | medium | run | **by design** since `c359491`: the strings stay as typed; «Perform» asks before names are joined, in both modes and for the seed folders (S14, S17e); an entry whose new path is invalid keeps its path |
 | 4 | «Current files list» on a filtered list: a database list loses its filter without a word and every record is rewritten; a plain list rewrites only what the filter shows | medium | run | **fixed**, `3d52bd4`, `f498afe`: a database list keeps its filter and changes only the entries shown, as a plain list |
 | 5 | A new path that another entry holds: on a database list the record keeps its old path while the list shows the new one, twice; a plain list gets the duplicate silently | medium | run | **fixed** on database lists, `c359491`: the entry keeps its path in the list and in the database, counted as a collision (S11); a plain list keeps the duplicate, by Marius's choice (S11c) |
-| 6 | Database lists: the captions, the audio notes and the folders list stay at the old paths; the renamed images lose their captions | medium | run | open |
+| 6 | Database lists: the captions, the audio notes and the folders list stay at the old paths; the renamed images lose their captions | medium | run | **fixed**, `7e93452`: the captions, the audio notes and the folders list follow the entries moved, on database lists and on `.SLD` files that keep their folders list (P1-P10) |
 | 7 | «Main seed folders list»: no message whatever happens; every network path in the list loses its leading backslash; a list of network paths alone counts as empty; the result is not cleaned | medium | run | **fixed**, `c359491`: a closing message, the cleaned list, the merges counted (S17); network paths out of scope since `f286bde`, so H4 stays |
-| 8 | Private mode: the two fields hide their text, then the on-screen message prints both strings in full | low | run (the message) + read (the display) | open |
-| 9 | «Entire seen images database»: the progress and time-left display never appears | low | run | open |
+| 8 | Private mode: the two fields hide their text, then the on-screen message prints both strings in full | low | run (the message) + read (the display) | **fixed**, `860a10f`: the message leaves the strings out, for the folder renames too (I1, I2, Q1) |
+| 9 | «Entire seen images database»: the progress and time-left display never appears | low | run | **fixed**, `b0cc029` (G2) |
 | 10 | The «identical strings» check compares numbers: «01» and «1», «1» and «1.0» are refused | low | run | open |
-| 11 | Small things: 11.1 to 11.6 | low | run / read | open |
+| 11 | Small things: 11.1 to 11.6 | low | run / read | 11.1 **fixed**, `a1dd2cb`: no route offers the panel below three files (K1, Q2); the rest open |
 
 The rows give the status at `c359491`.
 
@@ -176,6 +180,80 @@ Regression runs, the same kits on `f286bde` and on the change, compared line by 
 - **The multi-rename kit** (batches A, B, C, H and J of `.claude/scratch/multi-rename-panel-2026-11-24/`): the same
   on `f286bde` and on `63a2c42`, apart from timestamps, recycle-bin names and the kit's own INI line.
 - **Batch S again on `63a2c42`**: the same outcomes as on `c359491`.
+
+## 2026-11-27: findings 6, 8, 9 and 11.1
+
+Before the fixes, batches G, I, J and K were run again at `892ba6e`, with the outcomes reported (G2, I1, I2, J1, K1),
+and batch P ran the `.SLD` half of finding 6, read until then (P7 to P10). Marius's answers:
+
+- **Decision 6.** Every entry the pass moves takes its caption and its audio note along (the `imagesData` row keyed by
+  its path), in both modes and in every scope, the collisions written on a retry included; an entry that keeps its
+  path keeps its notes, and a note that no record holds at the new path gives way. The path of the audio file takes the
+  same replace, kept only when a file is there. The folders list follows the entries: a folder that no entry holds any
+  more hands its row, date included, to the first folder its entries reached, or leaves the list; another folder they
+  reached joins the list with that date, unless it is listed already. This holds for a database list (`staticfolders`),
+  for an `.SLD` file that keeps its own folders list, and for the folders list a plain list holds in memory.
+- **Decision 8.** In private mode the opening message leaves out the two strings, for the folder renames too, which
+  share it.
+- **Decision 9, 11.1 only.** The panel still wants three files. Ctrl+H, the Find menu and the files list menu stop
+  offering it below three, as they stop offering «Find duplicate images» (a filtered list excepted, as before); with
+  the menu items, the quick search entry goes too. The toolbar button still opens the panel, which refuses.
+- **Finding 9** asked for no decision: the timer starts before the loop, as in the passes of the files list.
+
+The commits: `b0cc029` (finding 9), `860a10f` (finding 8), `a1dd2cb` (11.1), `7e93452` (finding 6). Finding 6 acts in the
+panel's modes only (`folderMode` 0 and 3); the folder renames keep their own sequel, `renameStaticFolderSQLdb()` and
+`renameStaticFoldersEntries()`. The last loop of `SearchAndReplaceThroughIndex()`, which gives each entry its new path,
+notes the old and new paths of the entries that hold a note, and each pair of folders. `moveSQLdbNotes()` then moves
+the notes in one transaction, marking the rows with «?» first so that a chain of moves loses no note, and
+`followMovedFoldersList()` updates the folders list in memory (read from the file first for an `.SLD` file, as the
+folder renames do) and the `staticfolders` table.
+
+Runs, batch P (new; on `892ba6e` and on the fix's text):
+
+- **P1** (database list, folder mode, «old\» → «new\», captions and audio notes on a and b, «new\a.wav» on the disk,
+  «new\b.wav» not): at `892ba6e` both notes and the folders row stay at «old». With the fix both captions move, a's
+  audio note now names «new\a.wav», b's still names «old\b.wav», and the row «old» becomes «new», with its date.
+- **P2** («Selected files only», a and b; c stays; captions on a and c): a's caption moves, c's stays; «old» stays
+  listed and «new» joins it with the same date. QPV drops a selection of one entry, so two were selected.
+- **P3** (a collision: «new\a.png» is held): «old\a.png» keeps its path and its caption, b moves with its caption, and
+  both folders stay listed with their own dates.
+- **P4**, **P4b** (the chain of S12, «\zz» → «\zzz»: «zz\1.png» and «zzz\1.png» both move; unfiltered, then every
+  entry selected): at `892ba6e` the image now at «zzz\1.png» shows the other image's caption, and its own is lost.
+  With the fix each caption stays with its image; the folders list drops «zz», keeps «zzz» and gains «zzzz», with the
+  date of «zzz».
+- **P5** (whole-path mode, «\old\a» → «\new\x»: a file name changes): the caption follows to «new\x.png»; «old»
+  stays listed, «new» joins it.
+- **P6** (a note at the new path that no record holds): the moved caption replaces it.
+- **P7**, **P8**, **P9** (an `.SLD` file that keeps its folders list: everything moves; two of three selected; the
+  folders list read before, its date changed in memory): at `892ba6e` the saved file names «sl\old» in all three.
+  With the fix it names «sl\new» with the old date (P7), «sl\old» and «sl\new» since c stays (P8), and «sl\new» with
+  the date set in memory (P9).
+- **P10** (a folder opened as a list, its folders list made in memory): «sl\old» stays at `892ba6e`; «sl\new» with the
+  fix.
+- In P1 to P10, the files list, the database records and the closing messages are the same on both texts.
+- **P11** (30,003 records in 300 folders, all moved by a direct call; then back, with 1,000 captions): 3.1 to 3.4 s a
+  pass on `892ba6e`, 3.4 to 3.7 s with the fix, three runs each: the bookkeeping costs about a tenth. The second pass
+  now moves the 1,000 notes and the 300 rows of the folders list.
+
+Batch Q (new) and the audit's batches on the fix's text:
+
+- **G2** (60,000 seen records): the progress display appears at 1.5 s and at 3.0 s, with the time left.
+- **I1**, **I2**, **Q1** (private mode: the files list, the seen images database, `renameFolderInLists()`): «Performing
+  search and replace in the files list index» (or «…in the seen images database»), without the strings.
+- **K1**, **Q2** (two files): Ctrl+H calls nothing, and the Find menu and the files list menu show the item disabled;
+  its quick search entry is off. The panel, called directly, still refuses. **Q3** (three files) and **Q4** (a filter
+  showing two of three files): offered, as before.
+
+Regression, on `892ba6e` and on the fix's text, compared line by line (`run-regress.sh`):
+
+- **The audit's batches A to N**: the same, except G, I, J and K, the changes meant (finding 9's timer, finding 8's
+  message, J1's caption and folders row, K1's item disabled). The other lines that differ are the reload of the current
+  image, logged at another moment, and in H the «Search for» that the current file fills in (`RandomPicture()`). Batch
+  C stops at C1's question, asked in folder mode since `c359491` (S14), on both texts; `testSrC34` too.
+- **Batches S and S2** (the substring kit): the same, apart from the image reload and finding 9's timer in S16.
+- **Batches W to W6** (the kit of findings 3 and 4): the same, apart from the image reload.
+- **The folder renames** (the folders tree, T6 and T15; the folders list panel, H; the seed folders panel, MG, U, Y9,
+  D13 and S85): the same.
 
 ## 1. The search matches inside folder names
 
@@ -504,6 +582,10 @@ Read, not run: an `.SLD` list that keeps its own folders list (`SLDcacheFilesLis
 `newStaticFoldersListCache` as it was too, and `SaveFilesList()` writes it back unchanged (:35454-35462). The
 captions of plain lists are `.txt` files next to the images, which the panel rightly leaves alone.
 
+Run on 2026-11-27 at `892ba6e` (P7 to P10): after the replace, the `.SLD` file is saved with «old» in its folders
+list, and the folders list in memory keeps it too. Fixed in `7e93452`, on Marius's answer to decision 6; see «2026-11-27:
+findings 6, 8, 9 and 11.1».
+
 ## 7. «Main seed folders list»: no word, network paths cut, the result not cleaned
 
 The branch (:47408-47424) joins the seed folders into one text, adds a separator to each line, replaces, collapses
@@ -567,6 +649,9 @@ Read: the display draws the message as it is given. `CreateOSDinfoLine()` (:1002
 branch and hands `msg` to `drawTextInBox()` (:100278). The kit logs the message handed over; it did not capture
 what was painted. The message stays on screen while the pass runs.
 
+Fixed in `860a10f`: in private mode the message leaves out the two strings, in both passes and for the folder renames,
+which share the files list pass (I1, I2, Q1).
+
 ## 9. «Entire seen images database»: the progress display never appears
 
 `SearchAndReplaceSeenDB()` tests `A_TickCount - prevMSGdisplay>1500` at each record (:99454), but nothing sets
@@ -576,6 +661,8 @@ never set inside it either.
 
 Run: the kit logged the test's value at the first record: blank (G1, G2, G4, I2). **G2**: 60,000 records, a pass of
 3.5 s; the screen showed only the opening message and the final one, with no progress bar and no time left.
+
+Fixed in `b0cc029`: the timer starts before the loop. G2: the progress display appears at 1.5 s and at 3.0 s.
 
 ## 10. The «identical strings» check compares numbers
 
@@ -595,12 +682,15 @@ mode): as before.
 
 ✅ marks a fixed one.
 
-11.1. **Two files: the panel is offered, then refuses.** Ctrl+H (:1463) and the Find menu (:69166) offer the panel
+11.1. ✅ **Two files: the panel is offered, then refuses.** Ctrl+H (:1463) and the Find menu (:69166) offer the panel
 from two files up; the panel wants three (:47347), so it answers «WARNING: Insufficient files are currently
 indexed.». The Find menu disables «Find duplicate images» on that same condition (:69180-69181), but not this item.
 The seen images database and the seed folders need no files list at all, yet below three files no route reaches
 them. Run **K1**: with two files the Find menu lists «Search and re&place» enabled and «&Find duplicate images»
 disabled; the panel refuses.
+Fixed in `a1dd2cb`, on Marius's answer to decision 9: the panel still wants three files, and below three Ctrl+H, the
+Find menu and the files list menu no longer offer it, as with «Find duplicate images» (K1, Q2). The toolbar button
+still opens the panel, which refuses.
 
 11.2. **The seen images database is refused while recording is off.** «WARNING: The option to record seen images
 is currently deactivated.» (:47403-47404), though the database is there and the replace works on it. Run **G3**,
@@ -704,15 +794,19 @@ the folder renames still end with SQLite's message.
    writes, with no rollback; a plain list keeps the duplicate; the seen images database merges, counted apart (`c359491`).
 6. **Finding 6.** Move the captions, the audio notes and the folders list as `renameStaticFolderSQLdb()` does: in
    folder mode only, or in whole-path mode too (the captions are keyed by full path)? And the folders list of an
-   `.SLD` file?
+   `.SLD` file? **Answered 2026-11-27**: every entry moved takes its notes, in both modes and every scope, the audio
+   file path replaced when the file is there; the folders list follows the entries, its dates kept, on database lists
+   and `.SLD` files (`7e93452`).
 7. **Finding 7.** The wording of a closing message for the seed folders (a count, and «nothing matched»); whether a
    replace onto a folder already listed is refused, as the seed folders panel's rename refuses it, or merged by
    `cleanDynamicFoldersList()`. Since `474793a` it is merged, a consequence of `renameDynamicFoldersEntries()` (H5).
    This question was not put to Marius and is still open, as is the closing message. **Answered 2026-11-27**: a
    closing message with the counts, and the cleaned list merges, counted as subsumed (`c359491`).
-8. **Finding 8.** In private mode, leave the two strings out of the messages, or show them masked?
+8. **Finding 8.** In private mode, leave the two strings out of the messages, or show them masked? **Answered
+   2026-11-27**: left out, for the folder renames too (`860a10f`).
 9. **11.1 and 11.2.** Should the panel open with fewer than three files, for targets 3 and 4 or for all of them?
-   Should target 3 work while recording of seen images is off?
+   Should target 3 work while recording of seen images is off? **Answered 2026-11-27 for 11.1**: three files stay the
+   minimum; the routes stop offering the panel below three, as «Find duplicate images» (`a1dd2cb`). 11.2 was not asked.
 
 With decisions 1 to 3, Marius was offered four guards on 2026-11-26. He took two: the empty folder strings refused
 (`c2fde82`), and «Replace with» in lower case on a database list (`12fc79d`). He left two aside: filling «Search for»
@@ -746,8 +840,11 @@ folder path. Such a text now ends with «0 records were modified». Since `c3594
   matching entry left unselected).
 - **Batch S** (2026-11-27, kit `.claude/scratch/search-replace-substring-2026-11-27/`, `README.txt`): the rules of
   `c359491`, run over `f286bde`; the folder renames' kits and batches W to W6 run on `f286bde` and on the change.
-- **Read, not run**: the folders list of an `.SLD` file (finding 6), what the display paints (finding 8), 11.4 and
-  «Seen in passing». An empty «Replace with» (finding 3), read at first, was run on 2026-11-26 (Y4, Y4b).
+- **Batches P and Q** (2026-11-27, kit `.claude/scratch/search-replace-6-8-9-11-2026-11-27/`, `README.txt`): findings 6,
+  8 and 11.1 on `892ba6e` and on the fix's text, built by `mkfix.py` (the commits' four steps, each loaded; the last
+  is the committed text). `run-regress.sh` runs the regression of the section «2026-11-27: findings 6, 8, 9 and 11.1».
+- **Read, not run**: what the display paints (finding 8), 11.4 and «Seen in passing». The folders list of an `.SLD`
+  file (finding 6), read at first, was run on 2026-11-27 (P7 to P9). An empty «Replace with» (finding 3), read at first, was run on 2026-11-26 (Y4, Y4b).
 - **Not run on Windows**, and not run at all: real network shares; Quick search actions or user-defined shortcuts
   fired while the panel is open; collisions inside the seen images database; very large plain lists.
 - **Every plain list run was a folder opened as a list.** No `.SLD` file was run, so the save question and
