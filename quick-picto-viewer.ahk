@@ -99187,7 +99187,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
     whatuBare := Format("{:L}", RTrim(whatu, "\"))
     replaceru := RegExReplace(replacerz, "\\+$")
     If (silentus=0)
-       showTOOLtip("Performing search and replace in the files list index:`n" whatu "`n" replacerz)
+       showTOOLtip("Performing search and replace in the files list index" ((userPrivateMode=1) ? "" : ":`n" whatu "`n" replacerz))
 
     getSelectedFiles(0, 1)
     If (onlySelected=1 && markedSelectFile<1)
@@ -99410,7 +99410,8 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
     startOperation := A_TickCount
     prevMSGdisplay := A_TickCount
     modeInfo := (folderMode=1) ? "`nFolder paths only" : ""
-    showTOOLtip("Performing search and replace in the seen images database:`n" what "`n" replacer modeInfo)
+    stringsInfo := (userPrivateMode=1) ? "" : ":`n" what "`n" replacer
+    showTOOLtip("Performing search and replace in the seen images database" stringsInfo modeInfo)
     owle := setWhileLoopBusy()
     changeMcursor()
     seenImagesDB.Exec("BEGIN TRANSACTION;")
