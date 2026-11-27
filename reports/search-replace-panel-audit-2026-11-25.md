@@ -41,6 +41,11 @@ code does now; those notes cite lines at `12fc79d`. The other line numbers stay 
 The runs used the fix's text over `57d1f81`; the commits sit on Marius's `1fbbb4c` (see «How this was checked»).
 Sections 3, 4 and 5 then end with the fix of findings 3 and 4 and its runs; those notes cite lines at `f498afe`.
 
+**Status, 2026-11-27.** Marius redefined the panel: a replace of text, in the folder part or in the whole path, by
+one rule in every target, with three checks only (`c359491`). His answers on the corner cases settle decisions 5 and 7,
+and reverse decision 1, the balancing of decision 3 and the refusal of `c2fde82`; see «2026-11-27: the panel as a
+replace of text», after the summary, with batch S and the regression runs.
+
 ## Terms
 
 - **The panel**: panel 56, «Search and replace in the files index». Its routes: Ctrl+H (:1461-1464), «Search and
@@ -69,19 +74,96 @@ Sections 3, 4 and 5 then end with the fix of findings 3 and 4 and its runs; thos
 
 | # | Finding | Harm | Checked | Status |
 |---|---------|------|---------|--------|
-| 1 | The search matches inside folder names, folder mode included: the filled-in «…\pics» also rewrites «pics 2024» and «picsold» | medium | run | **fixed** in folder mode, `474793a`; whole-path mode stays a literal replace, by Marius's choice |
-| 2 | Database lists in folder mode: the database matches whole folders, the list matches text; the two disagree, the message counts the list, and the database's old paths come back at the next opening | high | run | **fixed**, `474793a`; the letter case of «Replace with» too, `12fc79d` |
-| 3 | A separator at the end of one string only: folder mode glues each subfolder's name to the new folder («photossub»), while the folder's own files come out right | medium | run | **fixed**: folder mode with finding 1, `474793a`, an empty string refused there, `c2fde82`; whole-path mode `c643842`: a question before names are joined, and an entry left without a full path keeps its path |
+| 1 | The search matches inside folder names, folder mode included: the filled-in «…\pics» also rewrites «pics 2024» and «picsold» | medium | run | **by design** since `c359491`: the panel replaces text, Marius's rule of 2026-11-27; whole folders stay the rule of the folder renames |
+| 2 | Database lists in folder mode: the database matches whole folders, the list matches text; the two disagree, the message counts the list, and the database's old paths come back at the next opening | high | run | **fixed**, `474793a`, then `c359491`: the database pass follows the list's rule, a replace of text (S5-S10); the letter case of «Replace with» `12fc79d` |
+| 3 | A separator at the end of one string only: folder mode glues each subfolder's name to the new folder («photossub»), while the folder's own files come out right | medium | run | **by design** since `c359491`: the strings stay as typed; «Perform» asks before names are joined, in both modes and for the seed folders (S14, S17e); an entry whose new path is invalid keeps its path |
 | 4 | «Current files list» on a filtered list: a database list loses its filter without a word and every record is rewritten; a plain list rewrites only what the filter shows | medium | run | **fixed**, `3d52bd4`, `f498afe`: a database list keeps its filter and changes only the entries shown, as a plain list |
-| 5 | A new path that another entry holds: on a database list the record keeps its old path while the list shows the new one, twice; a plain list gets the duplicate silently | medium | run | open; with a filter or «Selected files only», a database list now keeps the entry's path, or refuses the folder in folder mode (`3d52bd4`) |
+| 5 | A new path that another entry holds: on a database list the record keeps its old path while the list shows the new one, twice; a plain list gets the duplicate silently | medium | run | **fixed** on database lists, `c359491`: the entry keeps its path in the list and in the database, counted as a collision (S11); a plain list keeps the duplicate, by Marius's choice (S11c) |
 | 6 | Database lists: the captions, the audio notes and the folders list stay at the old paths; the renamed images lose their captions | medium | run | open |
-| 7 | «Main seed folders list»: no message whatever happens; every network path in the list loses its leading backslash; a list of network paths alone counts as empty; the result is not cleaned | medium | run | in part: H1 and H3 **fixed** with finding 1, `474793a`; H5 now merges (decision 7 open); no message and H4 open |
+| 7 | «Main seed folders list»: no message whatever happens; every network path in the list loses its leading backslash; a list of network paths alone counts as empty; the result is not cleaned | medium | run | **fixed**, `c359491`: a closing message, the cleaned list, the merges counted (S17); network paths out of scope since `f286bde`, so H4 stays |
 | 8 | Private mode: the two fields hide their text, then the on-screen message prints both strings in full | low | run (the message) + read (the display) | open |
 | 9 | «Entire seen images database»: the progress and time-left display never appears | low | run | open |
 | 10 | The «identical strings» check compares numbers: «01» and «1», «1» and «1.0» are refused | low | run | open |
 | 11 | Small things: 11.1 to 11.6 | low | run / read | open |
 
-The rows give the status at `f498afe`.
+The rows give the status at `c359491`.
+
+## 2026-11-27: the panel as a replace of text
+
+Marius, on the fixes of 2026-11-26: «you misunderstood the point of the panel ... The user must have full control».
+Both modes are a literal replace of text, the letter case ignored, every occurrence replaced, by the same rule in
+all four targets (`c359491`):
+
+- **Folder mode** («Modify folder paths only») replaces inside the folder part of each path, its last separator
+  included, so «pics\» finds the last folder; the separator before the file name stays, and the file name never
+  changes. «\pics» → «\photos» turns «C:\dingos\pics 2012\» into «C:\dingos\photos 2012\»; «pics\» → «photos\» turns
+  «C:\dingos\diana-pics\» into «C:\dingos\diana-photos\». A match that would run into the file name is not found.
+- **Whole-path mode** replaces anywhere in the path: «\pics\img_» → «\photos\image_» turns «c:\pics\img_123290.jpg»
+  into «c:\photos\image_123290.jpg».
+- **The seed folders** are matched with a separator added at their end; the checkbox does not apply to them.
+- **The only checks.** «/» becomes «\» and doubled separators collapse, in both strings and in each new path. A new
+  path must be a drive path whose every name Windows accepts, or its entry keeps its path: `isFullPath()` (drive
+  letters only since Marius's `f286bde`) also refuses, through `isValidFileName()`, a name holding a character
+  Windows forbids or a control character, a name ending with a dot or a space, and a device name (CON, PRN, AUX,
+  NUL, COM0-9, LPT0-9, COM¹²³, LPT¹²³). Multi-rename refuses the same names through the same helper.
+
+This reverses decision 1 (a), the silent balancing of decision 3, and the refusal of empty strings (`c2fde82`).
+Marius's answers on the corner cases, 2026-11-27:
+
+- A new path another record holds, on a database list: that entry keeps its path, in the list and in the database,
+  and counts as a collision, apart from the writes that fail; nothing is rolled back (decision 5). A plain list keeps
+  the duplicate. The seen images database still merges two records of one file, counted apart.
+- When one string has a separator at an end that the other lacks, «Perform» asks first, in both modes and for the
+  seed folders. Left empty, «Replace with» joins names only when the match takes a separator at each end.
+- The seed folders get a closing message, and their cleaned list merges what the replace made duplicate (decision 7).
+
+The folder renames of the folders tree and of the folders panels keep their own mode, whole folders from the start
+of the path (`folderMode` 1 and 2); the panel passes `folderMode=3`.
+
+Runs, batch S (new; the commit's text over `f286bde`):
+
+- **S1**, **S2**, **S3** (plain list) and **S5**, **S6**, **S7** (database list), Marius's three examples:
+  «\pics» → «\photos» moves «pics 2012\a.png» and «pics\b.png»; «pics\» → «photos\» moves «diana-pics\a.png» and
+  «pics\b.png»; whole-path «\pics\img_» → «\photos\image_» moves «pics\img_123290.png» alone. On the database lists
+  the list and the records agree, and so does the list read again from the database. **S3b**, **S7b**: the same
+  whole-path strings in folder mode change nothing.
+- **S4**, **S8** (folder mode, «pics» → «photos» over «pics\pics.png» and «x\pics b.png»): «photos\pics.png», and
+  «x\pics b.png» stays. **S4b** (whole-path mode): «photos\photos.png» and «x\photos b.png».
+- **S9** («Selected files only», a database list) and **S10** (a database list filtered to «\x\»): the entries in scope
+  move; the filter stays, and the hidden «y\pics 2012\c.png» stays, in the list and in the database.
+- **S11**, **S11b**, **S11d** (a database list that holds «photos 2012\a.png»: unfiltered, «Selected files only»,
+  filtered): «pics 2012\a.png» keeps its path, in the list and in the database, and «pics 2012\b.png» moves: «1
+  records were modified | 1 collisions: the new path is held by another record, the entries kept theirs». **S11c**
+  (a plain list): the duplicate, «2 records were modified».
+- **S12** («\zz» → «\zzz» over «zz\1.png» and «zzz\1.png»): both move, «zzz\1.png» and «zzzz\1.png»; the record
+  refused at first is written again once the other has moved.
+- **S13** to **S13e** («\pi|cs», «\con», «.png» → «.», whole-path «<work>\db\pics» → nothing, «\pics.»): every entry
+  keeps its path, «N entries kept their path: the new one would be invalid», in the list and in the database.
+- **S14** (folder mode, «pics\» → «photos»): the question; «No» changes nothing and the panel stays open. **S14b**,
+  «Yes»: «photos\a.png» and «photossub\b.png». **S14c** (whole-path «\pics\» → nothing): the question, then
+  «<work>\pla.png». **S14d**, **S14e** («\pics» → nothing, both modes): no question; «<work>\pl\a.png».
+- **S15**, **S15b** («pics/» → «photos/», «/pics» → «//photos»): as with backslashes.
+- **S16** to **S16f** (the seen images database): the outcomes of the lists. With «\s\photos\a.png» recorded
+  already: «0 records were modified | 1 records were merged into the one already holding the new path».
+- **S17** to **S17f** (the seed folders of a database list): «pics 2012» → «photos 2012» and «diana-pics» →
+  «diana-photos», «1 seed folders were modified», in the list and in the table; «pics» onto a listed «photos»: «1
+  seed folders were subsumed by others»; «\pi|cs»: «1 seed folders kept their path: the new one would be invalid»;
+  «pics\» → «photos»: the question; nothing matched: «0 seed folders were modified».
+- The path helpers alone (`searchReplaceEntryPath()`, `isFullPath()`, `repairPathSeparators()`), sliced into a test
+  script: 21 path rewrites in the four modes and 38 validity checks, all as intended.
+
+Regression runs, the same kits on `f286bde` and on the change, compared line by line:
+
+- **The folder renames** (the folders tree, T6 and T15; the folders list panel, H; the seed folders panel, MG, U, Y9,
+  D13 and S85): the same, except **Y9.5b**, a seed folder renamed on a database list that holds a record at one of
+  the new paths already. The list now keeps that entry at its old path, as the database does, and the message says
+  «1 collisions» where it said «Failed to modify 1 entries»; until then the list showed the new path until the
+  database was opened again (finding 5, in the pass the renames share with the panel).
+- **Batches W to W6** of the fix of findings 3 and 4: the same outcomes, except **W10**, **W13** and **W14b**
+  (folder mode, a taken path, a filtered or selected database list). The whole run was refused; now the taken entry
+  keeps its path, the others move, and the message says «1 records were modified | 1 collisions: …». **W14**
+  (whole-path mode) counts its taken path as a collision. The entries marked `||` (W16, W17, W20) give the outcomes
+  of `f498afe`. The tooltips show the strings as typed.
 
 ## 1. The search matches inside folder names
 
@@ -147,6 +229,8 @@ Runs with the fix, over `57d1f81`:
 - **X2**, **X3** (an entry marked `||`, on a plain list and on a database list): it moves and keeps its mark; on the
   database list its record moves too.
 
+**Since `c359491`** the rule is Marius's replace of text; see «2026-11-27: the panel as a replace of text».
+
 ## 2. Database lists in folder mode: the database and the list follow different rules
 
 On a database list, «Current files list» writes the database with SQL first and then the list in memory, and in
@@ -198,6 +282,8 @@ Runs with the fix, over `57d1f81`:
 - **Z4** (batch Z, new; a change of letter case alone, «…\db\old» → «…\db\Old»): at `57d1f81` the list showed
   «…\db\Old\…» until the database was opened again; with the fix nothing changes, though the message says «2 records
   were modified». A database list cannot hold such a change: its records are in lower case.
+
+**Since `c359491`** the rule is Marius's replace of text; see «2026-11-27: the panel as a replace of text».
 
 ## 3. A separator at the end of one string only glues folder names together
 
@@ -277,6 +363,8 @@ Runs with the fix, over `c5e0421`:
   **V15** («a.png» → nothing): that entry keeps its path.
 - **V6**, **V7**, **V8**: as before. **V12** («\\nas\share» → «Y:») and **V13** (folder mode, «…\pics\» →
   «…\photos»): no question, right.
+
+**Since `c359491`** the rule is Marius's replace of text; see «2026-11-27: the panel as a replace of text».
 
 ## 4. «Current files list» on a filtered list: two scopes, and a database list loses its filter
 
@@ -381,6 +469,8 @@ Since `3d52bd4`, with a filter or «Selected files only» on a database list, an
 its path in the list too (W14), and folder mode refuses the folder (W13); the unfiltered pass (E1, E3) is unchanged,
 and this finding stays open.
 
+**Since `c359491`** the rule is Marius's replace of text; see «2026-11-27: the panel as a replace of text».
+
 ## 6. Database lists: captions, audio notes and the folders list stay at the old paths
 
 Beside the paths in `images`, a database list keeps the captions and audio notes in `imagesData`, keyed by the
@@ -447,6 +537,8 @@ Runs with the fix, over `57d1f81`:
   → «…\h\pics\»): at `57d1f81` nothing changed, yet the table was written again and the list marked modified; with
   the fix, «WARNING: The search and replacement strings are identical».
 
+**Since `c359491`** the rule is Marius's replace of text; see «2026-11-27: the panel as a replace of text».
+
 ## 8. Private mode shows what the fields hide
 
 In private mode both fields are password fields (`doPwd`, :47366). The first message of the pass then prints both
@@ -509,7 +601,7 @@ move 0 0 0; after it, 0 0 0 as the thumbnails view asks (the kit set `thumbsDisp
 1 as the image view asks.
 
 11.4. **Folder mode stays offered for «Main seed folders list»,** where nothing reads it (the branch at
-:47408-47424). Read.
+:47408-47424). Read. Marius, 2026-11-27: the checkbox is irrelevant for the seed folders; it stays.
 
 11.5. **The filled-in search text of a file on a network path lacks the leading `\\`**: `zPlitPath()` skips the
 empty parts before the server's name and trims the rest (:60715-60720). This is the shared defect of the multi-rename audit's «Seen in passing» A (2026-11-24).
@@ -517,12 +609,13 @@ Run **L3**: the current entry «\\nas\share\pics\b.png»; «Search for» opens w
 Since `474793a` that text matches nothing in folder mode, which matches from the start of the path. Run **X5**, at
 `57d1f81`: the filled-in «nas\share\pics» → «nas\share\photos» moved all three entries, «pics 2024» included, the text
 being found inside each path; with the fix, «0 records were modified». Marius left this item open when he chose the
-fix of findings 1 and 2.
+fix of findings 1 and 2. Out of scope since `f286bde`: network paths are not supported.
 
 11.6. **A folder-mode collision names no file.** On a database list the message is SQLite's own: «Failed to update
 the files list database | UNIQUE constraint failed: images.fullPath» (E2). Nothing changes, so no harm is done, but
 the user is not told which path is taken. The refusal of the one-by-one write (finding 4, `3d52bd4`) gives a count,
-not the file, either.
+not the file, either. Since `c359491` the panel no longer runs that single `UPDATE`: a collision is counted (S11);
+the folder renames still end with SQLite's message.
 
 ## Seen in passing
 
@@ -551,7 +644,8 @@ not the file, either.
   reached «oldies», shares the matching rule of finding 1).
 - Whole-path mode on a database list: the database and the list agree (B3).
 - With both strings ending in a separator, folder mode moves exactly the folder and its subfolders (A3).
-- A folder-mode collision on a database list refuses the whole folder and says so; nothing changes (E2).
+- A folder-mode collision on a database list refuses the whole folder and says so; nothing changes (E2). Since
+  `c359491`, for the folder renames alone.
 
 ## Settled earlier, not reported again
 
@@ -575,6 +669,7 @@ not the file, either.
    depth); (c) keep the text rule and make only the database pass follow it. My recommendation: (a), which is the
    contract `SearchAndReplaceThroughIndex()` already states and the one its rename callers rely on. **Answered
    2026-11-26: (a)**, in all four targets, the seed folders through `renameDynamicFoldersEntries()` (`474793a`).
+   **Superseded 2026-11-27**: a replace of text, in the folder part or in the whole path (`c359491`).
 2. **Whole-path mode and finding 1.** Keep the literal replace (a part of a name can be fixed), or match whole
    names there too? **Answered 2026-11-26: the literal replace stays.**
 3. **Finding 3.** In folder mode, balance the separators silently (both strings end with one), or refuse a pair
@@ -583,7 +678,8 @@ not the file, either.
    mode**: balanced silently (`474793a`); an empty string is refused there and for the seed folders (`c2fde82`).
    **Answered 2026-11-26 for whole-path mode**: ask first when «Search for» begins or ends with a backslash that
    «Replace with» lacks; an entry the replace would leave without a full path keeps it, in every file target and
-   both modes (`c643842`).
+   both modes (`c643842`). **Superseded 2026-11-27**: the strings stay as typed, an empty «Replace with» is allowed,
+   and the question is asked in both modes and for the seed folders (`c359491`).
 4. **Finding 4, a filtered database list.** (a) Put the filter back after the pass; (b) limit «Current files list»
    to the entries the filter shows and write their records by number, as «Selected files only» does; (c) ask
    first. And on a plain list: keep «what the filter shows», or rewrite the list behind the filter too?
@@ -592,14 +688,16 @@ not the file, either.
    folder mode, the records of entries marked `||` written.
 5. **Finding 5, a new path that is taken.** (a) Skip the entry and count it as failed, so the list stays in step
    with the database; (b) merge the two entries, dropping the moved one; (c) ask. On a plain list: the same, or
-   keep the duplicate?
+   keep the duplicate? **Answered 2026-11-27: (a)** on database lists, counted as a collision apart from the failed
+   writes, with no rollback; a plain list keeps the duplicate; the seen images database merges, counted apart (`c359491`).
 6. **Finding 6.** Move the captions, the audio notes and the folders list as `renameStaticFolderSQLdb()` does: in
    folder mode only, or in whole-path mode too (the captions are keyed by full path)? And the folders list of an
    `.SLD` file?
 7. **Finding 7.** The wording of a closing message for the seed folders (a count, and «nothing matched»); whether a
    replace onto a folder already listed is refused, as the seed folders panel's rename refuses it, or merged by
    `cleanDynamicFoldersList()`. Since `474793a` it is merged, a consequence of `renameDynamicFoldersEntries()` (H5).
-   This question was not put to Marius and is still open, as is the closing message.
+   This question was not put to Marius and is still open, as is the closing message. **Answered 2026-11-27**: a
+   closing message with the counts, and the cleaned list merges, counted as subsumed (`c359491`).
 8. **Finding 8.** In private mode, leave the two strings out of the messages, or show them masked?
 9. **11.1 and 11.2.** Should the panel open with fewer than three files, for targets 3 and 4 or for all of them?
    Should target 3 work while recording of seen images is off?
@@ -607,7 +705,8 @@ not the file, either.
 With decisions 1 to 3, Marius was offered four guards on 2026-11-26. He took two: the empty folder strings refused
 (`c2fde82`), and «Replace with» in lower case on a database list (`12fc79d`). He left two aside: filling «Search for»
 with the leading «\\» of a network path (11.5), and refusing, in folder mode, a «Search for» that is not a full
-folder path. Such a text now ends with «0 records were modified».
+folder path. Such a text now ends with «0 records were modified». Since `c359491` such a text is the panel's point:
+«\pics» finds every folder whose name starts with «pics».
 
 ## How this was checked
 
@@ -633,6 +732,8 @@ folder path. Such a text now ends with «0 records were modified».
   I (private mode), J (captions and the folders list), K (two files), L («Selected files only» with the filled-in
   text and with nothing selected, a network path), M (the buttons and keys), N («Selected files only» with one
   matching entry left unselected).
+- **Batch S** (2026-11-27, kit `.claude/scratch/search-replace-substring-2026-11-27/`, `README.txt`): the rules of
+  `c359491`, run over `f286bde`; the folder renames' kits and batches W to W6 run on `f286bde` and on the change.
 - **Read, not run**: the folders list of an `.SLD` file (finding 6), what the display paints (finding 8), 11.4 and
   «Seen in passing». An empty «Replace with» (finding 3), read at first, was run on 2026-11-26 (Y4, Y4b).
 - **Not run on Windows**, and not run at all: real network shares; Quick search actions or user-defined shortcuts
