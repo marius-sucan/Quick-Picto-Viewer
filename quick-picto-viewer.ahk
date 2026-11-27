@@ -99050,8 +99050,8 @@ repairPathSeparators(pathu) {
 }
 
 isFullPath(pathu, isFolder:=0) {
-; it starts with a drive or a network share and, unless isFolder, ends with a file name
-   Return RegExMatch(pathu, "^([a-zA-Z]:|\\\\[^\\]+\\[^\\]+)" (isFolder ? "(\\|$)" : "\\.*[^\\]$")) ? 1 : 0
+    ; Must start with a drive letter (C:), not a network share
+    Return RegExMatch(pathu, "^[a-zA-Z]:" (isFolder ? "(\\|$)" : "\\.*[^\\]$")) ? 1 : 0
 }
 
 StrReplaceCaseless(haystack, needle, replacement, ByRef countu:=0) {
@@ -99165,7 +99165,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
           If !activeSQLdb.GetTable(SQLstr, RecordSet)
              errorOccurred := activeSQLdb.ErrorMsg
 
-          owle :=setWhileLoopBusy()
+          owle := setWhileLoopBusy()
           totalFiles := RecordSet.RowCount
           Loop, % RecordSet.RowCount
           {
