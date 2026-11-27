@@ -34644,15 +34644,15 @@ moveSQLdbEntry(oldEntry, newEntry, updateDates, dbIndex) {
    Return 0
 }
 
-updateSQLdbEntryPath(dbIndex, newFolder, newFileu, oldEntry:="") {
+updateSQLdbEntryPath(dbIndex, newFolder, newFileu, oldEntry:="", deadOnly:=0) {
 ; Writes the path of a single record back, split over the two columns it is stored in. The
 ; record is named by its imgidu; the path it holds right now is the fallback for the rare
-; entry that carries no database index.
+; entry that carries no database index. deadOnly=1: by that path, only a record marked deleted.
 ; Returns how many records were written
    If dbIndex
       wherePart := "imgidu='" dbIndex "'"
    Else If oldEntry
-      wherePart := "fullPath='" SQLescapeStr(Format("{:L}", oldEntry)) "' COLLATE NOCASE"
+      wherePart := "fullPath='" SQLescapeStr(Format("{:L}", oldEntry)) "' COLLATE NOCASE" (deadOnly ? " AND isDeleted IS NOT 0" : "")
    Else
       Return 0
 
@@ -99240,15 +99240,15 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
            newFolder := SubStr(pathu, 1, splitPos - 1)
            newFileu := SubStr(pathu, splitPos + 1)
            oldPath := LTrim(imgPath, "|")
-           ; a deleted file's record goes by its path: one replaced by a move has none, and its number may be reused
+           ; a deleted file's record goes by its path and its mark: a move that replaced the file took its record, number and path
            isGone := (oldPath!=imgPath) ? 1 : 0
            dbIndex := isGone ? "" : resultedFilesList[A_Index, 12]
-           If updateSQLdbEntryPath(dbIndex, newFolder, newFileu, oldPath)
+           If updateSQLdbEntryPath(dbIndex, newFolder, newFileu, oldPath, isGone)
               Continue
 
            ; the write fails on a new path taken, and changes nothing when the record is missing
            If activeSQLdb.ErrorCode
-              taken.Push([A_Index, dbIndex, newFolder, newFileu, oldPath])
+              taken.Push([A_Index, dbIndex, newFolder, newFileu, oldPath, isGone])
            Else If !isGone
               refusedIdx[A_Index] := 1
        }
@@ -99259,7 +99259,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
           moved := 0
           For i, entry in taken
           {
-             If updateSQLdbEntryPath(entry[2], entry[3], entry[4], entry[5])
+             If updateSQLdbEntryPath(entry[2], entry[3], entry[4], entry[5], entry[6])
                 moved++
              Else
                 stillTaken.Push(entry)
