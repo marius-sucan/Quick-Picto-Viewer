@@ -47419,11 +47419,24 @@ BTNperformIndexSearchReplace() {
    If (folderPaths && replacerz="")
       Return msgBeepTimer("WARNING: No replacement folder given")
 
+   If (!markedSelectFile && performSRindexMode=2)
+      Return msgBeepTimer("WARNING: There are no files selected in the QPV list")
+
+   If (mustRecordSeenImgs!=1 && performSRindexMode=3)
+      Return msgBeepTimer("WARNING: The option to record seen images is currently deactivated.")
+
+   ; a backslash at one end of «Search for» that «Replace with» lacks joins the names next to each match; \\ opens a share
+   joinsAfter := (SubStr(whatu, 0)="\" && SubStr(replacerz, 0)!="\") ? 1 : 0
+   joinsBefore := (SubStr(whatu, 1, 1)="\" && SubStr(whatu, 1, 2)!="\\" && SubStr(replacerz, 1, 1)!="\") ? 1 : 0
+   If (!folderPaths && replacerz!="" && (joinsAfter || joinsBefore))
+   {
+      msgResult := msgBoxWrapper(appTitle ": WARNING", "«Search for» " ((joinsAfter && joinsBefore) ? "begins and ends" : joinsAfter ? "ends" : "begins") " with a backslash that «Replace with» lacks. The folder or file names next to each match will be joined to the replacement text.`n`nDo you want to continue?", "&Yes|&No", 2, "exclamation")
+      If (msgResult!="Yes")
+         Return
+   }
+
    If (performSRindexMode=1 || performSRindexMode=2)
    {
-      If (!markedSelectFile && performSRindexMode=2)
-         Return msgBeepTimer("WARNING: There are no files selected in the QPV list")
-
       BtnCloseWindow()
       limitSearchReplaceSelected := (performSRindexMode=2) ? 1 : 0
       ; a database list holds its paths in lower case
@@ -47431,9 +47444,6 @@ BTNperformIndexSearchReplace() {
       SearchAndReplaceThroughIndex(editF5, plu, 0, userSrcRplcIndexFolder, limitSearchReplaceSelected, 1)
    } Else If (performSRindexMode=3)
    {
-      If (mustRecordSeenImgs!=1)
-         Return msgBeepTimer("WARNING: The option to record seen images is currently deactivated.")
-
       BtnCloseWindow()
       SearchAndReplaceSeenDB(editF5, editF6, userSrcRplcIndexFolder)
    } Else If (performSRindexMode=4)
@@ -99039,6 +99049,11 @@ repairPathSeparators(pathu) {
    Return RegExReplace(pathu, "(.)\\{2,}", "$1\")
 }
 
+isFullPath(pathu, isFolder:=0) {
+; it starts with a drive or a network share and, unless isFolder, ends with a file name
+   Return RegExMatch(pathu, "^([a-zA-Z]:|\\\\[^\\]+\\[^\\]+)" (isFolder ? "(\\|$)" : "\\.*[^\\]$")) ? 1 : 0
+}
+
 StrReplaceCaseless(haystack, needle, replacement, ByRef countu:=0) {
 ; StrReplace() that ignores the case of every letter, not only of A to Z.
 ; Lower case keeps the length of a string, so the positions found in it hold in the original
@@ -99094,6 +99109,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
     ; folderMode=2 does the same for the given folder alone, not its subfolders.
     ; The matches ignore the case of every letter: a database and the folders lists
     ; hold their paths in lower case.
+    ; An entry whose new path lacks a drive, a share or a file name keeps its path.
     ; Returns 0 when the database could not be updated
 
     If (folderMode=1 || folderMode=2)
@@ -99124,7 +99140,8 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
     setWhileLoopBusy()
     selectedFiles := totalAffected := doneFiles := 0
     refusedIdx := []
-    If (SLDtypeLoaded=3 && !shownOnly)
+    ; in folder mode every match moves under the new folder: without a drive or a share, none can
+    If (SLDtypeLoaded=3 && !shownOnly && ((folderMode!=1 && folderMode!=2) || isFullPath(replaceru, 1)))
     {
        activeSQLdb.Exec("BEGIN TRANSACTION;")
        If (folderMode=1 || folderMode=2)
@@ -99166,21 +99183,19 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
                  {
                     newFolder := RegExReplace(movedFolderPath(Row[2], whatuBare, replaceru), "\\+$")
                     newFileu := Row[3]
-                    pathOK := (StrLen(newFolder)>1) ? 1 : 0
+                    pathOK := isFullPath(newFolder "\" newFileu)
                  } Else
                  {
                     thisPath := repairPathSeparators(StrReplaceCaseless(Row[2] "\" Row[3], whatu, replacerz))
                     thisPos := InStr(thisPath, "\", 0, -1)
                     newFolder := SubStr(thisPath, 1, thisPos - 1)
                     newFileu := SubStr(thisPath, thisPos + 1)
-                    pathOK := (thisPos>1) ? 1 : 0
+                    pathOK := isFullPath(thisPath)
                  }
 
-                 If (pathOK=1)
-                 {
-                    If !updateSQLdbEntryPath(Row[1], newFolder, newFileu)
-                       failedFiles++
-                 } Else failedFiles++
+                 ; the files list pass counts an entry that has no full path
+                 If (pathOK=1 && !updateSQLdbEntryPath(Row[1], newFolder, newFileu))
+                    failedFiles++
               }
           }
           RecordSet.Free()
@@ -99218,16 +99233,10 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
 
            ; the entry of a file deleted from the disk starts with ||, its record does not
            pathu := LTrim(searchReplaceEntryPath(imgPath, whatu, replacerz, whatuBare, replaceru, folderMode, affected), "|")
-           If !affected
+           If (!affected || !isFullPath(pathu))
               Continue
 
            splitPos := InStr(pathu, "\", 0, -1)
-           If (splitPos<2)
-           {
-              refusedIdx[A_Index] := 1
-              Continue
-           }
-
            newFolder := SubStr(pathu, 1, splitPos - 1)
            newFileu := SubStr(pathu, splitPos + 1)
            oldPath := LTrim(imgPath, "|")
@@ -99291,6 +99300,12 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
            value := searchReplaceEntryPath(imgPath, whatu, replacerz, whatuBare, replaceru, folderMode, affected)
            If (!affected || refusedIdx[A_Index])
               Continue
+
+           If !isFullPath(LTrim(value, "|"))
+           {
+              failedFiles++
+              Continue
+           }
 
            resultedFilesList[A_Index, 1] := value
            If (StrLen(filesFilter)>1)
@@ -99393,6 +99408,12 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
               {
                  newFolderName := StrReplaceCaseless(Row[2], what, replacer, affected)
                  newFolderName := repairPathSeparators(newFolderName)
+              }
+
+              If (affected && !isFullPath(newFolderName))
+              {
+                 failedFiles++
+                 Continue
               }
 
               If affected
