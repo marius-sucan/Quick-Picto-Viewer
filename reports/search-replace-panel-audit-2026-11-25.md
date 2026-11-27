@@ -31,15 +31,15 @@ half of decision 3 with «balance the separators without a word». Of four guard
 - `12fc79d`: on a database list, «Replace with» goes to the pass in lower case, as the database stores it (X1, new).
 - Findings 3 and 4, after both were run again at `c5e0421` (batches V and W, new): `3d52bd4` keeps the filter of a
   database list and changes only the entries it shows, as on a plain list; `c643842` asks before a whole-path replace
-  joins names, and leaves alone an entry the replace would leave without a full path. Marius's answers are under
-  decisions 3 and 4.
+  joins names, and leaves alone an entry the replace would leave without a full path; `f498afe` looks the record of
+  a deleted file's entry up among the records marked deleted (W20). Marius's answers are under decisions 3 and 4.
 
 Three new batches, X, Y and Z, run what A-N lacked: the letter case, entries of deleted files, network paths, drive
 roots, a nested move, a filtered list in folder mode, and empty or identical strings in targets 1, 3 and 4 (see «How
 this was checked»). Sections 1, 2, 3, 7 and 10 and small thing 11.5 end with what was run and a note on what the
 code does now; those notes cite lines at `12fc79d`. The other line numbers stay those of `bbc49e4`.
 The runs used the fix's text over `57d1f81`; the commits sit on Marius's `1fbbb4c` (see «How this was checked»).
-Sections 3, 4 and 5 then end with the fix of findings 3 and 4 and its runs; those notes cite lines at `c643842`.
+Sections 3, 4 and 5 then end with the fix of findings 3 and 4 and its runs; those notes cite lines at `f498afe`.
 
 ## Terms
 
@@ -72,7 +72,7 @@ Sections 3, 4 and 5 then end with the fix of findings 3 and 4 and its runs; thos
 | 1 | The search matches inside folder names, folder mode included: the filled-in «…\pics» also rewrites «pics 2024» and «picsold» | medium | run | **fixed** in folder mode, `474793a`; whole-path mode stays a literal replace, by Marius's choice |
 | 2 | Database lists in folder mode: the database matches whole folders, the list matches text; the two disagree, the message counts the list, and the database's old paths come back at the next opening | high | run | **fixed**, `474793a`; the letter case of «Replace with» too, `12fc79d` |
 | 3 | A separator at the end of one string only: folder mode glues each subfolder's name to the new folder («photossub»), while the folder's own files come out right | medium | run | **fixed**: folder mode with finding 1, `474793a`, an empty string refused there, `c2fde82`; whole-path mode `c643842`: a question before names are joined, and an entry left without a full path keeps its path |
-| 4 | «Current files list» on a filtered list: a database list loses its filter without a word and every record is rewritten; a plain list rewrites only what the filter shows | medium | run | **fixed**, `3d52bd4`: a database list keeps its filter and changes only the entries shown, as a plain list |
+| 4 | «Current files list» on a filtered list: a database list loses its filter without a word and every record is rewritten; a plain list rewrites only what the filter shows | medium | run | **fixed**, `3d52bd4`, `f498afe`: a database list keeps its filter and changes only the entries shown, as a plain list |
 | 5 | A new path that another entry holds: on a database list the record keeps its old path while the list shows the new one, twice; a plain list gets the duplicate silently | medium | run | open; with a filter or «Selected files only», a database list now keeps the entry's path, or refuses the folder in folder mode (`3d52bd4`) |
 | 6 | Database lists: the captions, the audio notes and the folders list stay at the old paths; the renamed images lose their captions | medium | run | open |
 | 7 | «Main seed folders list»: no message whatever happens; every network path in the list loses its leading backslash; a list of network paths alone counts as empty; the result is not cleaned | medium | run | in part: H1 and H3 **fixed** with finding 1, `474793a`; H5 now merges (decision 7 open); no message and H4 open |
@@ -81,7 +81,7 @@ Sections 3, 4 and 5 then end with the fix of findings 3 and 4 and its runs; thos
 | 10 | The «identical strings» check compares numbers: «01» and «1», «1» and «1.0» are refused | low | run | open |
 | 11 | Small things: 11.1 to 11.6 | low | run / read | open |
 
-The rows give the status at `c643842`.
+The rows give the status at `f498afe`.
 
 ## 1. The search matches inside folder names
 
@@ -304,8 +304,9 @@ Run again at `c5e0421` (batch W, new; a list of «<work>\db\x\a.png», «x\b.png
 - **W1**, **W2**: D1 and D2, with «x\sub\f.png» shown as well; on the database list all five records change and the
   filter goes. **W3**: the same with the kind of filter the files filter panel builds on a database list,
   `SQL:query:WHERE (imgfolder LIKE '%\x' …)`, set with `coreSetFilesFilteru()`: the record of «x\sub\f.png», which it
-  hides, changes too. **W5**, **W6**: the same in folder mode. **W10** (folder mode, «z\a.png» listed already): the
-  pass is refused as a whole, and the filter is gone all the same.
+  hides, changes too. **W5**, **W6**: the same in folder mode, and **W18** and **W19** with the selection filter and
+  the seen images filter. **W10** (folder mode, «z\a.png» listed already): the pass is refused as a whole, and the
+  filter is gone all the same.
 - **W7**, **W8** (controls, «Selected files only» with the shown entries selected): the filter stays, and the records
   of the shown entries are written by their numbers, one at a time; below, **the one-by-one write**.
 
@@ -326,18 +327,20 @@ files only» shares:
 - in folder mode, refuses the whole folder when a new path stays taken: the transaction is rolled back, and the
   message is «Failed to update the files list database | The new path of N entries is taken already: nothing was
   changed» (:99270-99274); in whole-path mode such an entry keeps its path and counts as failed;
-- writes the record of an entry marked `||` too, found by its path (:99243-99245): a file replaced by a move has lost
-  its record, and its number may serve another file.
+- writes the record of an entry marked `||` too, found by its path among the records marked deleted (:99243-99246,
+  and `updateSQLdbEntryPath()` :34647; `f498afe`): a move that replaced the file deleted its record, its number may
+  serve another file, and the record at its path is then that of the replacing file, which only its own entry moves.
 
 The list changes only once the database has taken the change. Both passes take an entry's new path from
 `searchReplaceEntryPath()` (:99077), the code the list loop held for the two modes.
 
 Runs with the fix:
 
-- **W2**, **W3**, **W5**, **W6**: the filter stays; the entries shown change, in the list and in their records; the
-  hidden ones stay. The list and the database agree once the filter is removed and once the database is opened
-  again. **D2**: «2 records were modified», and the filter stays. **W15** (two of the three shown entries selected):
-  the three change.
+- **W2**, **W3**, **W5**, **W6**, and **W18** and **W19** (the selection filter,
+  `SQL:query:||Prev-Files-Selection||`, and the seen images filter): the filter stays; the entries shown change, in
+  the list and in their records; the hidden ones stay. The list and the database agree once the filter is removed and
+  once the database is opened again. **D2**: «2 records were modified», and the filter stays. **W15** (two of the
+  three shown entries selected): the three change.
 - **W1**, **W4**, **W7**, **W8**: as before.
 - **W11**, **W12**, **W12b**: both entries move. **W10**, **W13**, **W14b** (folder mode, a new path taken): the
   message above; nothing changes, and the filter stays. **W14** (whole-path mode): the entry whose new path is taken
@@ -347,6 +350,12 @@ Runs with the fix:
   nothing fails. **W17** (the same, with its record number then given to a file elsewhere, «q\new.png»): that file's
   record is left alone. Written by number, as `fix1.ahk` did (see «How this was checked»), W16 refused the marked
   entry, and W17 moved the record of «q\new.png» to «z\a.png», then refused the other entry, its new path taken.
+  **W20** («Selected files only», the marked entry selected without the one that replaced it): the record of the
+  replacing file stays, and the marked entry moves in the list alone; by its path alone, as `fix2.ahk` did, that
+  record moved while its entry kept the old path.
+- Read, not run: the dupes view (`SQL:query:JOIN`) keeps its filter the same way; its entries carry their record
+  numbers, and removing it queries the database again. The pages filter (`QPV:PAGES:`) never applies to a database
+  list: there it becomes a `LIKE` that matches no record, and QPV gives back the whole list.
 
 ## 5. A new path that another entry already holds
 
@@ -659,11 +668,12 @@ folder path. Such a text now ends with «0 records were modified».
     compares them. Inputs shaped as the folder renames pass them (absolute folders, both strings ending in «\»): they
     agree on 15,840 files list cases in each of the three modes, on 504 database records and on 7,920 seen images
     paths. The shapes the fix changes on purpose (no trailing «\», one only, a part of a path) differ.
-- **The fix of findings 3 and 4, 2026-11-26**: the kit `.claude/scratch/search-replace-3-4-2026-11-26/`
-  (README.txt), on the stock AutoHotkey 1.1.37.02. `head.ahk` is `c5e0421`. `fix1.ahk` is the first text of the fix,
-  which wrote the record of an entry marked `||` by its number; `fix2.ahk` is the final text, `c643842`; `mkstep.py`
-  takes finding 3's parts out of it to give `step4.ahk`, the text of `3d52bd4`. All three of the fix were loaded.
-  - **Batches V and W** (`test-34.ahk`, `run.sh`): V, V2 and V3 for finding 3, W to W4 for finding 4, on `head.ahk`
+- **The fix of findings 3 and 4, 2026-11-26**: the kit `.claude/scratch/search-replace-3-4-2026-11-26/` (README.txt),
+  on the stock AutoHotkey 1.1.37.02. `head.ahk` is `c5e0421`. `fix1.ahk` is the first text of the fix, which wrote
+  the record of an entry marked `||` by its number; `fix2.ahk` is the text of `c643842`, which looked the record up
+  by its path alone; `mkstep.py` takes finding 3's parts out of it to give `step4.ahk`, the text of `3d52bd4`.
+  `fix3.ahk`, the final text, is `f498afe`. The four texts of the fix were loaded.
+  - **Batches V and W** (`test-34.ahk`, `run.sh`): V, V2 and V3 for finding 3, W to W6 for finding 4, on `head.ahk`
     and on the fix; W to W4 also on `step4.ahk`. A test filter that matches nothing opens QPV's «No files matched»
     box, which waits: the watchdog then ends the batch.
   - **Regression** (`run-all.sh`): batches A to N of the audit (C as `testSrC34`, whose C4 answers the new question
@@ -671,4 +681,5 @@ folder path. Such a text now ends with «0 records were modified».
     outcomes are the same except D2, X4 and C4's question, the changes meant; the other lines that differ come from
     the current file `RandomPicture()` picks when a database opens, which fills in «Search for», and from the timing
     of an image reload. The other callers give the same logs. W, W2, W3, X, L and N ran again on `fix2.ahk`
-    (`run-final.sh`): the record lookup of entries marked `||` is all that separates it from `fix1.ahk`.
+    (`run-final.sh`), and W, W4, W6 and X on `fix3.ahk`: the record lookup of entries marked `||` is all that
+    separates the three texts.
