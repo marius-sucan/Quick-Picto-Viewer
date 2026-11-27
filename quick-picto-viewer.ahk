@@ -99070,20 +99070,20 @@ isFullPath(pathu, isFolder:=0) {
     If !RegExMatch(pathu, "^[a-zA-Z]:" (isFolder ? "(\\|$)" : "\\.*[^\\]$"))
        Return 0
 
-    Loop, Parse, % RTrim(SubStr(pathu, 4), "\"), \
-    {
-       If !isValidFileName(A_LoopField)
-          Return 0
-    }
-    Return 1
+    Return !hasInvalidFileName(RTrim(SubStr(pathu, 3), "\"))
 }
 
 isValidFileName(nameu) {
-; a folder or file name Windows accepts: no forbidden or control character, no dot or space at its end, no device name
-   If (nameu="" || StrLen(nameu)>255 || RegExMatch(nameu, "[\x00-\x1F\\/:*?""<>|]|[. ]$"))
-      Return 0
+; a folder or file name Windows accepts, see hasInvalidFileName()
+   Return (nameu!="" && !InStr(nameu, "\") && !hasInvalidFileName("\" nameu))
+}
 
-   Return !RegExMatch(nameu, "i)^(CON|PRN|AUX|NUL|COM[0-9\x{B9}\x{B2}\x{B3}]|LPT[0-9\x{B9}\x{B2}\x{B3}])(\.|$)")
+hasInvalidFileName(namesu) {
+; namesu: names, each one after a \. A name is invalid empty or over 255 characters, with a forbidden or
+; control character, with a dot or a space at its end, or as a device name
+   Static rx := "iS)[\x00-\x1F/:*?""<>|]|[. ](\\|$)|\\(\\|$)|\\(CON|PRN|AUX|NUL|COM[0-9\x{B9}\x{B2}\x{B3}]|LPT[0-9\x{B9}\x{B2}\x{B3}])(\.[^\\]*)?(\\|$)"
+   ; the length test apart keeps the pattern fast to scan
+   Return (RegExMatch(namesu, rx) || (StrLen(namesu)>256 && RegExMatch(namesu, "[^\\]{256}")))
 }
 
 StrReplaceCaseless(haystack, needle, replacement, ByRef countu:=0) {
