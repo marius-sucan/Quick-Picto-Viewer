@@ -1458,7 +1458,8 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum, deepSim) {
           func2Call := ["KbdToggleImgFavourites"]
     } Else If (givenKey="^h")
     {
-       If (HKifs("imgsLoaded", deepSim) && maxFilesIndex>1)
+       ; the panel wants three files, or a filtered list
+       If (HKifs("imgsLoaded", deepSim) && maxFilesIndex>1 && (maxFilesIndex>2 || filesFilter))
           func2Call := ["PanelSearchAndReplaceIndex"]
     } Else If (givenKey="h")
     {
@@ -69213,7 +69214,10 @@ InvokeMenuBarFind(manuID:=0, justBuild:=0) {
      kMenu("pvMenuBarFind", "Add", "&Find duplicate images", "PanelFindDupes")
      kMenu("pvMenuBarFind", "Add", "&Keywords indexer", "PanelKeywordsDetector")
      If (maxFilesIndex<3 && !filesFilter)
+     {
+        kMenu("pvMenuBarFind", "Disable", "Search and re&place`tCtrl+H", "PanelSearchAndReplaceIndex")
         kMenu("pvMenuBarFind", "Disable", "&Find duplicate images", "PanelFindDupes")
+     }
      If (maxFilesIndex<4)
         kMenu("pvMenuBarFind", "Disable", "&Keywords indexer", "PanelKeywordsDetector")
 
@@ -72982,6 +72986,8 @@ createMenuFilesIndexOptions() {
       }
 
       kMenu("PVfList", "Add", "Search and re&place`tCtrl+H", "PanelSearchAndReplaceIndex", "files index list")
+      If (maxFilesIndex<3 && !filesFilter)
+         kMenu("PVfList", "Disable", "Search and re&place`tCtrl+H", "PanelSearchAndReplaceIndex")
       kMenu("PVfList", "Add", "&Index filters`tCtrl+F", "PanelEnableFilesFilter", "files custom list entries")
       If (StrLen(filesFilter)>1 && !testIsDupesList())
          kMenu("PVfList", "Check", "&Index filters`tCtrl+F")
