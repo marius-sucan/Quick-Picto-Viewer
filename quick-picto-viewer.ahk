@@ -99408,6 +99408,7 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
     startOperation := A_TickCount
+    prevMSGdisplay := A_TickCount
     modeInfo := (folderMode=1) ? "`nFolder paths only" : ""
     showTOOLtip("Performing search and replace in the seen images database:`n" what "`n" replacer modeInfo)
     owle := setWhileLoopBusy()
