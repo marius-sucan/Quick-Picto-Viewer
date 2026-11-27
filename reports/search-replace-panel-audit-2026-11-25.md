@@ -103,9 +103,11 @@ all four targets (`c359491`):
 - **The seed folders** are matched with a separator added at their end; the checkbox does not apply to them.
 - **The only checks.** «/» becomes «\» and doubled separators collapse, in both strings and in each new path. A new
   path must be a drive path whose every name Windows accepts, or its entry keeps its path: `isFullPath()` (drive
-  letters only since Marius's `f286bde`) also refuses, through `isValidFileName()`, a name holding a character
+  letters only since Marius's `f286bde`) also refuses, through `hasInvalidFileName()`, a name holding a character
   Windows forbids or a control character, a name ending with a dot or a space, and a device name (CON, PRN, AUX,
-  NUL, COM0-9, LPT0-9, COM¹²³, LPT¹²³). Multi-rename refuses the same names through the same helper.
+  NUL, COM0-9, LPT0-9, COM¹²³, LPT¹²³). Multi-rename refuses the same names, through `isValidFileName()`, which
+  calls it. Since `63a2c42` the rules are one pattern over the names: 0.33 s for 100,000 paths of seven names, where
+  the check of `c359491`, two patterns a name, took 1.1 s and the drive test alone takes 0.1 s.
 
 This reverses decision 1 (a), the silent balancing of decision 3, and the refusal of empty strings (`c2fde82`).
 Marius's answers on the corner cases, 2026-11-27:
@@ -149,8 +151,15 @@ Runs, batch S (new; the commit's text over `f286bde`):
   «diana-photos», «1 seed folders were modified», in the list and in the table; «pics» onto a listed «photos»: «1
   seed folders were subsumed by others»; «\pi|cs»: «1 seed folders kept their path: the new one would be invalid»;
   «pics\» → «photos»: the question; nothing matched: «0 seed folders were modified».
-- The path helpers alone (`searchReplaceEntryPath()`, `isFullPath()`, `repairPathSeparators()`), sliced into a test
-  script: 21 path rewrites in the four modes and 38 validity checks, all as intended.
+- **S18**, **S18b** (`folderMode=2`, the folders list panel's rename without its subfolders, called directly; an
+  entry marked `||` in the folder): the entry now moves with its folder, in the list as its record does; at
+  `f286bde` the list kept it at the old path while the record moved.
+- **R6**, **R6b** (a relative «Replace with» on the seed folders, run at `f286bde` on 2026-11-27: the seed became
+  «\photos» and two unrelated seeds were dropped): «1 seed folders kept their path: the new one would be invalid»;
+  no seed changes.
+- The path helpers alone (`searchReplaceEntryPath()`, `isFullPath()`, `isValidFileName()`, `repairPathSeparators()`),
+  sliced into a test script: 21 path rewrites in the four modes, 38 path checks and 20 name checks, all as intended,
+  on the text of `63a2c42`.
 
 Regression runs, the same kits on `f286bde` and on the change, compared line by line:
 
@@ -164,6 +173,9 @@ Regression runs, the same kits on `f286bde` and on the change, compared line by 
   keeps its path, the others move, and the message says «1 records were modified | 1 collisions: …». **W14**
   (whole-path mode) counts its taken path as a collision. The entries marked `||` (W16, W17, W20) give the outcomes
   of `f498afe`. The tooltips show the strings as typed.
+- **The multi-rename kit** (batches A, B, C, H and J of `.claude/scratch/multi-rename-panel-2026-11-24/`): the same
+  on `f286bde` and on `63a2c42`, apart from timestamps, recycle-bin names and the kit's own INI line.
+- **Batch S again on `63a2c42`**: the same outcomes as on `c359491`.
 
 ## 1. The search matches inside folder names
 
