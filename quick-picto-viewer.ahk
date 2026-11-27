@@ -47428,7 +47428,7 @@ BTNperformIndexSearchReplace() {
       limitSearchReplaceSelected := (performSRindexMode=2) ? 1 : 0
       ; a database list holds its paths in lower case
       plu := (SLDtypeLoaded=3) ? Format("{:L}", editF6) : editF6
-      SearchAndReplaceThroughIndex(editF5, plu, 0, userSrcRplcIndexFolder, limitSearchReplaceSelected)
+      SearchAndReplaceThroughIndex(editF5, plu, 0, userSrcRplcIndexFolder, limitSearchReplaceSelected, 1)
    } Else If (performSRindexMode=3)
    {
       If (mustRecordSeenImgs!=1)
@@ -99059,8 +99059,35 @@ StrReplaceCaseless(haystack, needle, replacement, ByRef countu:=0) {
    Return countu ? result SubStr(haystack, startPos) : haystack
 }
 
-SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlySelected:=0) {
+searchReplaceEntryPath(imgPath, whatu, replacerz, whatuBare, replaceru, folderMode, ByRef affected) {
+; the path SearchAndReplaceThroughIndex() gives a files list entry; affected: the replacements made
+   affected := 0
+   If (folderMode!=1 && folderMode!=2)
+      Return repairPathSeparators(StrReplaceCaseless(imgPath, whatu, replacerz, affected))
+
+   thisPos := InStr(imgPath, "\", 0, -1)
+   If (thisPos<2)
+      Return imgPath
+
+   fileFolder := SubStr(imgPath, 1, thisPos)
+   If (folderMode=2)
+   {
+      affected := (Format("{:L}", RTrim(fileFolder, "\"))==whatuBare) ? 1 : 0
+      newFolder := affected ? replacerz : fileFolder
+   } Else
+   {
+      ; the entry of a file deleted from the disk starts with ||
+      gone := (SubStr(fileFolder, 1, 2)="||") ? "||" : ""
+      newFolder := movedFolderPath(SubStr(fileFolder, StrLen(gone) + 1, -1), whatuBare, replaceru)
+      affected := (newFolder!="") ? 1 : 0
+      newFolder := affected ? gone newFolder : fileFolder
+   }
+   Return repairPathSeparators(newFolder "\" SubStr(imgPath, thisPos + 1))
+}
+
+SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlySelected:=0, keepFilter:=0) {
     ; onlySelected=1 limits the operation to the files the user selected.
+    ; keepFilter=1: a filtered list keeps its filter, and only the entries it shows change.
     ; in folderMode=1, both strings always cover entire folder paths: 
     ; whole folders are matched, from the start of the path
     ; d:\pics\old must never match d:\pics\oldies
@@ -99085,16 +99112,19 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
     If (onlySelected=1 && markedSelectFile<1)
        Return msgBeepTimer("WARNING: No files are currently selected")
 
+    ; on a database list the records of the entries shown are then written one by one
+    shownOnly := (onlySelected=1 || (keepFilter=1 && StrLen(filesFilter)>1)) ? 1 : 0
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
     changeMcursor()
     owle := setWhileLoopBusy()
-    If (StrLen(filesFilter)>1 && SLDtypeLoaded=3 && onlySelected!=1)
+    If (StrLen(filesFilter)>1 && SLDtypeLoaded=3 && !shownOnly)
        remFilesListFilter("simple")
 
     setWhileLoopBusy()
     selectedFiles := totalAffected := doneFiles := 0
-    If (SLDtypeLoaded=3 && onlySelected!=1)
+    refusedIdx := []
+    If (SLDtypeLoaded=3 && !shownOnly)
     {
        activeSQLdb.Exec("BEGIN TRANSACTION;")
        If (folderMode=1 || folderMode=2)
@@ -99134,7 +99164,6 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
               {
                  If (folderMode=1)
                  {
-
                     newFolder := RegExReplace(movedFolderPath(Row[2], whatuBare, replaceru), "\\+$")
                     newFileu := Row[3]
                     pathOK := (StrLen(newFolder)>1) ? 1 : 0
@@ -99162,88 +99191,84 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
        whileLoopExec := owle
     }
 
-    If !errorOccurred
+    If (!errorOccurred && SLDtypeLoaded=3 && shownOnly)
     {
-       writeSQLrows := (SLDtypeLoaded=3 && onlySelected=1) ? 1 : 0
+       ; a record may still hold the new path of another, until it moves on itself:
+       ; the refused writes are tried again until none moves
+       activeSQLdb.Exec("BEGIN TRANSACTION;")
+       totalFiles := (onlySelected=1) ? markedSelectFile : maxFilesIndex
        startOperation := A_TickCount
        prevMSGdisplay := A_TickCount
-       If (writeSQLrows=1)
-          activeSQLdb.Exec("BEGIN TRANSACTION;")
-
+       taken := []
        owle := setWhileLoopBusy()
        Loop, % maxFilesIndex + 1
        {
            imgPath := resultedFilesList[A_Index, 1]
-           If !imgPath
+           If (!imgPath || (onlySelected=1 && resultedFilesList[A_Index, 2]!=1))
               Continue
 
-           If (onlySelected=1 && resultedFilesList[A_Index, 2]!=1)
+           doneFiles++
+           changeMcursor()
+           If (A_TickCount - prevMSGdisplay>1500)
+           {
+              etaTime := ETAinfos(doneFiles, totalFiles, startOperation)
+              showTOOLtip("Performing search and replace in the files list index" etaTime, 0, 0, doneFiles/totalFiles)
+              prevMSGdisplay := A_TickCount
+           }
+
+           ; the entry of a file deleted from the disk starts with ||, its record does not
+           pathu := LTrim(searchReplaceEntryPath(imgPath, whatu, replacerz, whatuBare, replaceru, folderMode, affected), "|")
+           If !affected
               Continue
 
-           If (writeSQLrows=1)
+           splitPos := InStr(pathu, "\", 0, -1)
+           If (splitPos<2)
            {
-              doneFiles++
-              changeMcursor()
-              If (A_TickCount - prevMSGdisplay>1500)
-              {
-                 etaTime := ETAinfos(doneFiles, markedSelectFile, startOperation)
-                 showTOOLtip("Performing search and replace in the files list index" etaTime, 0, 0, doneFiles/markedSelectFile)
-                 prevMSGdisplay := A_TickCount
-              }
+              refusedIdx[A_Index] := 1
+              Continue
            }
 
-           If (folderMode=1 || folderMode=2)
-           {
-              affected := 0
-              value := imgPath
-              thisPos := InStr(imgPath, "\", 0, -1)
-              If (thisPos>1)
-              {
-                 fileFolder := SubStr(imgPath, 1, thisPos)
-                 If (folderMode=2)
-                 {
-                    affected := (Format("{:L}", RTrim(fileFolder, "\"))==whatuBare) ? 1 : 0
-                    newFolder := affected ? replacerz : fileFolder
-                 } Else
-                 {
-                    ; the entry of a file deleted from the disk starts with ||
-                    gone := (SubStr(fileFolder, 1, 2)="||") ? "||" : ""
-                    newFolder := movedFolderPath(SubStr(fileFolder, StrLen(gone) + 1, -1), whatuBare, replaceru)
-                    affected := (newFolder!="") ? 1 : 0
-                    newFolder := affected ? gone newFolder : fileFolder
-                 }
-                 value := repairPathSeparators(newFolder "\" SubStr(imgPath, thisPos + 1))
-              }
-           } Else
-           {
-              value := StrReplaceCaseless(imgPath, whatu, replacerz, affected)
-              value := repairPathSeparators(value)
-           }
+           newFolder := SubStr(pathu, 1, splitPos - 1)
+           newFileu := SubStr(pathu, splitPos + 1)
+           oldPath := LTrim(imgPath, "|")
+           ; a deleted file's record goes by its path: one replaced by a move has none, and its number may be reused
+           isGone := (oldPath!=imgPath) ? 1 : 0
+           dbIndex := isGone ? "" : resultedFilesList[A_Index, 12]
+           If updateSQLdbEntryPath(dbIndex, newFolder, newFileu, oldPath)
+              Continue
 
-           entryOK := 1
-           If (writeSQLrows=1 && affected && !InStr(imgPath, "||"))
-           {
-              splitPos := InStr(value, "\", 0, -1)
-              entryOK := (splitPos>1) ? updateSQLdbEntryPath(resultedFilesList[A_Index, 12], SubStr(value, 1, splitPos - 1), SubStr(value, splitPos + 1), imgPath) : 0
-              If !entryOK
-                 failedFiles++
-           }
-
-           If entryOK
-           {
-              resultedFilesList[A_Index, 1] := value
-              If (StrLen(filesFilter)>1)
-                 updateMainUnfilteredList(A_Index, 1, value)
-
-              totalAffected += affected
-           }
-
-           If (resultedFilesList[A_Index, 2]=1)
-              selectedFiles++
+           ; the write fails on a new path taken, and changes nothing when the record is missing
+           If activeSQLdb.ErrorCode
+              taken.Push([A_Index, dbIndex, newFolder, newFileu, oldPath])
+           Else If !isGone
+              refusedIdx[A_Index] := 1
        }
 
-       If (writeSQLrows=1)
+       Loop
        {
+          stillTaken := []
+          moved := 0
+          For i, entry in taken
+          {
+             If updateSQLdbEntryPath(entry[2], entry[3], entry[4], entry[5])
+                moved++
+             Else
+                stillTaken.Push(entry)
+          }
+          taken := stillTaken
+       } Until (!moved || !taken.Length())
+
+       ; in folder mode a new path that stays taken refuses the whole folder
+       If (folderMode=1 && taken.Length())
+       {
+          activeSQLdb.Exec("ROLLBACK TRANSACTION;")
+          errorOccurred := "The new path of " groupDigits(taken.Length()) " entries is taken already: nothing was changed"
+       } Else
+       {
+          For i, entry in taken
+             refusedIdx[entry[1]] := 1
+
+          failedFiles += refusedIdx.Count()
           showTOOLtip("Finishing search and replace in the files list, please wait")
           If !activeSQLdb.Exec("COMMIT TRANSACTION;")
              errorOccurred := activeSQLdb.ErrorMsg
@@ -99251,10 +99276,35 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
        whileLoopExec := owle
     }
 
+    If !errorOccurred
+    {
+       owle := setWhileLoopBusy()
+       Loop, % maxFilesIndex + 1
+       {
+           imgPath := resultedFilesList[A_Index, 1]
+           If (!imgPath || (onlySelected=1 && resultedFilesList[A_Index, 2]!=1))
+              Continue
+
+           If (resultedFilesList[A_Index, 2]=1)
+              selectedFiles++
+
+           value := searchReplaceEntryPath(imgPath, whatu, replacerz, whatuBare, replaceru, folderMode, affected)
+           If (!affected || refusedIdx[A_Index])
+              Continue
+
+           resultedFilesList[A_Index, 1] := value
+           If (StrLen(filesFilter)>1)
+              updateMainUnfilteredList(A_Index, 1, value)
+
+           totalAffected += affected
+       }
+       markedSelectFile := selectedFiles
+       whileLoopExec := owle
+    }
+
     If totalAffected
        currentFilesListModified := 1
 
-    markedSelectFile := selectedFiles
     ForceRefreshNowThumbsList()
     dummyTimerDelayiedImageDisplay(50)
     If (SLDtypeLoaded=3)
