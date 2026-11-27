@@ -32092,11 +32092,14 @@ followProtectedFolder(oldFolder, newFolder) {
    IniAction(1, "protectedFolderPath", "General")
 }
 
-renameDynamicFoldersEntries(oldFolder, newFolder, doPropagate) {
-; the seed folder that is the given folder gets the new path and, with doPropagate, those placed inside it; returns 1 when an entry changed
+renameDynamicFoldersEntries(oldFolder, newFolder, doPropagate, ByRef refused:=0, ByRef subsumed:=0) {
+; the seed folder that is the given folder gets the new path and, with doPropagate=1, those placed inside it.
+; doPropagate=2: a search and replace of the text oldFolder in every seed folder, matched with a separator at its end;
+; refused: the seeds left as they were, their new path being invalid; subsumed: the seeds the cleaned list then merged
+; or dropped. Returns how many entries changed
    oldLow := Format("{:L}", oldFolder)
    finalListu := ""
-   changed := 0
+   changed := refused := subsumed := 0
    foldersListu := getDynamicFoldersList()
    Loop, Parse, foldersListu, `n, `r
    {
@@ -32105,10 +32108,22 @@ renameDynamicFoldersEntries(oldFolder, newFolder, doPropagate) {
 
       thisFolder := StrReplace(A_LoopField, "|")
       thisLow := Format("{:L}", thisFolder)
-      If (thisLow==oldLow || (doPropagate=1 && InStr(thisLow, oldLow "\")=1))
+      If (doPropagate=2)
+      {
+         newPath := RTrim(repairPathSeparators(StrReplaceCaseless(thisFolder "\", oldFolder, newFolder)), "\")
+         isNew := (Format("{:L}", newPath)==thisLow) ? 0 : 1
+         If (isNew && isFullPath(newPath, 1))
+         {
+            thisFolder := newPath
+            changed++
+         } Else If isNew
+         {
+            refused++
+         }
+      } Else If (thisLow==oldLow || (doPropagate=1 && InStr(thisLow, oldLow "\")=1))
       {
          thisFolder := newFolder SubStr(thisFolder, StrLen(oldLow) + 1)
-         changed := 1
+         changed++
       }
 
       finalListu .= (InStr(A_LoopField, "|") ? "|" : "") thisFolder "`n"
@@ -32118,10 +32133,11 @@ renameDynamicFoldersEntries(oldFolder, newFolder, doPropagate) {
       Return 0
 
    DynamicFoldersList := cleanDynamicFoldersList(finalListu)
+   subsumed := StrSplit(finalListu, "`n").Length() - StrSplit(DynamicFoldersList, "`n").Length()
    If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
       recreateDynaFoldersSQLdbList(DynamicFoldersList)
 
-   Return 1
+   Return changed
 }
 
 invokeOmniBoxCurrentFile() {
@@ -41177,7 +41193,7 @@ multiRenameFileStatus(srcPath, srcAttr, newFileName, newPath, thisIndex, ByRef s
    If !srcAttr
       Return 2
 
-   If (StrLen(newFileName)>255 || RegExMatch(newFileName, "[\\/:*?""<>|]") || RegExMatch(newFileName, "i)^(CON|PRN|AUX|NUL|COM\d|LPT\d)(\.|$)"))
+   If !isValidFileName(newFileName)
       Return 3
 
    keyu := Format("{:L}", newPath)
@@ -47406,18 +47422,13 @@ BTNperformIndexSearchReplace() {
    GuiControlGet, editF6
    GuiControlGet, performSRindexMode
    GuiControlGet, userSrcRplcIndexFolder
-   ; in folder mode and for the seed folders both strings are folder paths: a trailing separator does not count
-   folderPaths := (userSrcRplcIndexFolder=1 || performSRindexMode=4) ? 1 : 0
-   whatu := folderPaths ? RTrim(editF5, "\") : editF5
-   replacerz := folderPaths ? RTrim(editF6, "\") : editF6
+   whatu := repairPathSeparators(editF5)
+   replacerz := repairPathSeparators(editF6)
    If (whatu="")
       Return msgBeepTimer("WARNING: No search criteria given")
 
    If (whatu==replacerz)
       Return msgBeepTimer("WARNING: The search and replacement strings are identical")
-
-   If (folderPaths && replacerz="")
-      Return msgBeepTimer("WARNING: No replacement folder given")
 
    If (!markedSelectFile && performSRindexMode=2)
       Return msgBeepTimer("WARNING: There are no files selected in the QPV list")
@@ -47425,36 +47436,42 @@ BTNperformIndexSearchReplace() {
    If (mustRecordSeenImgs!=1 && performSRindexMode=3)
       Return msgBeepTimer("WARNING: The option to record seen images is currently deactivated.")
 
-   ; a backslash at one end of «Search for» that «Replace with» lacks joins the names next to each match; \\ opens a share
-   joinsAfter := (SubStr(whatu, 0)="\" && SubStr(replacerz, 0)!="\") ? 1 : 0
-   joinsBefore := (SubStr(whatu, 1, 1)="\" && SubStr(whatu, 1, 2)!="\\" && SubStr(replacerz, 1, 1)!="\") ? 1 : 0
-   If (!folderPaths && replacerz!="" && (joinsAfter || joinsBefore))
+   If (performSRindexMode=4 && !InStr(getDynamicFoldersList(), ":")) ; a drive root is d:
+      Return msgBeepTimer("WARNING: The seed folders list is empty")
+
+   ; a backslash at one end of «Search for» that «Replace with» lacks joins the names next to each match; \\ opens a share.
+   ; Left empty, «Replace with» joins them only when the match takes both separators
+   cutStart := (SubStr(whatu, 1, 1)="\" && SubStr(whatu, 1, 2)!="\\" && SubStr(replacerz, 1, 1)!="\") ? 1 : 0
+   cutEnd := (SubStr(whatu, 0)="\" && SubStr(replacerz, 0)!="\") ? 1 : 0
+   If ((replacerz="") ? (cutStart && cutEnd) : (cutStart || cutEnd))
    {
-      msgResult := msgBoxWrapper(appTitle ": WARNING", "«Search for» " ((joinsAfter && joinsBefore) ? "begins and ends" : joinsAfter ? "ends" : "begins") " with a backslash that «Replace with» lacks. The folder or file names next to each match will be joined to the replacement text.`n`nDo you want to continue?", "&Yes|&No", 2, "exclamation")
+      msgResult := msgBoxWrapper(appTitle ": WARNING", "«Search for» " ((cutStart && cutEnd) ? "begins and ends" : cutEnd ? "ends" : "begins") " with a backslash that «Replace with» lacks. The folder or file names next to each match will be joined" ((replacerz="") ? "" : " to the replacement text") ".`n`nDo you want to continue?", "&Yes|&No", 2, "exclamation")
       If (msgResult!="Yes")
          Return
    }
 
+   BtnCloseWindow()
    If (performSRindexMode=1 || performSRindexMode=2)
    {
-      BtnCloseWindow()
       limitSearchReplaceSelected := (performSRindexMode=2) ? 1 : 0
       ; a database list holds its paths in lower case
-      plu := (SLDtypeLoaded=3) ? Format("{:L}", editF6) : editF6
-      SearchAndReplaceThroughIndex(editF5, plu, 0, userSrcRplcIndexFolder, limitSearchReplaceSelected, 1)
+      plu := (SLDtypeLoaded=3) ? Format("{:L}", replacerz) : replacerz
+      SearchAndReplaceThroughIndex(whatu, plu, 0, (userSrcRplcIndexFolder=1) ? 3 : 0, limitSearchReplaceSelected, 1)
    } Else If (performSRindexMode=3)
    {
-      BtnCloseWindow()
-      SearchAndReplaceSeenDB(editF5, editF6, userSrcRplcIndexFolder)
+      SearchAndReplaceSeenDB(whatu, replacerz, userSrcRplcIndexFolder)
    } Else If (performSRindexMode=4)
    {
-      listu := getDynamicFoldersList()
-      If !InStr(listu, ":") ; a drive root is d:
-         Return msgBeepTimer("WARNING: The seed folders list is empty")
-
-      BtnCloseWindow()
-      If renameDynamicFoldersEntries(whatu, replacerz, 1)
+      changed := renameDynamicFoldersEntries(whatu, replacerz, 2, refused, subsumed)
+      If changed
          currentFilesListModified := 1
+
+      msgu := "Finished updating the seed folders list`n" groupDigits(changed) " seed folders were modified"
+      If subsumed
+         msgu .= "`n" groupDigits(subsumed) " seed folders were subsumed by others"
+      If refused
+         msgu .= "`n" groupDigits(refused) " seed folders kept their path: the new one would be invalid"
+      msgBeepTimer(msgu, 900)
    }
 }
 
@@ -99043,15 +99060,30 @@ renameStaticFolderSQLdb(oldFolder, newFolder, doPropagate) {
 }
 
 repairPathSeparators(pathu) {
-; collapses the separators doubled by a search and replace: the callers do not
-; agree on the trailing separator of the strings they hand over. The leading
-; "\\" of an UNC path is left alone
-   Return RegExReplace(pathu, "(.)\\{2,}", "$1\")
+; turns / into \ and collapses the separators doubled by a search and replace.
+; The leading "\\" of an UNC path is left alone
+   Return RegExReplace(StrReplace(pathu, "/", "\"), "(.)\\{2,}", "$1\")
 }
 
 isFullPath(pathu, isFolder:=0) {
-    ; Must start with a drive letter (C:), not a network share
-    Return RegExMatch(pathu, "^[a-zA-Z]:" (isFolder ? "(\\|$)" : "\\.*[^\\]$")) ? 1 : 0
+    ; Must start with a drive letter (C:), not a network share; every name in it must be valid
+    If !RegExMatch(pathu, "^[a-zA-Z]:" (isFolder ? "(\\|$)" : "\\.*[^\\]$"))
+       Return 0
+
+    Loop, Parse, % RTrim(SubStr(pathu, 4), "\"), \
+    {
+       If !isValidFileName(A_LoopField)
+          Return 0
+    }
+    Return 1
+}
+
+isValidFileName(nameu) {
+; a folder or file name Windows accepts: no forbidden or control character, no dot or space at its end, no device name
+   If (nameu="" || StrLen(nameu)>255 || RegExMatch(nameu, "[\x00-\x1F\\/:*?""<>|]|[. ]$"))
+      Return 0
+
+   Return !RegExMatch(nameu, "i)^(CON|PRN|AUX|NUL|COM[0-9\x{B9}\x{B2}\x{B3}]|LPT[0-9\x{B9}\x{B2}\x{B3}])(\.|$)")
 }
 
 StrReplaceCaseless(haystack, needle, replacement, ByRef countu:=0) {
@@ -99075,41 +99107,74 @@ StrReplaceCaseless(haystack, needle, replacement, ByRef countu:=0) {
 }
 
 searchReplaceEntryPath(imgPath, whatu, replacerz, whatuBare, replaceru, folderMode, ByRef affected) {
-; the path SearchAndReplaceThroughIndex() gives a files list entry; affected: the replacements made
+; the path a search and replace gives a files list entry, a record or a seen image; affected=1 when it changes.
+; folderMode=0: the whole path; 3: the folder part with its last separator, kept before the file name; 1, 2: see SearchAndReplaceThroughIndex()
    affected := 0
-   If (folderMode!=1 && folderMode!=2)
-      Return repairPathSeparators(StrReplaceCaseless(imgPath, whatu, replacerz, affected))
-
-   thisPos := InStr(imgPath, "\", 0, -1)
-   If (thisPos<2)
-      Return imgPath
-
-   fileFolder := SubStr(imgPath, 1, thisPos)
-   If (folderMode=2)
+   ; the entry of a file deleted from the disk starts with ||
+   gone := (SubStr(imgPath, 1, 2)="||") ? "||" : ""
+   pathu := SubStr(imgPath, StrLen(gone) + 1)
+   thisPos := InStr(pathu, "\", 0, -1)
+   fileu := SubStr(pathu, thisPos + 1)
+   If (folderMode=0)
    {
-      affected := (Format("{:L}", RTrim(fileFolder, "\"))==whatuBare) ? 1 : 0
-      newFolder := affected ? replacerz : fileFolder
+      newPath := StrReplaceCaseless(pathu, whatu, replacerz, hits)
+   } Else If (thisPos<2)
+   {
+      Return imgPath
+   } Else If (folderMode=3)
+   {
+      newPath := RTrim(StrReplaceCaseless(SubStr(pathu, 1, thisPos), whatu, replacerz, hits), "\") "\" fileu
+   } Else If (folderMode=2)
+   {
+      hits := (Format("{:L}", SubStr(pathu, 1, thisPos - 1))==whatuBare) ? 1 : 0
+      newPath := replaceru "\" fileu
    } Else
    {
-      ; the entry of a file deleted from the disk starts with ||
-      gone := (SubStr(fileFolder, 1, 2)="||") ? "||" : ""
-      newFolder := movedFolderPath(SubStr(fileFolder, StrLen(gone) + 1, -1), whatuBare, replaceru)
-      affected := (newFolder!="") ? 1 : 0
-      newFolder := affected ? gone newFolder : fileFolder
+      newFolder := movedFolderPath(SubStr(pathu, 1, thisPos - 1), whatuBare, replaceru)
+      hits := (newFolder!="") ? 1 : 0
+      newPath := newFolder "\" fileu
    }
-   Return repairPathSeparators(newFolder "\" SubStr(imgPath, thisPos + 1))
+
+   If !hits
+      Return imgPath
+
+   newPath := repairPathSeparators(newPath)
+   affected := (newPath==pathu) ? 0 : 1
+   Return gone newPath
+}
+
+retrySQLdbTakenPaths(taken) {
+; a record may hold the new path of another until it moves on itself: the refused writes are tried again
+; until none moves; taken holds [key, imgidu, newFolder, newFile, oldPath, isGone], see updateSQLdbEntryPath().
+; Returns the entries still refused
+   Loop
+   {
+      stillTaken := []
+      moved := 0
+      For i, entry in taken
+      {
+         If updateSQLdbEntryPath(entry[2], entry[3], entry[4], entry[5], entry[6])
+            moved++
+         Else
+            stillTaken.Push(entry)
+      }
+      taken := stillTaken
+   } Until (!moved || !taken.Length())
+   Return taken
 }
 
 SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlySelected:=0, keepFilter:=0) {
     ; onlySelected=1 limits the operation to the files the user selected.
     ; keepFilter=1: a filtered list keeps its filter, and only the entries it shows change.
+    ; folderMode=0 replaces the text anywhere in the path, folderMode=3 in the folder part alone.
     ; in folderMode=1, both strings always cover entire folder paths: 
     ; whole folders are matched, from the start of the path
     ; d:\pics\old must never match d:\pics\oldies
     ; folderMode=2 does the same for the given folder alone, not its subfolders.
     ; The matches ignore the case of every letter: a database and the folders lists
     ; hold their paths in lower case.
-    ; An entry whose new path lacks a drive, a share or a file name keeps its path.
+    ; An entry keeps its path when the new one is invalid, see isFullPath(), and, on a database
+    ; list, when another record holds it.
     ; Returns 0 when the database could not be updated
 
     If (folderMode=1 || folderMode=2)
@@ -99139,8 +99204,11 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
 
     setWhileLoopBusy()
     selectedFiles := totalAffected := doneFiles := 0
+    collidedFiles := invalidFiles := failedFiles := 0
+    ; the records refused, by list index or by their old path
     refusedIdx := []
-    ; in folder mode every match moves under the new folder: without a drive or a share, none can
+    refusedPaths := []
+    ; in folder mode every match moves under the new folder: without a drive, none can
     If (SLDtypeLoaded=3 && !shownOnly && ((folderMode!=1 && folderMode!=2) || isFullPath(replaceru, 1)))
     {
        activeSQLdb.Exec("BEGIN TRANSACTION;")
@@ -99155,18 +99223,19 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
        {
           If !activeSQLdb.Exec(SQLStr)
              errorOccurred := activeSQLdb.ErrorMsg
-       } Else If (nested || activeSQLdb.Exec(SQLStr) || folderMode!=1)
+       } Else If (folderMode!=1 || nested || activeSQLdb.Exec(SQLStr))
        {
           If (folderMode=1)
              SQLstr := "SELECT imgidu, imgfolder, imgfile FROM images WHERE " SQLfolderMatchClause(whatu) (nested ? " ORDER BY length(imgfolder) DESC" : "") ";"
           Else
-             SQLstr := "SELECT imgidu, imgfolder, imgfile FROM images WHERE fullPath LIKE '%" Format("{:L}", SQLescapeStr(whatu, 1)) "%' ESCAPE '>';"
+             SQLstr := "SELECT imgidu, imgfolder, imgfile FROM images WHERE " ((folderMode=3) ? "imgfolder||'\'" : "fullPath") " LIKE '%" Format("{:L}", SQLescapeStr(whatu, 1)) "%' ESCAPE '>';"
 
           If !activeSQLdb.GetTable(SQLstr, RecordSet)
              errorOccurred := activeSQLdb.ErrorMsg
 
           owle := setWhileLoopBusy()
           totalFiles := RecordSet.RowCount
+          taken := []
           Loop, % RecordSet.RowCount
           {
               Row := RecordSet.Rows[A_Index]
@@ -99177,28 +99246,27 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
                  prevMSGdisplay := A_TickCount
               }
 
-              If Row[2]
-              {
-                 If (folderMode=1)
-                 {
-                    newFolder := RegExReplace(movedFolderPath(Row[2], whatuBare, replaceru), "\\+$")
-                    newFileu := Row[3]
-                    pathOK := isFullPath(newFolder "\" newFileu)
-                 } Else
-                 {
-                    thisPath := repairPathSeparators(StrReplaceCaseless(Row[2] "\" Row[3], whatu, replacerz))
-                    thisPos := InStr(thisPath, "\", 0, -1)
-                    newFolder := SubStr(thisPath, 1, thisPos - 1)
-                    newFileu := SubStr(thisPath, thisPos + 1)
-                    pathOK := isFullPath(thisPath)
-                 }
+              If !Row[2]
+                 Continue
 
-                 ; the files list pass counts an entry that has no full path
-                 If (pathOK=1 && !updateSQLdbEntryPath(Row[1], newFolder, newFileu))
-                    failedFiles++
-              }
+              ; the files list pass counts the entries refused here and those with an invalid new path
+              oldPath := RTrim(Row[2], "\") "\" Row[3]
+              thisPath := searchReplaceEntryPath(oldPath, whatu, replacerz, whatuBare, replaceru, folderMode, affected)
+              If (!affected || !isFullPath(thisPath))
+                 Continue
+
+              thisPos := InStr(thisPath, "\", 0, -1)
+              If updateSQLdbEntryPath(Row[1], SubStr(thisPath, 1, thisPos - 1), SubStr(thisPath, thisPos + 1))
+                 Continue
+
+              If ((activeSQLdb.ErrorCode & 0xFF)=19) ; SQLITE_CONSTRAINT: another record holds the new path
+                 taken.Push([Format("{:L}", oldPath), Row[1], SubStr(thisPath, 1, thisPos - 1), SubStr(thisPath, thisPos + 1)])
+              Else
+                 refusedPaths[Format("{:L}", oldPath)] := "failed"
           }
           RecordSet.Free()
+          For i, entry in retrySQLdbTakenPaths(taken)
+             refusedPaths[entry[1]] := "taken"
        } Else errorOccurred := activeSQLdb.ErrorMsg
 
        showTOOLtip("Finishing search and replace in the files list, please wait")
@@ -99208,8 +99276,6 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
 
     If (!errorOccurred && SLDtypeLoaded=3 && shownOnly)
     {
-       ; a record may still hold the new path of another, until it moves on itself:
-       ; the refused writes are tried again until none moves
        activeSQLdb.Exec("BEGIN TRANSACTION;")
        totalFiles := (onlySelected=1) ? markedSelectFile : maxFilesIndex
        startOperation := A_TickCount
@@ -99231,7 +99297,8 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
               prevMSGdisplay := A_TickCount
            }
 
-           ; the entry of a file deleted from the disk starts with ||, its record does not
+           ; the entry of a file deleted from the disk starts with ||, its record does not;
+           ; the files list pass counts the entries with an invalid new path
            pathu := LTrim(searchReplaceEntryPath(imgPath, whatu, replacerz, whatuBare, replaceru, folderMode, affected), "|")
            If (!affected || !isFullPath(pathu))
               Continue
@@ -99247,41 +99314,18 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
               Continue
 
            ; the write fails on a new path taken, and changes nothing when the record is missing
-           If activeSQLdb.ErrorCode
+           If ((activeSQLdb.ErrorCode & 0xFF)=19) ; SQLITE_CONSTRAINT
               taken.Push([A_Index, dbIndex, newFolder, newFileu, oldPath, isGone])
-           Else If !isGone
-              refusedIdx[A_Index] := 1
+           Else If (activeSQLdb.ErrorCode || !isGone)
+              refusedIdx[A_Index] := "failed"
        }
 
-       Loop
-       {
-          stillTaken := []
-          moved := 0
-          For i, entry in taken
-          {
-             If updateSQLdbEntryPath(entry[2], entry[3], entry[4], entry[5], entry[6])
-                moved++
-             Else
-                stillTaken.Push(entry)
-          }
-          taken := stillTaken
-       } Until (!moved || !taken.Length())
+       For i, entry in retrySQLdbTakenPaths(taken)
+          refusedIdx[entry[1]] := "taken"
 
-       ; in folder mode a new path that stays taken refuses the whole folder
-       If (folderMode=1 && taken.Length())
-       {
-          activeSQLdb.Exec("ROLLBACK TRANSACTION;")
-          errorOccurred := "The new path of " groupDigits(taken.Length()) " entries is taken already: nothing was changed"
-       } Else
-       {
-          For i, entry in taken
-             refusedIdx[entry[1]] := 1
-
-          failedFiles += refusedIdx.Count()
-          showTOOLtip("Finishing search and replace in the files list, please wait")
-          If !activeSQLdb.Exec("COMMIT TRANSACTION;")
-             errorOccurred := activeSQLdb.ErrorMsg
-       }
+       showTOOLtip("Finishing search and replace in the files list, please wait")
+       If !activeSQLdb.Exec("COMMIT TRANSACTION;")
+          errorOccurred := activeSQLdb.ErrorMsg
        whileLoopExec := owle
     }
 
@@ -99298,20 +99342,27 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
               selectedFiles++
 
            value := searchReplaceEntryPath(imgPath, whatu, replacerz, whatuBare, replaceru, folderMode, affected)
-           If (!affected || refusedIdx[A_Index])
+           If !affected
               Continue
 
+           refusal := refusedIdx.HasKey(A_Index) ? refusedIdx[A_Index] : refusedPaths[Format("{:L}", LTrim(imgPath, "|"))]
            If !isFullPath(LTrim(value, "|"))
            {
+              invalidFiles++
+           } Else If (refusal="taken")
+           {
+              collidedFiles++
+           } Else If (refusal="failed")
+           {
               failedFiles++
-              Continue
+           } Else
+           {
+              resultedFilesList[A_Index, 1] := value
+              If (StrLen(filesFilter)>1)
+                 updateMainUnfilteredList(A_Index, 1, value)
+
+              totalAffected++
            }
-
-           resultedFilesList[A_Index, 1] := value
-           If (StrLen(filesFilter)>1)
-              updateMainUnfilteredList(A_Index, 1, value)
-
-           totalAffected += affected
        }
        markedSelectFile := selectedFiles
        whileLoopExec := owle
@@ -99331,9 +99382,14 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
        msgBeepTimer("Failed to update the files list database`n" errorOccurred)
     } Else
     {
+       msgu := "Finished updating the files list`n" groupDigits(totalAffected) " records were modified"
+       If collidedFiles
+          msgu .= "`n" groupDigits(collidedFiles) " collisions: the new path is held by another record, the entries kept theirs"
+       If invalidFiles
+          msgu .= "`n" groupDigits(invalidFiles) " entries kept their path: the new one would be invalid"
        If failedFiles
-          someErrors := "Failed to modify " groupDigits(failedFiles) " entries in the files list`n"
-       msgBeepTimer(someErrors "Finished updating the files list`n" groupDigits(totalAffected) " records were modified", 900)
+          msgu .= "`nFailed to update " groupDigits(failedFiles) " entries in the database"
+       msgBeepTimer(msgu, 900)
     }
 
     CurrentSLD := backCurrentSLD
@@ -99344,18 +99400,10 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
 
 SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
     ; folderMode=1 confines the replacement to the folder part of every path: the file names
-    ; are left exactly as they are, and whole folders are matched from the start of the path.
+    ; are left exactly as they are, see searchReplaceEntryPath()
     initSeenImagesListDB()
     If (sqlFailedInit=1)
        Return msgBeepTimer("Failed to initialize the database of seen images")
-
-    whatBare := RTrim(what, "\")
-    replacerBare := RTrim(replacer, "\")
-    If (folderMode=1)
-    {
-       what := whatBare "\"
-       replacer := replacerBare "\"
-    }
 
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
@@ -99376,6 +99424,7 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
        errorOccurred := seenImagesDB.ErrorMsg
 
     totalAffected := failedFiles := 0
+    invalidFiles := mergedFiles := 0
     totalFiles := RecordSet.RowCount
     collided := []
     If !errorOccurred
@@ -99390,43 +99439,26 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
               prevMSGdisplay := A_TickCount
            }
 
-           If Row[2]
+           If !Row[2]
+              Continue
+
+           newPath := searchReplaceEntryPath(Row[2], what, replacer, "", "", (folderMode=1) ? 3 : 0, affected)
+           If !affected
+              Continue
+
+           If !isFullPath(newPath)
            {
-              If (folderMode=1)
-              {
-                 affected := 0
-                 newFolderName := Row[2]
-                 thisPos := InStr(Row[2], "\", 0, -1)
-                 If (thisPos>1)
-                 {
-                    newFolder := movedFolderPath(SubStr(Row[2], 1, thisPos - 1), whatBare, replacerBare)
-                    affected := (newFolder!="") ? 1 : 0
-                    If affected
-                       newFolderName := newFolder "\" SubStr(Row[2], thisPos + 1)
-                 }
-              } Else
-              {
-                 newFolderName := StrReplaceCaseless(Row[2], what, replacer, affected)
-                 newFolderName := repairPathSeparators(newFolderName)
-              }
-
-              If (affected && !isFullPath(newFolderName))
-              {
-                 failedFiles++
-                 Continue
-              }
-
-              If affected
-              {
-                 SQLstr := "UPDATE images SET imgfile='" SQLescapeStr(newFolderName) "' WHERE ROWID='" Row[1] "';"
-                 If !seenImagesDB.Exec(SQLstr)
-                    failedFiles++
-                 Else If seenImagesDB.Changes
-                    totalAffected++
-                 Else ; the column ignores a path recorded already
-                    collided.Push([Row[1], newFolderName, Row[3]])
-              }
+              invalidFiles++
+              Continue
            }
+
+           SQLstr := "UPDATE images SET imgfile='" SQLescapeStr(newPath) "' WHERE ROWID='" Row[1] "';"
+           If !seenImagesDB.Exec(SQLstr)
+              failedFiles++
+           Else If seenImagesDB.Changes
+              totalAffected++
+           Else ; the column ignores a path recorded already
+              collided.Push([Row[1], newPath, Row[3]])
        }
        RecordSet.Free()
 
@@ -99453,7 +99485,7 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
           SQLstr := "UPDATE images SET imgViewDate=max(ifnull(imgViewDate, ''), '" SQLescapeStr(entry[3]) "') WHERE imgfile='" SQLescapeStr(entry[2]) "';"
           SQLstr .= "DELETE FROM images WHERE ROWID='" entry[1] "';"
           If seenImagesDB.Exec(SQLstr)
-             totalAffected++
+             mergedFiles++
           Else
              failedFiles++
        }
@@ -99465,9 +99497,14 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
        msgBeepTimer("Failed to update the seen images database`n" errorOccurred)
     } Else
     {
+       msgu := "Finished updating the seen images database`n" groupDigits(totalAffected) " records were modified"
+       If mergedFiles
+          msgu .= "`n" groupDigits(mergedFiles) " records were merged into the one already holding the new path"
+       If invalidFiles
+          msgu .= "`n" groupDigits(invalidFiles) " records kept their path: the new one would be invalid"
        If failedFiles
-          someErrors := "Failed to modify " groupDigits(failedFiles) " entries in the seen images database`n"
-       msgBeepTimer(someErrors "Finished updating the seen images database`n" groupDigits(totalAffected) " records were modified", 900)
+          msgu .= "`nFailed to update " groupDigits(failedFiles) " records in the seen images database"
+       msgBeepTimer(msgu, 900)
     }
 
     CurrentSLD := backCurrentSLD
