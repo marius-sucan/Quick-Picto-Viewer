@@ -99361,7 +99361,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
     setWhileLoopBusy()
     selectedFiles := totalAffected := doneFiles := 0
     collidedFiles := invalidFiles := failedFiles := 0
-    ; the records refused, by list index or by their old path
+    ; the records not written, by list index or by their old path
     refusedIdx := []
     refusedPaths := []
     ; in folder mode every match moves under the new folder: without a drive, none can
@@ -99469,11 +99469,14 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
            If updateSQLdbEntryPath(dbIndex, newFolder, newFileu, oldPath, isGone)
               Continue
 
-           ; the write fails on a new path taken, and changes nothing when the record is missing
+           ; the write fails on a new path taken, and changes nothing when the record is missing;
+           ; a deleted file's entry without a record leaves the notes at its path to the live entry there
            If ((activeSQLdb.ErrorCode & 0xFF)=19) ; SQLITE_CONSTRAINT
               taken.Push([A_Index, dbIndex, newFolder, newFileu, oldPath, isGone])
            Else If (activeSQLdb.ErrorCode || !isGone)
               refusedIdx[A_Index] := "failed"
+           Else
+              refusedIdx[A_Index] := "unrecorded"
        }
 
        For i, entry in retrySQLdbTakenPaths(taken)
@@ -99527,7 +99530,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
               {
                  oldPath := LTrim(imgPath, "|")
                  newPath := LTrim(value, "|")
-                 If notedPaths.HasKey(oldPath)
+                 If (notedPaths.HasKey(oldPath) && refusal!="unrecorded")
                     movedNotes.Push([oldPath, newPath, notedPaths[oldPath]])
 
                  oldFolder := Format("{:L}", SubStr(oldPath, 1, InStr(oldPath, "\", 0, -1) - 1))
