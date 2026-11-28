@@ -72985,9 +72985,9 @@ createMenuFilesIndexOptions() {
          kMenu("PVfList", "Add", "Erase search &criteria", "EraseSearchEdit")
       }
 
-      kMenu("PVfList", "Add", "Search and re&place`tCtrl+H", "PanelSearchAndReplaceIndex", "files index list")
-      If (maxFilesIndex<3 && !filesFilter)
-         kMenu("PVfList", "Disable", "Search and re&place`tCtrl+H", "PanelSearchAndReplaceIndex")
+      If (maxFilesIndex>3 && CurrentSLD)
+         kMenu("PVfList", "Add", "Search and re&place`tCtrl+H", "PanelSearchAndReplaceIndex", "files index list")
+
       kMenu("PVfList", "Add", "&Index filters`tCtrl+F", "PanelEnableFilesFilter", "files custom list entries")
       If (StrLen(filesFilter)>1 && !testIsDupesList())
          kMenu("PVfList", "Check", "&Index filters`tCtrl+F")
@@ -99171,8 +99171,8 @@ retrySQLdbTakenPaths(taken) {
 
 notedSQLdbPaths() {
 ; the images of a database list that hold a caption or an audio note: their paths in lower case, each with its audio file
-   noted := {}
    RecordSet := ""
+   noted := new hashtable()
    If !activeSQLdb.GetTable("SELECT imgfile, imgAudio FROM imagesData;", RecordSet)
    {
       throwSQLqueryDBerror(A_ThisFunc)
@@ -99180,7 +99180,11 @@ notedSQLdbPaths() {
    }
 
    Loop, % RecordSet.RowCount
-      noted[Format("{:L}", RecordSet.Rows[A_Index, 1])] := RecordSet.Rows[A_Index, 2]
+   {
+      i := Format("{:L}", RecordSet.Rows[A_Index, 1])
+      noted[i] := RecordSet.Rows[A_Index, 2]
+   }
+
    RecordSet.Free()
    Return noted
 }
@@ -99206,116 +99210,17 @@ moveSQLdbNotes(movedNotes, whatu, replacerz, folderMode) {
    }
 
    activeSQLdb.Exec("BEGIN TRANSACTION;")
-   If (!activeSQLdb.Exec(markSQL moveSQL) || !activeSQLdb.Exec("COMMIT TRANSACTION;"))
+   If !activeSQLdb.Exec(markSQL moveSQL)
    {
       throwSQLqueryDBerror(A_ThisFunc)
       activeSQLdb.Exec("ROLLBACK TRANSACTION;")
    }
-}
 
-followMovedFoldersList(movedFolders, leftFolders, listFile) {
-; the folders list after a search and replace moved entries: movedFolders maps each folder they reached to the one
-; they left, leftFolders holds the folders they left, all in lower case, see foldersListAfterMoves()
-   ; a cached list writes its folders list from memory when saved: it must be loaded first
-   If (SLDtypeLoaded!=3 && FileExist(listFile) && RegExMatch(listFile, sldsPattern) && SLDcacheFilesList=1)
-      LoadStaticFoldersCached(listFile, countStaticFolders)
-
-   If (SLDtypeLoaded!=3 && !newStaticFoldersListCache.MaxIndex())
-      Return
-
-   held := {}
-   If (SLDtypeLoaded=3)
-   {
-      RecordSet := ""
-      If !activeSQLdb.GetTable("SELECT DISTINCT imgfolder FROM images;", RecordSet)
-         Return throwSQLqueryDBerror(A_ThisFunc)
-
-      Loop, % RecordSet.RowCount
-         held[Format("{:L}", RecordSet.Rows[A_Index, 1])] := 1
-      RecordSet.Free()
-   } Else
-   {
-      ; the entries a filter hides count too; GenerateStaticFoldersListNow() leaves out those of deleted files
-      filtered := (StrLen(filesFilter)>1) ? 1 : 0
-      Loop, % filtered ? bckpMaxFilesIndex : maxFilesIndex
-      {
-         imgPath := filtered ? bckpResultedFilesList[A_Index, 1] : resultedFilesList[A_Index, 1]
-         If (imgPath && !InStr(imgPath, "||"))
-            held[Format("{:L}", SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1))] := 1
-      }
-   }
-
-   If newStaticFoldersListCache.MaxIndex()
-      newStaticFoldersListCache := foldersListAfterMoves(newStaticFoldersListCache, movedFolders, leftFolders, held)
-   If (SLDtypeLoaded!=3)
-      Return
-
-   RecordSet := ""
-   If !activeSQLdb.GetTable("SELECT imgfolder, fmodified FROM staticfolders;", RecordSet)
-      Return throwSQLqueryDBerror(A_ThisFunc)
-
-   rows := []
-   Loop, % RecordSet.RowCount
-      rows.Push([RecordSet.Rows[A_Index, 1], RecordSet.Rows[A_Index, 2]])
-   RecordSet.Free()
-   rows := foldersListAfterMoves(rows, movedFolders, leftFolders, held, changed)
-   If !changed
-      Return
-
-   SQL := "DELETE FROM staticfolders;"
-   For i, row in rows
-      SQL .= "INSERT INTO staticfolders (imgfolder, fmodified) VALUES ('" SQLescapeStr(Format("{:L}", row[1])) "', '" SQLescapeStr(row[2]) "');"
-
-   activeSQLdb.Exec("BEGIN TRANSACTION;")
-   If (!activeSQLdb.Exec(SQL) || !activeSQLdb.Exec("COMMIT TRANSACTION;"))
+   If !activeSQLdb.Exec("COMMIT TRANSACTION;")
    {
       throwSQLqueryDBerror(A_ThisFunc)
       activeSQLdb.Exec("ROLLBACK TRANSACTION;")
    }
-}
-
-foldersListAfterMoves(rows, movedFolders, leftFolders, held, ByRef changed:=0) {
-; rows: [folder, date, ...] of a folders list. A folder left that no entry holds any more gives its row to the
-; first folder its files reached, or leaves the list; the other folders reached join it with that folder's date,
-; unless listed already
-   listed := {}
-   For i, row in rows
-      listed[Format("{:L}", row[1])] := 1
-
-   reached := {}
-   For newFolder, oldFolder in movedFolders
-   {
-      If (held[newFolder] && !listed.HasKey(newFolder) && listed.HasKey(oldFolder))
-      {
-         If !reached.HasKey(oldFolder)
-            reached[oldFolder] := []
-         reached[oldFolder].Push(newFolder)
-      }
-   }
-
-   changed := 0
-   newRows := []
-   For i, row in rows
-   {
-      thisFolder := Format("{:L}", row[1])
-      gone := (leftFolders[thisFolder] && !held[thisFolder]) ? 1 : 0
-      If gone
-         changed++
-      Else
-         newRows.Push(row)
-
-      If !reached.HasKey(thisFolder)
-         Continue
-
-      For j, newFolder in reached[thisFolder]
-      {
-         thisRow := (gone && j=1) ? row.Clone() : [newFolder, row[2]]
-         thisRow[1] := newFolder
-         newRows.Push(thisRow)
-         changed++
-      }
-   }
-   Return newRows
 }
 
 SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlySelected:=0, keepFilter:=0) {
@@ -99342,8 +99247,9 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
     ; the stored paths carry no trailing separator, see SQLfolderMatchClause()
     whatuBare := Format("{:L}", RTrim(whatu, "\"))
     replaceru := RegExReplace(replacerz, "\\+$")
+    pluza :=  (userPrivateMode=1) ? "" : ":`n" whatu "`n" replacerz
     If (silentus=0)
-       showTOOLtip("Performing search and replace in the files list index" ((userPrivateMode=1) ? "" : ":`n" whatu "`n" replacerz))
+       showTOOLtip("Performing search and replace in the files list index" pluza)
 
     getSelectedFiles(0, 1)
     If (onlySelected=1 && markedSelectFile<1)
@@ -99420,6 +99326,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
               Else
                  refusedPaths[Format("{:L}", oldPath)] := "failed"
           }
+
           RecordSet.Free()
           For i, entry in retrySQLdbTakenPaths(taken)
              refusedPaths[entry[1]] := "taken"
@@ -99493,8 +99400,6 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
        followUp := (folderMode=0 || folderMode=3) ? 1 : 0
        notedPaths := (followUp && SLDtypeLoaded=3) ? notedSQLdbPaths() : {}
        movedNotes := []
-       movedFolders := {}
-       leftFolders := {}
        owle := setWhileLoopBusy()
        Loop, % maxFilesIndex + 1
        {
@@ -99532,24 +99437,13 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
                  newPath := LTrim(value, "|")
                  If (notedPaths.HasKey(oldPath) && refusal!="unrecorded")
                     movedNotes.Push([oldPath, newPath, notedPaths[oldPath]])
-
-                 oldFolder := Format("{:L}", SubStr(oldPath, 1, InStr(oldPath, "\", 0, -1) - 1))
-                 newFolder := Format("{:L}", SubStr(newPath, 1, InStr(newPath, "\", 0, -1) - 1))
-                 If (oldFolder!=newFolder)
-                 {
-                    leftFolders[oldFolder] := 1
-                    If !movedFolders.HasKey(newFolder)
-                       movedFolders[newFolder] := oldFolder
-                 }
               }
            }
        }
        markedSelectFile := selectedFiles
-       whileLoopExec := owle
        If movedNotes.Length()
           moveSQLdbNotes(movedNotes, whatu, replacerz, folderMode)
-       If movedFolders.Count()
-          followMovedFoldersList(movedFolders, leftFolders, backCurrentSLD)
+       whileLoopExec := owle
     }
 
     If totalAffected
@@ -99576,8 +99470,8 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
        msgBeepTimer(msgu, 900)
     }
 
-    CurrentSLD := backCurrentSLD
     Sleep, 25
+    CurrentSLD := backCurrentSLD
     SetTimer, ResetImgLoadStatus, -100
     Return errorOccurred ? 0 : 1
 }
@@ -99595,10 +99489,10 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
     prevMSGdisplay := A_TickCount
     modeInfo := (folderMode=1) ? "`nFolder paths only" : ""
     stringsInfo := (userPrivateMode=1) ? "" : ":`n" what "`n" replacer
-    showTOOLtip("Performing search and replace in the seen images database" stringsInfo modeInfo)
     owle := setWhileLoopBusy()
-    changeMcursor()
+    showTOOLtip("Performing search and replace in the seen images database" stringsInfo modeInfo)
     seenImagesDB.Exec("BEGIN TRANSACTION;")
+    changeMcursor()
     ; LIKE ignores the case of A to Z only: every other character matches any character here,
     ; and StrReplaceCaseless() keeps the true matches. A surrogate pair is one character to SQLite
     likeu := ""
@@ -99676,6 +99570,7 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
              failedFiles++
        }
     }
+
     whileLoopExec := owle
     k := seenImagesDB.Exec("COMMIT TRANSACTION;")
     If (errorOccurred || !k)
