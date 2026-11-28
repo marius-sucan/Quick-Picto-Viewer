@@ -32067,13 +32067,6 @@ renameFolderInLists(oldFolder, newFolder) {
 
    If renameDynamicFoldersEntries(oldFolder, newFolder, 1)
       currentFilesListModified := 1
-
-   If (SLDtypeLoaded!=3 && FileExist(CurrentSLD) && RegExMatch(CurrentSLD, sldsPattern) && SLDcacheFilesList=1)
-      LoadStaticFoldersCached(CurrentSLD, countStaticFolders)
-
-   renameStaticFoldersEntries(oldFolder, newLow, 1)
-   If (SLDtypeLoaded=3)
-      renameStaticFolderSQLdb(oldFolder, newFolder, 1)
 }
 
 movedFolderPath(pathu, oldFolder, newFolder) {
@@ -42959,9 +42952,7 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
 
          externTooltiput("Please wait - performing folder action")
          If (InStr(r, "_") && src!=dest && InStr(src, ":\") && InStr(dest, ":\"))
-         {
             r := UIcoreFolderPasteFoldersInto(0, "given", r, src, dest)
-         }
       }
       externTooltiput("-hide-")
       prevent := 1
@@ -62083,6 +62074,7 @@ BtnCopyMoveAction(dummy:=0) {
         ; on a drive only: .\ for a file at the root of a drive gives a path without one
         If (SubStr(folderu, 2, 2)=":\")
            FileCreateDir, % folderu
+
         If !FolderExist(folderu)
         {
            OutDir := PathCompact(folderu, "a", 1, OSDfontSize)
@@ -62427,7 +62419,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0, typedDe
 
       If relativeModePath
       {
-         parentu :=SubStr(OldOutDir, 1, InStr(OldOutDir, "\", 0, -1) - 1)
+         parentu := SubStr(OldOutDir, 1, InStr(OldOutDir, "\", 0, -1) - 1)
          If (relativeModePath=1 || relativeModePath=2)
             finalDest := parentu relativeStringPath
          Else
@@ -62579,8 +62571,8 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0, typedDe
          failedFiles++
    }
 
-   lockDestinationFileName("", 2)
    whileLoopExec := 0
+   lockDestinationFileName("", 2)
    CurrentSLD := backCurrentSLD
    someErrors := "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
    If (SLDtypeLoaded=3)
@@ -69280,7 +69272,7 @@ InvokeMenuBarList(manuID:=0, justBuild:=0) {
   infoMenuRefresh := RegExMatch(CurrentSLD, sldsPattern) ? "Reload .SLD file" : "Refresh open folder(s)"
   pathu := PathCompact(CurrentSLD, 40)
   If pathu
-      kMenu("pvMenuBarList", "Add", infoMenuRefresh "`tShift+F5", "RefreshFilesList", "reload refresh list files")
+     kMenu("pvMenuBarList", "Add", infoMenuRefresh "`tShift+F5", "RefreshFilesList", "reload refresh list files")
 
   If (maxFilesIndex>3)
   {
@@ -95218,7 +95210,7 @@ PanelStaticFolderzManager() {
     btnWid2 := (PrefsLargeFonts=1) ? 160 : 95
     btnWid3 := (PrefsLargeFonts=1) ? btnWid + 40 : btnWid + 30
     btnWid4 := (PrefsLargeFonts=1) ? 70 : 60
-    sml := (PrefsLargeFonts=1) ? 120 : 90
+    sml := (PrefsLargeFonts=1) ? 135 : 100
 
     Gui, Add, Text, x15 y15, This folders list was generated based on the indexed files. Multiple items can be selected.
     hLVmainu := GuiAddListView("+LV0x10000 +LV0x400 r" uLVr " Grid xp y+10 w" lstWid " +multi AltSubmit Count" totals " guiLVfolderzFilterListBTN vLViewOthers", "#|Date|(?)|Folder path|Files|Selected|`%|Files on disk|Difference|Size (MB)", "Referenced folders")
@@ -98879,40 +98871,29 @@ PanelRenameStaticFolder() {
       BtnCloseWindow()
       newName := newFileName
       replaceMode := (winOpen=2 && doPropagate!=1) ? 2 : 1
-      If isDBrename
+      If (winOpen=2)
       {
-         ; a database lists the folders its files are placed in: the files move first, without asking
-         If SearchAndReplaceThroughIndex(folderu "\", newName "\", 0, replaceMode)
-         {
-            renameStaticFoldersEntries(folderu, newName, doPropagate)
-            renameStaticFolderSQLdb(folderu, newName, doPropagate)
-         }
+         showTOOLtip("Updating static folders list")
+         renameStaticFoldersEntries(folderu, newName, doPropagate)
+         If (SLDtypeLoaded=3)
+            renameStaticFolderSQLdb(folderu, newName, 1)
       } Else
+         renameDynamicFoldersEntries(folderu, newName, doPropagate)
+
+      currentFilesListModified := 1
+      msgResult := msgBoxWrapper(appTitle ": Update files list", "You have renamed a folder entry. Would you like to perform a search and replace in the files list to update the corresponding records?", 4, 0, "question")
+      If (msgResult="Yes")
+         rz := SearchAndReplaceThroughIndex(folderu "\", newName "\", 0, replaceMode)
+
+      If (msgResult="Yes" && winOpen=3 && rz)
       {
-         If (winOpen=2)
-         {
-            showTOOLtip("Updating static folders list")
-            renameStaticFoldersEntries(folderu, newName, doPropagate)
-         } Else
-         {
-            renameDynamicFoldersEntries(folderu, newName, doPropagate)
-         }
+         ; the files of the subfolders moved too, whatever the tick: the folders list follows them
+         If (SLDtypeLoaded!=3 && FileExist(CurrentSLD) && RegExMatch(CurrentSLD, sldsPattern) && SLDcacheFilesList=1)
+            LoadStaticFoldersCached(CurrentSLD, countStaticFolders)
 
-         currentFilesListModified := 1
-         msgResult := msgBoxWrapper(appTitle ": Update files list", "You have renamed a folder entry. Would you like to perform a search and replace in the files list to update the corresponding records?", 4, 0, "question")
-         If (msgResult="Yes")
-            rz := SearchAndReplaceThroughIndex(folderu "\", newName "\", 0, replaceMode)
-
-         If (msgResult="Yes" && winOpen=3 && rz)
-         {
-            ; the files of the subfolders moved too, whatever the tick: the folders list follows them
-            If (SLDtypeLoaded!=3 && FileExist(CurrentSLD) && RegExMatch(CurrentSLD, sldsPattern) && SLDcacheFilesList=1)
-               LoadStaticFoldersCached(CurrentSLD, countStaticFolders)
-
-            renameStaticFoldersEntries(folderu, Format("{:L}", newName), 1)
-            If (SLDtypeLoaded=3)
-               renameStaticFolderSQLdb(folderu, newName, 1)
-         }
+         renameStaticFoldersEntries(folderu, Format("{:L}", newName), 1)
+         If (SLDtypeLoaded=3)
+            renameStaticFolderSQLdb(folderu, newName, 1)
       }
 
       SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -99247,7 +99228,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
     ; the stored paths carry no trailing separator, see SQLfolderMatchClause()
     whatuBare := Format("{:L}", RTrim(whatu, "\"))
     replaceru := RegExReplace(replacerz, "\\+$")
-    pluza :=  (userPrivateMode=1) ? "" : ":`n" whatu "`n" replacerz
+    pluza := (userPrivateMode=1) ? "" : ":`n" whatu "`n" replacerz
     If (silentus=0)
        showTOOLtip("Performing search and replace in the files list index" pluza)
 
@@ -99330,7 +99311,8 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
           RecordSet.Free()
           For i, entry in retrySQLdbTakenPaths(taken)
              refusedPaths[entry[1]] := "taken"
-       } Else errorOccurred := activeSQLdb.ErrorMsg
+       } Else
+          errorOccurred := activeSQLdb.ErrorMsg
 
        showTOOLtip("Finishing search and replace in the files list, please wait")
        activeSQLdb.Exec("COMMIT TRANSACTION;")
@@ -99440,9 +99422,13 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
               }
            }
        }
+
        markedSelectFile := selectedFiles
        If movedNotes.Length()
           moveSQLdbNotes(movedNotes, whatu, replacerz, folderMode)
+       If followUp
+          regenerateStaticFoldersList()
+
        whileLoopExec := owle
     }
 
